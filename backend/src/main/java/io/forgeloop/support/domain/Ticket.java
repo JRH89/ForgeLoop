@@ -1,0 +1,3 @@
+package io.forgeloop.support.domain;
+import jakarta.persistence.*;
+@Entity public class Ticket { @Id private String id; private String title; private String status; @ManyToOne(optional=false) private Organization organization; @ManyToOne private Member assignee; protected Ticket() {} public Ticket(String id,String title,Organization organization){this.id=id;this.title=title;this.status="OPEN";this.organization=organization;} public String getId(){return id;} public String getTitle(){return title;} public String getStatus(){return status;} public Organization getOrganization(){return organization;} public String getOrganizationId(){return organization.getId();} public Member getAssignee(){return assignee;} public void assignTo(Member member){this.assignee=member;} }

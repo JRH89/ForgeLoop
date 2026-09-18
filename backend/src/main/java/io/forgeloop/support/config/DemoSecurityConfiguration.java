@@ -1,0 +1,3 @@
+package io.forgeloop.support.config;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty; import org.springframework.context.annotation.*; import org.springframework.security.config.annotation.web.builders.HttpSecurity; import org.springframework.security.web.SecurityFilterChain;
+@Configuration @ConditionalOnProperty(name="forgeloop.auth.mode",havingValue="header-demo") public class DemoSecurityConfiguration { @Bean SecurityFilterChain demoSecurity(HttpSecurity http) throws Exception { return http.csrf(csrf->csrf.disable()).authorizeHttpRequests(requests->requests.anyRequest().permitAll()).build(); } }

@@ -1,0 +1,11 @@
+.idea/
+.vscode/
+.DS_Store
+**/node_modules/
+**/target/
+**/dist/
+*.tsbuildinfo
+**/test-results/
+**/playwright-report/
+.env
+evidence/

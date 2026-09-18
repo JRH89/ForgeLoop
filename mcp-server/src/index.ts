@@ -1,0 +1,5 @@
+import {Server} from '@modelcontextprotocol/sdk/server/index.js'; import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js'; import {ListToolsRequestSchema,CallToolRequestSchema} from '@modelcontextprotocol/sdk/types.js'; import {toolNames,safeCommandFor} from './tools.js';
+const server=new Server({name:'forgeloop-mcp',version:'0.1.0'},{capabilities:{tools:{}}});
+server.setRequestHandler(ListToolsRequestSchema,async()=>({tools:toolNames.map(name=>({name,description:`ForgeLoop least-privilege tool: ${name}`,inputSchema:{type:'object',properties:{featureId:{type:'string'}},required:['featureId']}}))}));
+server.setRequestHandler(CallToolRequestSchema,async request=>{const name=request.params.name; if(!toolNames.includes(name as typeof toolNames[number])) throw new Error('Unknown tool'); return {content:[{type:'text',text:JSON.stringify({tool:name,featureId:request.params.arguments?.featureId??'FEATURE-142',instruction:safeCommandFor(name as typeof toolNames[number]),note:'Execution is delegated to a sandboxed ForgeLoop worker; this MCP server does not execute arbitrary commands.'})}]};});
+await server.connect(new StdioServerTransport());

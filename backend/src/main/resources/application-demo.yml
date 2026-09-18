@@ -1,0 +1,7 @@
+spring:
+  jpa:
+    hibernate: { ddl-auto: create-drop }
+  flyway: { enabled: false }
+forgeloop:
+  auth: { mode: header-demo }
+  demo-data: { enabled: true }

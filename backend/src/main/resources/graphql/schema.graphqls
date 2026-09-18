@@ -1,0 +1,10 @@
+type Query { ticket(id: ID!): Ticket!, tickets: [Ticket!]!, organizationMembers(organizationId: ID!): [Member!]!, auditEvents(ticketId: ID!): [AuditEvent!]!, deliveryRun(featureId: ID!): DeliveryRun! }
+type Mutation { assignTicket(ticketId: ID!, assigneeId: ID!): Ticket, createTicket(title: String!): Ticket! }
+type Ticket { id: ID!, title: String!, status: String!, organizationId: ID!, assignee: Member }
+type Member { id: ID!, displayName: String!, role: String! }
+type AuditEvent { action: String!, ticketId: ID!, actorId: ID!, assigneeId: ID!, occurredAt: String! }
+type DeliveryRun { featureId: ID!, state: String!, startedAt: String!, metrics: DeliveryMetrics!, agents: [AgentRun!]!, gates: [VerificationGate!]!, requirements: [RequirementEvidence!]! }
+type DeliveryMetrics { repairAttempts: Int!, humanInterventions: Int!, tokenCount: Int!, estimatedCostUsd: Float!, elapsedMinutes: Int! }
+type AgentRun { name: String!, responsibility: String!, model: String!, state: String!, durationSeconds: Int!, costUsd: Float! }
+type VerificationGate { name: String!, state: String!, evidence: String! }
+type RequirementEvidence { criterion: String!, state: String!, evidence: String! }

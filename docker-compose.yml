@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: forgeloop
+      POSTGRES_USER: forgeloop
+      POSTGRES_PASSWORD: forgeloop
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgeloop -d forgeloop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports: ["5432:5432"]
+  api:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/forgeloop
+      SPRING_DATASOURCE_USERNAME: forgeloop
+      SPRING_DATASOURCE_PASSWORD: forgeloop
+      SPRING_PROFILES_ACTIVE: demo
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports: ["8080:8080"]
+  control-plane:
+    build: ./control-plane
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/forgeloop
+      SPRING_DATASOURCE_USERNAME: forgeloop
+      SPRING_DATASOURCE_PASSWORD: forgeloop
+      SPRING_JPA_DDL_AUTO: update
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports: ["8090:8090"]
+  web:
+    build: ./frontend
+    depends_on:
+      api: { condition: service_healthy }
+    ports: ["5173:80"]

@@ -1,0 +1,21 @@
+spring:
+  application: { name: forgeloop-support-api }
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    hibernate: { ddl-auto: validate }
+    open-in-view: false
+  flyway: { enabled: true }
+  graphql: { graphiql: { enabled: false } }
+  security:
+    oauth2:
+      resourceserver:
+        jwt: { issuer-uri: "${FORGELOOP_OIDC_ISSUER_URI:}" }
+management:
+  endpoints: { web: { exposure: { include: health,info } } }
+  endpoint: { health: { probes: { enabled: true } } }
+forgeloop:
+  auth: { mode: oidc }
+  demo-data: { enabled: false }

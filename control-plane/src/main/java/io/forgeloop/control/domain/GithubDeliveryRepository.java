@@ -1,0 +1,1 @@
+package io.forgeloop.control.domain; import org.springframework.data.jpa.repository.JpaRepository; public interface GithubDeliveryRepository extends JpaRepository<GithubDelivery,String>{ boolean existsByDeliveryId(String deliveryId); }

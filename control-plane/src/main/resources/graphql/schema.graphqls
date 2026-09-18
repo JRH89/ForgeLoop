@@ -1,0 +1,9 @@
+type Query { featureRun(id: ID!): FeatureRun!, featureRuns: [FeatureRun!]! }
+type Mutation { submitFeature(input: SubmitFeatureInput!): FeatureRun!, transitionTask(taskId: ID!, to: TaskState!): Task! }
+input SubmitFeatureInput { repository: String!, sourceRef: String!, title: String!, specification: String!, budgetUsd: Float! }
+enum RunState { RECEIVED VALIDATING PLANNING QUEUED EXECUTING INTEGRATING VERIFYING REVIEWING READY_FOR_REVIEW PR_OPEN COMPLETE REJECTED BLOCKED CANCELLED FAILED }
+enum TaskState { PENDING LEASED PREPARING RUNNING CHANGE_READY INTEGRATED VERIFIED RETRYABLE_FAILURE REPAIR_QUEUED HELD FAILED }
+type FeatureRun { id: ID!, repository: String!, sourceRef: String!, title: String!, specification: String!, budgetUsd: Float!, state: RunState!, createdAt: String!, tasks: [Task!]!, gates: [VerificationGate!]!, criteria: [AcceptanceCriterion!]! }
+type Task { id: ID!, role: String!, title: String!, state: TaskState!, attemptBudget: Int!, attempts: Int! }
+type VerificationGate { id: ID!, name: String!, required: Boolean!, state: String! }
+type AcceptanceCriterion { id: ID!, statement: String!, coverageState: String! }

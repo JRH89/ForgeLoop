@@ -1,0 +1,15 @@
+server: { port: 8090 }
+spring:
+  application: { name: forgeloop-control-plane }
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:forgeloop-control;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate: { ddl-auto: "${SPRING_JPA_DDL_AUTO:create-drop}" }
+    open-in-view: false
+management:
+  endpoints: { web: { exposure: { include: health,info } } }
+forgeloop:
+  github:
+    webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"

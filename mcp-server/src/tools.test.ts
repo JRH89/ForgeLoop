@@ -1,0 +1,1 @@
+import {describe,it,expect} from 'vitest'; import {safeCommandFor,toolNames} from './tools.js'; describe('MCP tool boundary',()=>{it('allows only named operations',()=>expect(toolNames).toContain('run_backend_tests'));it('does not expose arbitrary shell execution',()=>expect(safeCommandFor('run_backend_tests')).toBe('cd backend && mvn verify'));});

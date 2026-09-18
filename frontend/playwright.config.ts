@@ -1,0 +1,1 @@
+import {defineConfig} from '@playwright/test'; export default defineConfig({testDir:'e2e',use:{baseURL:process.env.PLAYWRIGHT_BASE_URL??'http://localhost:5173'},reporter:[['html',{open:'never'}],['json',{outputFile:'../evidence/FEATURE-142/verification/playwright-results.json'}]]});

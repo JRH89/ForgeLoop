@@ -1,0 +1,3 @@
+package io.forgeloop.support.domain;
+import jakarta.persistence.*;
+@Entity public class Member { @Id private String id; private String displayName; @Enumerated(EnumType.STRING) private Role role; @ManyToOne(optional=false) private Organization organization; protected Member() {} public Member(String id,String displayName,Role role,Organization organization){this.id=id;this.displayName=displayName;this.role=role;this.organization=organization;} public String getId(){return id;} public String getDisplayName(){return displayName;} public Role getRole(){return role;} public Organization getOrganization(){return organization;} }

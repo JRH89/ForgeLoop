@@ -1,0 +1,3 @@
+package io.forgeloop.support.api;
+import graphql.GraphQLError; import graphql.GraphqlErrorBuilder; import io.forgeloop.support.application.AssignmentForbiddenException; import org.springframework.graphql.data.method.annotation.GraphQlExceptionHandler; import org.springframework.graphql.execution.ErrorType; import org.springframework.web.bind.annotation.ControllerAdvice;
+@ControllerAdvice public class GraphQlErrorAdvice { @GraphQlExceptionHandler(AssignmentForbiddenException.class) public GraphQLError forbidden(AssignmentForbiddenException ex){return GraphqlErrorBuilder.newError().message(ex.getMessage()).errorType(ErrorType.FORBIDDEN).build();} }
