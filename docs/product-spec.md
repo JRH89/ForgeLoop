@@ -4,9 +4,9 @@
 
 ForgeLoop is a software-delivery control plane. It accepts a GitHub issue or a structured specification, creates a bounded execution run, dispatches scoped engineering tasks to model providers in isolated Git worktrees and containers, verifies resulting changes, routes failures to bounded repairs, and creates a pull request only when required evidence passes.
 
-The customer-support SaaS is a separate target repository used to prove ForgeLoop on a non-trivial Java, React, GraphQL, PostgreSQL, Docker application. It is not the ForgeLoop product UI, a package in the ForgeLoop monorepo, or a mocked integration. It has its own Git history, GitHub remote, CI, issue tracker, release lifecycle, credentials, and GitHub App installation. During local development its checkout may live at `targets/support-desk` for convenience, but it remains an independently initialized repository and must never be committed as ForgeLoop source code or treated as a submodule dependency.
+ForgeLoop is repository-agnostic. A connected repository is an independently managed GitHub repository with its own Git history, CI, issue tracker, release lifecycle, credentials, and GitHub App installation. ForgeLoop never includes a customer repository as a package, submodule, or source dependency. Ticketly, located in the separate `C:\Users\jrh89\Work\Ticketly` repository, is only the first validation target for the portfolio scenario; it receives no product-specific behavior or code path.
 
-The target repository is the acceptance environment: an allow-listed GitHub issue opened there is delivered to ForgeLoop through the installed GitHub App; ForgeLoop creates a run, a runner clones that repository, performs work on a new branch, verifies the change, and opens a draft pull request back to that same GitHub repository. This is the end-to-end path that proves the product.
+For every connected repository, an allow-listed GitHub issue is delivered through the installed GitHub App; ForgeLoop creates a run, a runner clones that repository, performs work on a new branch, verifies the change, and opens a draft pull request back to that same repository. Ticketly is used to prove this path end to end, not to define it.
 
 ## Deployment architecture: cloud control plane and distributed runners
 
@@ -73,6 +73,7 @@ Failure transitions are `RETRYABLE_FAILURE`, `REPAIR_QUEUED`, `HELD`, and `FAILE
 | Entity | Essential fields |
 | --- | --- |
 | `RepositoryConnection` | installation id, repository id, default branch, policy revision, enabled status |
+| `RepositoryPolicy` | issue labels, branch rules, harness profile, allowed paths, required checks, permitted tools, budgets, PR policy |
 | `FeatureRun` | id, source issue/spec, repository, branch, state, budget, timestamps, correlation id |
 | `AcceptanceCriterion` | run id, statement, priority, verification mapping, coverage state |
 | `Task` | run id, dependency ids, scope paths, capability, owner, state, attempt budget |
@@ -90,7 +91,7 @@ Failure transitions are `RETRYABLE_FAILURE`, `REPAIR_QUEUED`, `HELD`, and `FAILE
 
 ## API and integration contracts
 
-The control plane exposes GraphQL for the operator UI and REST webhook endpoints for GitHub. GitHub uses App installation credentials, webhook signature validation, delivery-id idempotency, least-privilege permissions, and reconciliation polling. Provider credentials are stored outside the database and injected only into short-lived workers.
+The control plane exposes GraphQL for the operator UI and REST webhook endpoints for GitHub. GitHub uses App installation credentials, webhook signature validation, delivery-id idempotency, least-privilege permissions, and reconciliation polling. Each run resolves its checks and commands from a versioned `RepositoryPolicy` or detected harness profile; no framework or target-application name is hard-coded into the orchestration path. Provider credentials are stored outside the database and injected only into short-lived workers.
 
 MCP tools are capability-specific and sandboxed: repository context, schema access, test execution, container inspection, failure-log retrieval, and evidence submission. There is no arbitrary shell MCP tool.
 
@@ -120,4 +121,4 @@ The MVP defaults to runner-managed credentials: the runner reads provider and Gi
 
 ## Completion definition
 
-ForgeLoop is complete for its first production release when it can autonomously process the FEATURE-142 GitHub issue against the target SaaS from webhook intake through a verified PR in a GitHub sandbox repository, with all artifact paths, model selections, costs, test outcomes, repair attempts, and acceptance-criteria coverage visible in the operator UI and recoverable after restart.
+ForgeLoop is complete for its first production release when it can autonomously process an allow-listed GitHub issue from any installed repository through a verified PR in that repository, with all artifact paths, model selections, costs, test outcomes, repair attempts, and acceptance-criteria coverage visible in the operator UI and recoverable after restart. Ticketly FEATURE-142 is the first end-to-end validation, followed by a second repository-profile validation.

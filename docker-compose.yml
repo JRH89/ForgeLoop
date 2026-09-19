@@ -11,21 +11,6 @@ services:
       timeout: 3s
       retries: 10
     ports: ["5432:5432"]
-  api:
-    build: ./backend
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/forgeloop
-      SPRING_DATASOURCE_USERNAME: forgeloop
-      SPRING_DATASOURCE_PASSWORD: forgeloop
-      SPRING_PROFILES_ACTIVE: demo
-    depends_on:
-      postgres: { condition: service_healthy }
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    ports: ["8080:8080"]
   control-plane:
     build: ./control-plane
     environment:
@@ -44,5 +29,5 @@ services:
   web:
     build: ./frontend
     depends_on:
-      api: { condition: service_healthy }
+      control-plane: { condition: service_healthy }
     ports: ["5173:80"]

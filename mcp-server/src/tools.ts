@@ -1,3 +1,15 @@
-export const toolNames=['get_feature_spec','get_repository_context','get_architecture_rules','get_graphql_schema','run_backend_tests','run_frontend_tests','run_browser_tests','inspect_container','get_failure_logs','submit_verification_evidence'] as const;
-export type ToolName=typeof toolNames[number];
-export function safeCommandFor(tool:ToolName){const commands:Record<ToolName,string>={get_feature_spec:'read docs/feature-142.md',get_repository_context:'read docs/architecture.md',get_architecture_rules:'read CONTRIBUTING.md',get_graphql_schema:'read backend/src/main/resources/graphql/schema.graphqls',run_backend_tests:'cd backend && mvn verify',run_frontend_tests:'cd frontend && npm run check',run_browser_tests:'npm run test:e2e',inspect_container:'docker compose ps --format json',get_failure_logs:'read evidence failure logs',submit_verification_evidence:'append evidence metadata'};return commands[tool];}
+/** Control-plane MCP operations. Repository execution remains runner-local. */
+export const toolNames = ['get_run_context', 'get_repository_policy', 'get_task_context', 'read_verification_evidence', 'submit_verification_evidence', 'request_task_cancellation'] as const;
+export type ToolName = typeof toolNames[number];
+
+export function operationFor(tool: ToolName): string {
+  const operations: Record<ToolName, string> = {
+    get_run_context: 'Read the authorized delivery-run context from the ForgeLoop control plane.',
+    get_repository_policy: 'Read the policy revision bound to the selected repository and run.',
+    get_task_context: 'Read the authorized scoped task context and capability grant.',
+    read_verification_evidence: 'Read evidence metadata and approved artifacts for a delivery run.',
+    submit_verification_evidence: 'Submit checksummed, redacted verification evidence for the leased task.',
+    request_task_cancellation: 'Request a policy-authorized cancellation; the control plane records the decision.'
+  };
+  return operations[tool];
+}

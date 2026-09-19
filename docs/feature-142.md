@@ -1,4 +1,6 @@
-# FEATURE-142: Ticket assignment
+# Ticketly sample issue: FEATURE-142 — Ticket assignment
+
+This is an example issue for the external Ticketly repository. ForgeLoop must consume it through the ordinary GitHub App and repository-policy path; no code in ForgeLoop may reference this feature identifier or Ticketly-specific commands.
 
 ## Acceptance criteria
 
@@ -21,4 +23,3 @@ mutation Assign($ticketId: ID!, $assigneeId: ID!) {
 ```
 
 The actor identity is supplied by `X-Actor-Id` in this demo. The API derives authorization from persisted organization membership; it never trusts a role or organization supplied by the mutation.
-
