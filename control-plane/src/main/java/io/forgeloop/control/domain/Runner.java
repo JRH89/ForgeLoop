@@ -21,9 +21,12 @@ public class Runner {
   @Column(nullable = false, length = 2000) private String capabilities;
   @Column(nullable = false) private Instant registeredAt;
   @Column(nullable = false) private Instant lastHeartbeatAt;
+  /** SHA-256 hash of the runner-scoped credential; raw credentials are never persisted. */
+  @Column(nullable = false, length = 64) private String credentialHash;
   @Column(nullable = false) private boolean enabled;
   protected Runner() { }
-  public Runner(String organizationId, String name, String version, List<String> capabilities) { this.organizationId = organizationId; this.name = name; this.version = version; this.capabilities = String.join(",", capabilities); this.registeredAt = Instant.now(); this.lastHeartbeatAt = registeredAt; this.enabled = true; }
+  public Runner(String organizationId, String name, String version, List<String> capabilities, String credentialHash) { this.organizationId = organizationId; this.name = name; this.version = version; this.capabilities = String.join(",", capabilities); this.credentialHash = credentialHash; this.registeredAt = Instant.now(); this.lastHeartbeatAt = registeredAt; this.enabled = true; }
   public void heartbeat() { lastHeartbeatAt = Instant.now(); }
+  public boolean matchesCredentialHash(String candidateHash) { return java.security.MessageDigest.isEqual(credentialHash.getBytes(java.nio.charset.StandardCharsets.US_ASCII), candidateHash.getBytes(java.nio.charset.StandardCharsets.US_ASCII)); }
   public String getId() { return id; } public String getOrganizationId() { return organizationId; } public String getName() { return name; } public String getVersion() { return version; } public List<String> getCapabilities() { return Arrays.stream(capabilities.split(",")).filter(value -> !value.isBlank()).toList(); } public String getRegisteredAt() { return registeredAt.toString(); } public String getLastHeartbeatAt() { return lastHeartbeatAt.toString(); } public boolean isEnabled() { return enabled; }
 }

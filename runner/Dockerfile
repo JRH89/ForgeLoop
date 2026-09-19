@@ -8,5 +8,8 @@ FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S forgeloop && adduser -S forgeloop -G forgeloop
 WORKDIR /app
 COPY --from=build /app/target/runner-0.1.0.jar runner.jar
+RUN mkdir /state && chown forgeloop:forgeloop /state
+VOLUME ["/state"]
+ENV FORGELOOP_RUNNER_STATE_FILE=/state/runner
 USER forgeloop
 ENTRYPOINT ["java", "-cp", "runner.jar", "io.forgeloop.runner.RunnerMain"]
