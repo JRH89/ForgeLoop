@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import App from './main';
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-const run = { id: 'run-1', repository: 'any-org/any-repository', sourceRef: 'issue-4', title: 'Improve search', specification: '- Results are ranked', budgetUsd: 25, state: 'QUEUED', createdAt: '2026-09-19T12:00:00Z', tasks: [], gates: [], criteria: [] };
-it('loads generic repository runs without target-application data', async () => { vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { featureRuns: [run] } }) })); render(<App />); expect(await screen.findAllByText('Improve search')).toHaveLength(2); expect(screen.getAllByText('any-org/any-repository · issue-4')).toHaveLength(2); expect(screen.queryByText('Support Desk')).not.toBeInTheDocument(); });
-it('submits a run for the repository selected by the operator', async () => { const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ data: { featureRuns: [] } }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ data: { submitFeature: run } }) }); vi.stubGlobal('fetch', fetchMock); render(<App />); await screen.findByText('No delivery runs yet. Connect a repository through the GitHub App, then create a run from an allowed issue or specification.'); fireEvent.change(screen.getByLabelText('Repository'), { target: { value: 'any-org/any-repository' } }); fireEvent.change(screen.getByLabelText('Issue or source reference'), { target: { value: 'issue-4' } }); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Improve search' } }); fireEvent.change(screen.getByLabelText('Specification'), { target: { value: '- Results are ranked' } }); fireEvent.click(screen.getByRole('button', { name: 'Create delivery run' })); await waitFor(() => expect(screen.getAllByText('Improve search')).toHaveLength(2)); expect(fetchMock).toHaveBeenCalledTimes(2); });
+afterEach(() => vi.unstubAllGlobals());
+
+it('shows only persisted generic repository controls', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { featureRuns: [], repositoryConnections: [] } }) }));
+  render(<App />);
+  expect(await screen.findByText('Start a delivery run')).toBeInTheDocument();
+  expect(screen.getByLabelText('Authorized repository')).toBeInTheDocument();
+  expect(screen.queryByText('Support Desk')).not.toBeInTheDocument();
+});
