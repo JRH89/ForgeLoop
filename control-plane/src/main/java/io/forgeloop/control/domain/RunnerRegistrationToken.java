@@ -1,0 +1,4 @@
+package io.forgeloop.control.domain;
+import jakarta.persistence.*;
+import java.time.Instant;
+@Entity public class RunnerRegistrationToken { @Id @GeneratedValue(strategy=GenerationType.UUID) private String id; @Column(nullable=false,unique=true) private String tokenHash; @Column(nullable=false) private String organizationId; @Column(nullable=false) private Instant expiresAt; private Instant consumedAt; protected RunnerRegistrationToken(){} public RunnerRegistrationToken(String tokenHash,String organizationId,Instant expiresAt){this.tokenHash=tokenHash;this.organizationId=organizationId;this.expiresAt=expiresAt;} public boolean usable(){return consumedAt==null&&Instant.now().isBefore(expiresAt);} public void consume(){if(!usable())throw new IllegalStateException("Registration token is expired or already used");consumedAt=Instant.now();} public String getOrganizationId(){return organizationId;} }
