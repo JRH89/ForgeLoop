@@ -2,9 +2,9 @@
 
 ## Phase 0 — Reset the product boundary
 
-Extract the support SaaS into an independently initialized Git repository at `targets/support-desk` for local development, then publish it to its own GitHub remote. It must have separate Git history, CI, environment configuration, issue tracker, GitHub App installation, and release lifecycle; it is not a ForgeLoop package or submodule. Remove it from ForgeLoop navigation. Replace fabricated run metrics with persisted `FeatureRun` records. Preserve the existing ticket-assignment feature only as the first automated target scenario.
+Move the existing ticket-SaaS scaffold into the independently initialized `C:\Users\jrh89\Work\Ticketly` repository. It must have separate Git history, CI, environment configuration, issue tracker, GitHub App installation, and release lifecycle; it is not a ForgeLoop package or submodule. Replace the ForgeLoop ticket UI with the real operator console. Replace fabricated run metrics with persisted `FeatureRun` records. Ticket assignment remains a Ticketly issue only, never a ForgeLoop feature.
 
-Exit criteria: ForgeLoop UI has no ticket CRUD; the target SaaS runs independently; Git reports it as a distinct repository; its GitHub remote is installed in the ForgeLoop GitHub App; and its documented repository contract specifies labels, default branch, required checks, permitted paths, test commands, and PR policy.
+Exit criteria: ForgeLoop UI has no ticket CRUD; Ticketly runs independently; Git reports it as a distinct repository; Ticketly is one installed ForgeLoop GitHub App repository; and every connected repository has a documented versioned policy specifying labels, default branch, required checks, permitted paths, test commands, and PR policy.
 
 ## Phase 1 — Control-plane foundation
 
@@ -14,9 +14,9 @@ Exit criteria: restart-safe run/task/gate state, authenticated operator access, 
 
 ## Phase 2 — GitHub App intake and PR reconciliation
 
-Implement GitHub App installation flow, encrypted installation metadata, webhook signature verification, delivery idempotency, issue-label policy, repository policy sync, branch discovery, check-run reporting, PR creation, and reconciliation workers.
+Implement GitHub App installation flow, encrypted installation metadata, webhook signature verification, delivery idempotency, issue-label policy, repository policy sync, harness-profile detection, branch discovery, check-run reporting, PR creation, and reconciliation workers. Repository policy and the selected harness profile, not the Ticketly application shape, determine task roles and verification gates.
 
-Exit criteria: a signed issue event from the target SaaS creates exactly one run; duplicate deliveries create none; a passing synthetic run creates one draft PR in that target repository; and the control plane records the source issue, branch, commit SHA, and PR URL.
+Exit criteria: a signed issue event from any installed repository creates exactly one run; duplicate deliveries create none; a passing synthetic run creates one draft PR in its source repository; and the control plane records the source issue, branch, commit SHA, policy revision, and PR URL.
 
 ## Phase 3 — Isolation and execution substrate
 
@@ -64,9 +64,9 @@ Exit criteria: an operator can diagnose, cancel, retry, and approve a run withou
 
 ## Phase 8 — End-to-end target scenario
 
-Run FEATURE-142 as a real GitHub issue against the separate support-desk repository. Verify webhook delivery, the created branch, GraphQL authorization, UI behavior, audit event, container health, Playwright scenario, required checks, and generated draft PR.
+Run FEATURE-142 as a real GitHub issue against Ticketly, the separate example SaaS repository. Verify webhook delivery, the created branch, GraphQL authorization, UI behavior, audit event, container health, Playwright scenario, required checks, and generated draft PR. Then repeat a smaller issue against a second repository profile to prove ForgeLoop has no Ticketly-specific orchestration path.
 
-Exit criteria: a fresh sandbox repository issue completes without manual code edits by the operator.
+Exit criteria: a fresh issue in Ticketly and a fresh issue in a second repository profile each complete without manual code edits by the operator; their run records retain their independent policy and harness-profile evidence.
 
 ## Phase 9 — Production hardening and launch
 

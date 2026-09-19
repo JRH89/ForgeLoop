@@ -1,7 +1,22 @@
-export type Member={id:string;displayName:string;role:string}; export type Ticket={id:string;title:string;status:string;organizationId:string;assignee:Member|null}; export type AuditEvent={action:string;ticketId:string;actorId:string;assigneeId:string;occurredAt:string};
-export type DeliveryRun={featureId:string;state:string;metrics:{repairAttempts:number;humanInterventions:number;tokenCount:number;estimatedCostUsd:number;elapsedMinutes:number};agents:{name:string;responsibility:string;model:string;state:string;durationSeconds:number;costUsd:number}[];gates:{name:string;state:string;evidence:string}[];requirements:{criterion:string;state:string;evidence:string}[]};
-const endpoint=import.meta.env.VITE_GRAPHQL_URL ?? '/graphql';
-async function request<T>(query:string,variables:Record<string,string>={}):Promise<T>{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json','X-Actor-Id':'admin-1'},body:JSON.stringify({query,variables})});const body=await response.json();if(!response.ok||body.errors)throw new Error(body.errors?.[0]?.message??'Request failed');return body.data as T;}
-export function loadWorkspace(){return request<{tickets:Ticket[];members:Member[];run:DeliveryRun;audits:AuditEvent[]}>('query { tickets { id title status organizationId assignee { id displayName role } } members: organizationMembers(organizationId:"org-acme") { id displayName role } run: deliveryRun(featureId:"FEATURE-142") { featureId state metrics { repairAttempts humanInterventions tokenCount estimatedCostUsd elapsedMinutes } agents { name responsibility model state durationSeconds costUsd } gates { name state evidence } requirements { criterion state evidence } } audits: auditEvents(ticketId:"ticket-142") { action ticketId actorId assigneeId occurredAt } }');}
-export function assignTicket(ticketId:string,assigneeId:string){return request<{assignTicket:Ticket}>('mutation($ticketId: ID!, $assigneeId: ID!) { assignTicket(ticketId:$ticketId, assigneeId:$assigneeId) { id title status organizationId assignee { id displayName role } } }',{ticketId,assigneeId}).then(data=>data.assignTicket);}
-export function createTicket(title:string){return request<{createTicket:Ticket}>('mutation($title: String!) { createTicket(title:$title) { id title status organizationId assignee { id displayName role } } }',{title}).then(data=>data.createTicket);}
+const endpoint = import.meta.env.VITE_GRAPHQL_URL ?? '/graphql';
+
+export type Task = { id: string; role: string; title: string; state: string; attemptBudget: number; attempts: number };
+export type Gate = { id: string; name: string; required: boolean; state: string };
+export type Criterion = { id: string; statement: string; state: string };
+export type FeatureRun = { id: string; repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number; state: string; createdAt: string; tasks: Task[]; gates: Gate[]; criteria: Criterion[] };
+export type SubmitFeature = { repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number };
+
+async function request<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+  const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
+  const body = await response.json() as { data?: T; errors?: Array<{ message?: string }> };
+  if (!response.ok || body.errors?.length || !body.data) throw new Error(body.errors?.[0]?.message ?? 'ForgeLoop control plane request failed');
+  return body.data;
+}
+
+export function loadRuns(): Promise<FeatureRun[]> {
+  return request<{ featureRuns: FeatureRun[] }>('query { featureRuns { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement state } } }').then(data => data.featureRuns);
+}
+
+export function submitFeature(input: SubmitFeature): Promise<FeatureRun> {
+  return request<{ submitFeature: FeatureRun }>('mutation($input: SubmitFeatureInput!) { submitFeature(input: $input) { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement state } } }', { input }).then(data => data.submitFeature);
+}

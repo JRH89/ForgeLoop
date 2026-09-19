@@ -1,6 +1,6 @@
 # Verification protocol
 
-Required gates for FEATURE-142:
+Required gates are selected per repository by its versioned `RepositoryPolicy` or harness profile. The following are the Ticketly sample profile gates for FEATURE-142; they are not ForgeLoop defaults for every repository:
 
 1. Backend compile and unit/integration tests (`mvn verify`).
 2. Frontend unit tests, lint, TypeScript check, and production build (`npm run check`).
@@ -11,4 +11,3 @@ Required gates for FEATURE-142:
 7. Acceptance-criteria review, with one evidence item per criterion.
 
 The orchestration state machine never treats an agent's completion message as proof. Every gate must have a timestamped command/result artifact. Repairs are capped per failed gate; manual intervention, skipped checks, and simulated provider results are represented explicitly in the final report.
-
