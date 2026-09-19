@@ -26,7 +26,7 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Runner-scoped credential issued once at registration, stored only as a hash by the control plane, and required for runner heartbeats.
 - [x] Runner credential required to claim or acknowledge a task lease, in addition to the lease's one-time nonce.
 - [ ] Capability matching, cancellation, and recovery.
-- [x] Containerized local/self-hosted runner CLI with validated explicit registration input and registration/heartbeat GraphQL transport; it does not yet clone, execute, or acknowledge leased work.
+- [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, and nonce-backed lease acknowledgement; it does not yet discover, clone, or execute leased work.
 - [ ] Git clone/worktrees, isolated containers, local MCP processes, redacted events, and checksummed artifact upload.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
 
