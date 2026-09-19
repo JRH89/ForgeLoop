@@ -24,7 +24,8 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Persisted runner identity, one-time 15-minute registration tokens stored as hashes, GraphQL registration, runner listing, and heartbeats.
 - [x] Expiring, single-owner task leases with one-time runner nonce material stored only as a hash.
 - [x] Runner-scoped credential issued once at registration, stored only as a hash by the control plane, and required for runner heartbeats.
-- [ ] Capability matching, authenticated task leases, cancellation, and recovery.
+- [x] Runner credential required to claim or acknowledge a task lease, in addition to the lease's one-time nonce.
+- [ ] Capability matching, cancellation, and recovery.
 - [x] Containerized local/self-hosted runner CLI with validated explicit registration input and registration/heartbeat GraphQL transport; it does not yet clone, execute, or acknowledge leased work.
 - [ ] Git clone/worktrees, isolated containers, local MCP processes, redacted events, and checksummed artifact upload.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
