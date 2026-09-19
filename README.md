@@ -22,8 +22,10 @@ This checklist is maintained as implementation progresses. A checked item is imp
 ### Runner and execution
 
 - [x] Persisted runner identity, one-time 15-minute registration tokens stored as hashes, GraphQL registration, runner listing, and heartbeats.
-- [ ] Runner authentication after registration, capability matching, task leases, cancellation, and recovery.
-- [ ] Local/self-hosted runner CLI with Git clone/worktrees, isolated containers, local MCP processes, redacted events, and checksummed artifact upload.
+- [x] Expiring, single-owner task leases with one-time runner nonce material stored only as a hash.
+- [ ] Runner authentication after registration, capability matching, lease acknowledgement, cancellation, and recovery.
+- [x] Containerized local/self-hosted runner CLI with validated explicit registration input and registration/heartbeat GraphQL transport; it does not yet clone, execute, or acknowledge leased work.
+- [ ] Git clone/worktrees, isolated containers, local MCP processes, redacted events, and checksummed artifact upload.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
 
 ### Evidence and repository delivery
