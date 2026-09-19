@@ -22,8 +22,4 @@ class RunnerMainTest {
                 () -> RunnerMain.configFrom(new String[]{"register", "http://localhost:8090", "token", "node"}));
     }
 
-    @Test
-    void extractsRunnerIdFromGraphQlResponse() {
-        assertEquals("runner-123", RunnerMain.runnerIdFrom("{\"data\":{\"registerRunner\":{\"id\":\"runner-123\"}}}"));
-    }
 }

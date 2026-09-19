@@ -2,6 +2,7 @@ package io.forgeloop.runner;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -13,9 +14,15 @@ public final class RunnerMain {
     }
 
     public static void main(String[] arguments) throws Exception {
+        if (arguments.length > 0 && "heartbeat".equals(arguments[0])) {
+            heartbeat(arguments);
+            return;
+        }
         RunnerConfig config = configFrom(arguments);
-        String result = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
-        System.out.println("Runner registered: " + runnerIdFrom(result));
+        RunnerIdentity identity = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
+        Path statePath = statePath();
+        new RunnerIdentityStore().save(statePath, identity);
+        System.out.println("Runner enrolled. Local state saved to " + statePath + ".");
     }
 
     static RunnerConfig configFrom(String[] arguments) {
@@ -31,7 +38,16 @@ public final class RunnerMain {
                 List.of(arguments[4].split(",")));
     }
 
-    static String runnerIdFrom(String response) {
-        return response.replaceAll("(?s).*\\\"id\\\":\\\"([^\\\"]+).*", "$1");
+    private static void heartbeat(String[] arguments) throws Exception {
+        if (arguments.length != 3) throw new IllegalArgumentException("Usage: heartbeat <control-plane-url> <state-file>");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).heartbeat(identity);
+        System.out.println("Runner heartbeat accepted.");
     }
+
+    private static Path statePath() {
+        String configured = System.getenv("FORGELOOP_RUNNER_STATE_FILE");
+        return configured == null || configured.isBlank() ? Path.of("forgeloop-runner.state") : Path.of(configured);
+    }
+
 }
