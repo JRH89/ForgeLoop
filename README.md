@@ -22,7 +22,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
 - [x] Docker Compose deployment with PostgreSQL, control-plane health checks, and operator-console GraphQL proxy.
 - [x] Flyway forward migrations verified against the local PostgreSQL control-plane database.
-- [ ] OIDC authentication, organization RBAC, audit ledger, queues, object storage, and production configuration validation.
+- [ ] Organization RBAC, queues, object storage, and production configuration validation.
+- [x] OIDC JWT resource-server boundary outside an explicitly selected development mode, plus append-only digest-only audit records for run submissions, task transitions, and gate results.
 
 ### Runner and execution
 
