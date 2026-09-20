@@ -28,6 +28,10 @@ public final class RunnerMain {
             providerHealth(arguments);
             return;
         }
+        if (arguments.length > 0 && "generate-patch".equals(arguments[0])) {
+            generatePatch(arguments);
+            return;
+        }
         if (arguments.length > 0 && "claim-task".equals(arguments[0])) {
             claimTask(arguments);
             return;
@@ -161,6 +165,20 @@ public final class RunnerMain {
         };
         ProviderResult result = provider.execute(new ProviderRequest(arguments[2], "You are a credential health check.", "Reply with exactly: ForgeLoop provider ready.", 128));
         System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
+    }
+
+    /** Generates and commits a schema-validated Claude patch only within operator-supplied policy prefixes. */
+    private static void generatePatch(String[] arguments) throws Exception {
+        if (arguments.length != 6) throw new IllegalArgumentException("Usage: generate-patch <model> <worktree> <allowed-prefixes> <title> <specification>");
+        ProviderClient provider = new AnthropicMessagesProviderClient(HttpClient.newHttpClient(), URI.create("https://api.anthropic.com/v1/messages"), requiredEnvironment("ANTHROPIC_API_KEY"));
+        String instructions = "Return JSON only: {summary:string,changes:[{path:string,content:string,message:string}]}. "
+                + "Propose complete file contents only. Do not use paths outside the allowed prefixes.";
+        String input = "Task: " + arguments[4] + "\nAllowed prefixes: " + arguments[3] + "\nSpecification:\n" + arguments[5];
+        PatchPlan plan = PatchPlan.parse(provider.execute(new ProviderRequest(arguments[1], instructions, input, 8192)).output());
+        Path worktree = Path.of(arguments[2]); List<String> prefixes = List.of(arguments[3].split(","));
+        new PatchWriter().apply(worktree, plan, prefixes);
+        String sha = new GitWorktreeManager().commit(worktree, "forgeloop: " + plan.summary());
+        System.out.println("Validated patch committed: " + sha);
     }
 
     /** Claims exactly one server-advertised task, then creates its isolated worktree from a pre-cloned local checkout. */
