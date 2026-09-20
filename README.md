@@ -10,6 +10,10 @@ The goal is not to generate more code. The goal is to build the system around co
 
 This checklist is maintained as implementation progresses. A checked item is implemented and has been verified locally; it does not imply every downstream production dependency is complete.
 
+## GitHub repository connection
+
+Copy `.env.example` to `.env`, create a GitHub App with the required repository permissions and webhook URL, then set `FORGELOOP_GITHUB_APP_SLUG` and `FORGELOOP_GITHUB_WEBHOOK_SECRET`. In the ForgeLoop console, select **Repositories** and choose **Install ForgeLoop GitHub App**. GitHub—not the user—supplies the installation identity after the App callback/repository-sync phase is configured.
+
 ### Control plane
 
 - [x] Spring Boot GraphQL control plane with persisted delivery-run, task, gate, criterion, and GitHub-delivery records.
