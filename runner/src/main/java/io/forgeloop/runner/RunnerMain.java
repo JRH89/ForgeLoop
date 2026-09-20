@@ -82,6 +82,9 @@ public final class RunnerMain {
 
     private static void completeLease(String[] arguments) throws Exception {
         if (arguments.length != 6) throw new IllegalArgumentException("Usage: complete-lease <control-plane-url> <state-file> <lease-id> <nonce> <passed>");
+        if (!"true".equals(arguments[5]) && !"false".equals(arguments[5])) {
+            throw new IllegalArgumentException("Lease completion result must be true or false");
+        }
         boolean passed = Boolean.parseBoolean(arguments[5]);
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).completeLease(identity, arguments[3], arguments[4], passed);
