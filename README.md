@@ -17,7 +17,8 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Generic repository connection policy: installation ID, branch, issue label, harness profile, required gates, and budget enforcement.
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
 - [x] Docker Compose deployment with PostgreSQL, control-plane health checks, and operator-console GraphQL proxy.
-- [ ] OIDC authentication, organization RBAC, audit ledger, Flyway migrations, queues, object storage, and production configuration validation.
+- [x] Flyway forward migrations verified against the local PostgreSQL control-plane database.
+- [ ] OIDC authentication, organization RBAC, audit ledger, queues, object storage, and production configuration validation.
 
 ### Runner and execution
 
