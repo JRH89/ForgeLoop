@@ -41,7 +41,8 @@ This checklist is maintained as implementation progresses. A checked item is imp
 
 - [x] Lease-bound container verification can execute and report result evidence through the runner CLI; policy selection and browser/security gates remain outstanding.
 - [ ] Immutable evidence bundles and a gate-enforced `READY_FOR_REVIEW` transition.
-- [ ] GitHub App installation flow, branch creation, check runs, draft PR creation, and reconciliation.
+- [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
+- [ ] GitHub App callback/repository synchronization, branch creation, check runs, draft PR creation, and reconciliation.
 - [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
 
 ### Current capability boundary

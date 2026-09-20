@@ -16,3 +16,4 @@ management:
 forgeloop:
   github:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
+    app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"
