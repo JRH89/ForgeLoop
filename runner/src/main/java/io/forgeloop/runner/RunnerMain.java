@@ -56,6 +56,10 @@ public final class RunnerMain {
             verifyContainer(arguments);
             return;
         }
+        if (arguments.length > 0 && "verify-container-and-record".equals(arguments[0])) {
+            verifyContainerAndRecord(arguments);
+            return;
+        }
         RunnerConfig config = configFrom(arguments);
         RunnerIdentity identity = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
         Path statePath = statePath();
@@ -163,6 +167,29 @@ public final class RunnerMain {
                 Duration.ofSeconds(timeoutSeconds),
                 allowNetwork);
         System.out.println(result.passed() ? "Container verification passed." : "Container verification failed or timed out.");
+        System.out.print(result.output());
+        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
+    }
+
+    /** Executes, reports, then leaves lease completion to an explicit policy decision. */
+    private static void verifyContainerAndRecord(String[] arguments) throws Exception {
+        if (arguments.length < 10) {
+            throw new IllegalArgumentException("Usage: verify-container-and-record <control-plane-url> <identity-file> <lease-file> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
+        }
+        boolean allowNetwork = switch (arguments[6]) {
+            case "none" -> false;
+            case "allow" -> true;
+            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
+        };
+        Path worktree = Path.of(arguments[4]);
+        List<String> command = Arrays.asList(arguments).subList(8, arguments.length);
+        VerificationResult result = new ContainerVerificationExecutor().execute(
+                worktree, dockerVisibleWorktree(worktree), arguments[7], command, Duration.ofSeconds(Long.parseLong(arguments[5])), allowNetwork);
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerLease lease = new RunnerLeaseStore().load(Path.of(arguments[3]));
+        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).recordEvidence(identity, lease,
+                new VerificationEvidenceReport("CONTAINER", arguments[7], String.join(" ", command), result));
+        System.out.println(result.passed() ? "Container verification recorded as passed." : "Container verification recorded as failed.");
         System.out.print(result.output());
         if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
     }

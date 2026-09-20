@@ -38,7 +38,7 @@ This checklist is maintained as implementation progresses. A checked item is imp
 
 ### Evidence and repository delivery
 
-- [ ] Policy-selected build/test/container/browser/security verification executed by a runner.
+- [x] Lease-bound container verification can execute and report result evidence through the runner CLI; policy selection and browser/security gates remain outstanding.
 - [ ] Immutable evidence bundles and a gate-enforced `READY_FOR_REVIEW` transition.
 - [ ] GitHub App installation flow, branch creation, check runs, draft PR creation, and reconciliation.
 - [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
