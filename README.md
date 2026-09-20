@@ -27,7 +27,8 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Runner credential required to claim or acknowledge a task lease, in addition to the lease's one-time nonce.
 - [ ] Capability matching, cancellation, and recovery.
 - [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, and nonce-backed lease acknowledgement; it does not yet discover, clone, or execute leased work.
-- [ ] Git clone/worktrees, isolated containers, local MCP processes, redacted events, and checksummed artifact upload.
+- [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
+- [ ] Git clone, isolated containers, local MCP processes, redacted events, and checksummed artifact upload.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
 
 ### Evidence and repository delivery
