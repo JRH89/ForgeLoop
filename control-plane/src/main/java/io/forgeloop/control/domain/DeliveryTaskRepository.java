@@ -1,1 +1,1 @@
-package io.forgeloop.control.domain; import org.springframework.data.jpa.repository.JpaRepository; public interface DeliveryTaskRepository extends JpaRepository<DeliveryTask,String>{}
+package io.forgeloop.control.domain; import java.util.Collection; import java.util.List; import org.springframework.data.jpa.repository.JpaRepository; public interface DeliveryTaskRepository extends JpaRepository<DeliveryTask,String>{List<DeliveryTask> findByStateIn(Collection<TaskState> states);}

@@ -4,13 +4,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import io.forgeloop.control.application.RunnerService;
+import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.TaskLeaseService;
 import org.junit.jupiter.api.Test;
 
 class RunnerExecutionControllerTest {
     private final TaskLeaseService leases = mock(TaskLeaseService.class);
     private final RunnerService runners = mock(RunnerService.class);
-    private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners);
+    private final RunnerDispatchService dispatch = mock(RunnerDispatchService.class);
+    private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch);
 
     @Test
     void authenticatesRunnerBeforeClaimingLease() {
