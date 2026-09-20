@@ -64,6 +64,10 @@ public final class RunnerMain {
             verifyContainerGateAndRecord(arguments);
             return;
         }
+        if (arguments.length > 0 && "verify-container-and-bundle".equals(arguments[0])) {
+            verifyContainerAndBundle(arguments);
+            return;
+        }
         RunnerConfig config = configFrom(arguments);
         RunnerIdentity identity = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
         Path statePath = statePath();
@@ -217,6 +221,27 @@ public final class RunnerMain {
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).recordEvidence(identity, lease,
                 new VerificationEvidenceReport("CONTAINER", arguments[4], arguments[8], String.join(" ", command), result));
         System.out.println(result.passed() ? "Verification gate recorded as passed." : "Verification gate recorded as failed.");
+        System.out.print(result.output());
+        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
+    }
+
+    /** Runs a bounded container check and writes a checksummed local evidence bundle without sending source or credentials remotely. */
+    private static void verifyContainerAndBundle(String[] arguments) throws Exception {
+        if (arguments.length < 8) {
+            throw new IllegalArgumentException("Usage: verify-container-and-bundle <bundle-directory> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
+        }
+        boolean allowNetwork = switch (arguments[4]) {
+            case "none" -> false;
+            case "allow" -> true;
+            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
+        };
+        Path worktree = Path.of(arguments[2]);
+        List<String> command = Arrays.asList(arguments).subList(6, arguments.length);
+        VerificationResult result = new ContainerVerificationExecutor().execute(
+                worktree, dockerVisibleWorktree(worktree), arguments[5], command, Duration.ofSeconds(Long.parseLong(arguments[3])), allowNetwork);
+        Path artifact = new EvidenceBundleWriter().write(Path.of(arguments[1]),
+                new VerificationEvidenceReport("CONTAINER", null, arguments[5], String.join(" ", command), result));
+        System.out.println("Verification evidence bundle written: " + artifact.toAbsolutePath().normalize());
         System.out.print(result.output());
         if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
     }
