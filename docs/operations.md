@@ -2,9 +2,9 @@
 
 ## Environments
 
-`demo` is the only profile that accepts `X-Actor-Id` and seeds data. It is for local demonstrations only. Docker Compose explicitly selects it.
+Docker Compose explicitly sets `FORGELOOP_SECURITY_MODE=development` for local evaluation only. It deliberately does not represent a production deployment.
 
-The default profile is production-oriented: GraphiQL is disabled, Hibernate validates rather than creates schema, Flyway applies versioned migrations, no datasource credentials have defaults, and demo seeding/header identity are disabled. Set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` through a secrets manager before startup. A production deployment must provide an OIDC/JWT principal adapter before accepting traffic; the application deliberately does not fall back to the header transport.
+The default security mode is `production`: all operator routes require a JWT validated by Spring Security's OIDC resource server. Set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` (or a JWK set URI) through a secrets manager before startup. Only `/actuator/health` and signed GitHub webhooks bypass JWT authentication; webhook authenticity is independently checked with the configured HMAC secret.
 
 ## Release gates
 
