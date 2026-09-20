@@ -17,6 +17,10 @@ forgeloop:
   security:
     mode: "${FORGELOOP_SECURITY_MODE:production}"
     development-organization-id: "${FORGELOOP_DEVELOPMENT_ORGANIZATION_ID:local-development}"
+    oidc-audience: "${FORGELOOP_OIDC_AUDIENCE:}"
+    encryption-key: "${FORGELOOP_ENCRYPTION_KEY:}"
+  artifacts:
+    storage-uri: "${FORGELOOP_ARTIFACT_STORAGE_URI:}"
   github:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
     app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"

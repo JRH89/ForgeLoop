@@ -10,13 +10,15 @@ import org.springframework.stereotype.Controller;
 /** Operator-facing control-plane GraphQL operations. */
 @Controller
 public class ControlPlaneController {
-  private final FeatureRunService runs; private final RepositoryConnectionService connections; private final RunnerService runners; private final OrganizationService organizations; private final OperatorContext operators;
-  public ControlPlaneController(FeatureRunService runs, RepositoryConnectionService connections, RunnerService runners, OrganizationService organizations, OperatorContext operators) { this.runs = runs; this.connections = connections; this.runners = runners; this.organizations = organizations; this.operators = operators; }
+  private final FeatureRunService runs; private final RepositoryConnectionService connections; private final RunnerService runners; private final OrganizationService organizations; private final OperatorContext operators; private final AuditLedgerService audit;
+  public ControlPlaneController(FeatureRunService runs, RepositoryConnectionService connections, RunnerService runners, OrganizationService organizations, OperatorContext operators, AuditLedgerService audit) { this.runs = runs; this.connections = connections; this.runners = runners; this.organizations = organizations; this.operators = operators; this.audit = audit; }
   @QueryMapping public FeatureRun featureRun(@Argument String id) { return runs.get(id); }
   @QueryMapping public List<FeatureRun> featureRuns() { return runs.list(); }
   @QueryMapping public List<RepositoryConnection> repositoryConnections() { return connections.list(); }
   @QueryMapping public List<Runner> runners(@Argument String organizationId) { operators.requireOrganization(organizationId); return runners.list(organizationId); }
   @QueryMapping public List<OrganizationMembership> organizationMemberships(@Argument String organizationId) { return organizations.memberships(organizationId); }
+  /** The run lookup establishes tenant access before its audit history is returned. */
+  @QueryMapping public List<AuditLedgerEntry> featureRunAuditEvents(@Argument String runId) { runs.get(runId); return audit.events("FEATURE_RUN", runId); }
   @MutationMapping public FeatureRun submitFeature(@Argument SubmitFeatureInput input) { return runs.submit(new FeatureSubmission(input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd())); }
   @MutationMapping public RepositoryConnection connectRepository(@Argument ConnectRepositoryInput input) { operators.requireAdministrator(); return connections.register(new RepositoryRegistration(input.repository(), input.installationId(), input.defaultBranch(), input.issueLabel(), input.harnessProfile(), input.requiredGates(), input.maxBudgetUsd())); }
   @MutationMapping public String issueRunnerRegistrationToken(@Argument String organizationId) { operators.requireAdministrator(); operators.requireOrganization(organizationId); return runners.issueRegistrationToken(organizationId); }

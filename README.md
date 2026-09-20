@@ -22,9 +22,10 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
 - [x] Docker Compose deployment with PostgreSQL, control-plane health checks, and operator-console GraphQL proxy.
 - [x] Flyway forward migrations verified against the local PostgreSQL control-plane database.
-- [ ] Persisted organization memberships/roles, queues, object storage, and production configuration validation.
-- [x] JWT `org_id` context scopes operator repository connections and delivery-run visibility; cross-organization repository access and runner-token issuance are rejected.
-- [x] OIDC JWT resource-server boundary outside an explicitly selected development mode, plus append-only digest-only audit records for run submissions, task transitions, and gate results.
+- [x] Persisted organization memberships and roles scope repository ownership, delivery-run visibility, runner enrollment, and privileged operator actions.
+- [x] JWT `org_id` context is checked against persisted membership server-side; cross-organization repository access and runner-token issuance are rejected.
+- [x] OIDC JWT issuer and audience boundary outside explicitly selected development mode, with digest-only audit records and tenant-scoped run timeline queries.
+- [x] Production startup rejects missing OIDC audience, webhook secret, PostgreSQL, validated schema mode, artifact-storage URI, or encryption-key configuration.
 
 ### Runner and execution
 
