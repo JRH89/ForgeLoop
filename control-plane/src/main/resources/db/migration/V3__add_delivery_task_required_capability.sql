@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS delivery_task
+    ADD COLUMN IF NOT EXISTS required_capability VARCHAR(255) NOT NULL DEFAULT 'git';

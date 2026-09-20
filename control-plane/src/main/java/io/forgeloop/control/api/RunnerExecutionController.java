@@ -26,7 +26,7 @@ public class RunnerExecutionController {
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
-        runners.authenticated(runnerId, credential); return dispatch.available();
+        return dispatch.available(runners.authenticated(runnerId, credential));
     }
     @MutationMapping public LeaseGrant claimTaskLease(@Argument String taskId, @Argument String runnerId, @Argument String credential) {
         runners.authenticated(runnerId, credential); return leases.claim(taskId, runnerId);

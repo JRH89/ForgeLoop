@@ -27,6 +27,8 @@ public class Runner {
   protected Runner() { }
   public Runner(String organizationId, String name, String version, List<String> capabilities, String credentialHash) { this.organizationId = organizationId; this.name = name; this.version = version; this.capabilities = String.join(",", capabilities); this.credentialHash = credentialHash; this.registeredAt = Instant.now(); this.lastHeartbeatAt = registeredAt; this.enabled = true; }
   public void heartbeat() { lastHeartbeatAt = Instant.now(); }
+  /** Capability matching is exact and case-sensitive to prevent accidental privilege expansion. */
+  public boolean hasCapability(String requiredCapability) { return requiredCapability != null && getCapabilities().contains(requiredCapability); }
   public boolean matchesCredentialHash(String candidateHash) { return java.security.MessageDigest.isEqual(credentialHash.getBytes(java.nio.charset.StandardCharsets.US_ASCII), candidateHash.getBytes(java.nio.charset.StandardCharsets.US_ASCII)); }
   public String getId() { return id; } public String getOrganizationId() { return organizationId; } public String getName() { return name; } public String getVersion() { return version; } public List<String> getCapabilities() { return Arrays.stream(capabilities.split(",")).filter(value -> !value.isBlank()).toList(); } public String getRegisteredAt() { return registeredAt.toString(); } public String getLastHeartbeatAt() { return lastHeartbeatAt.toString(); } public boolean isEnabled() { return enabled; }
 }
