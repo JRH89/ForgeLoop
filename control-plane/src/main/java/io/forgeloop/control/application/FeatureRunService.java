@@ -12,8 +12,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class FeatureRunService {
-  private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections;
-  public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections) { this.runs = runs; this.tasks = tasks; this.connections = connections; }
+  private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections; private final AuditLedgerService audit;
+  public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections, AuditLedgerService audit) { this.runs = runs; this.tasks = tasks; this.connections = connections; this.audit = audit; }
   @Transactional public FeatureRun submit(FeatureSubmission input) {
     RepositoryConnection connection = connections.requireEnabled(input.repository());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
@@ -23,10 +23,10 @@ public class FeatureRunService {
     run.addTask("INDEPENDENT_TEST", "Derive independent verification from acceptance criteria", "docker");
     for (String gate : connection.getRequiredGates()) run.addGate(gate);
     input.specification().lines().filter(line -> line.strip().startsWith("- ")).map(line -> line.strip().substring(2)).forEach(run::addCriterion);
-    return runs.save(run);
+    FeatureRun saved = runs.save(run); audit.record("FEATURE_RUN_SUBMITTED", "FEATURE_RUN", saved.getId() == null ? input.sourceRef() : saved.getId(), input.repository() + "|" + input.sourceRef()); return saved;
   }
-  @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); task.transition(state); return task; }
-  @Transactional public FeatureRun recordGate(String runId, String gate, boolean passed) { FeatureRun run = get(runId); run.recordGate(gate, passed); return run; }
+  @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
+  @Transactional public FeatureRun recordGate(String runId, String gate, boolean passed) { FeatureRun run = get(runId); run.recordGate(gate, passed); audit.record("VERIFICATION_GATE_RECORDED", "FEATURE_RUN", runId, gate + "|" + passed); return run; }
   public FeatureRun get(String id) { return runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); }
   public List<FeatureRun> list() { return runs.findAll(); }
 }

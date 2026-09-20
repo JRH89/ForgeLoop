@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 class FeatureRunServiceTest {
-  private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections);
+  private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections, audit);
   @Test void submissionUsesConnectedRepositoryPolicy() {
     RepositoryConnection connection = new RepositoryConnection("acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile", "browser"), 25);
     when(connections.requireEnabled("acme/support")).thenReturn(connection); when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
