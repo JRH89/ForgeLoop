@@ -6,6 +6,7 @@ import io.forgeloop.control.application.FeatureRunService;
 import io.forgeloop.control.application.FeatureSubmission;
 import io.forgeloop.control.domain.GithubDelivery;
 import io.forgeloop.control.domain.GithubDeliveryRepository;
+import io.forgeloop.control.domain.GithubInstallationRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
 import java.util.List;
@@ -26,17 +27,20 @@ public class GithubWebhookController {
     private final GithubDeliveryRepository deliveries;
     private final FeatureRunService runs;
     private final RepositoryConnectionRepository connections;
+    private final GithubInstallationRepository installationOwners;
     private final GithubInstallationRepositorySyncService installations;
     private final ObjectMapper json;
     private final String secret;
 
     public GithubWebhookController(GithubWebhookVerifier verifier, GithubDeliveryRepository deliveries, FeatureRunService runs,
-                                   RepositoryConnectionRepository connections, GithubInstallationRepositorySyncService installations,
+                                   RepositoryConnectionRepository connections, GithubInstallationRepository installationOwners,
+                                   GithubInstallationRepositorySyncService installations,
                                    ObjectMapper json, @Value("${forgeloop.github.webhook-secret:}") String secret) {
         this.verifier = verifier;
         this.deliveries = deliveries;
         this.runs = runs;
         this.connections = connections;
+        this.installationOwners = installationOwners;
         this.installations = installations;
         this.json = json;
         this.secret = secret;
@@ -55,6 +59,14 @@ public class GithubWebhookController {
             if ("issues".equals(event)) processIssue(payload);
             if ("installation_repositories".equals(event) && "added".equals(payload.path("action").asText())) {
                 installations.synchronizeAddedRepositories(payload);
+            }
+            if ("installation".equals(event) && "created".equals(payload.path("action").asText())) {
+                long installationId = payload.path("installation").path("id").asLong();
+                // GitHub can deliver this before its setup-URL callback. The callback synchronizes once
+                // ownership is verified, so accepting this delivery avoids an unsafe retry loop.
+                if (installationOwners.findByInstallationId(installationId).isPresent()) {
+                    installations.synchronizeInstallation(installationId);
+                }
             }
         } catch (Exception exception) {
             throw new IllegalArgumentException("Invalid GitHub webhook payload", exception);

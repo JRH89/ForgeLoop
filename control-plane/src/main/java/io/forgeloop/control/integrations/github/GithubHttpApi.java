@@ -14,6 +14,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,12 @@ public class GithubHttpApi implements GithubApi {
                          @Value("${forgeloop.github.app-id:}") String appId,
                          @Value("${forgeloop.github.private-key:}") String privateKey, ObjectMapper json) {
         this.apiUrl = apiUrl.replaceAll("/$", ""); this.appId = appId; this.privateKey = privateKey; this.json = json;
+    }
+    @Override public List<GithubInstalledRepository> listInstallationRepositories(long installationId) {
+        JsonNode response = request(installationId, "GET", "/installation/repositories", Map.of());
+        java.util.ArrayList<GithubInstalledRepository> repositories = new java.util.ArrayList<>();
+        for (JsonNode repository : response.path("repositories")) repositories.add(new GithubInstalledRepository(repository.path("full_name").asText(), repository.path("default_branch").asText("main")));
+        return List.copyOf(repositories);
     }
     @Override public void createBranch(long installationId, String repository, String branch, String baseSha) { request(installationId, "POST", "/repos/" + repository + "/git/refs", Map.of("ref", "refs/heads/" + branch, "sha", baseSha)); }
     @Override public String putFile(long installationId, String repository, String branch, GithubChange change) {
@@ -43,7 +50,8 @@ public class GithubHttpApi implements GithubApi {
     }
     private JsonNode request(long installationId, String method, String path, Object body) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + installationToken(installationId)).method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + installationToken(installationId));
+            HttpRequest request = "GET".equals(method) ? builder.GET().build() : builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
             HttpResponse<String> response = sendWithRetry(request);
             return json.readTree(response.body());
         } catch (Exception exception) { throw new IllegalStateException("GitHub API request failed", exception); }
@@ -54,7 +62,8 @@ public class GithubHttpApi implements GithubApi {
     }
     private JsonNode requestAsApp(String method, String path, Object body) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + appJwt()).method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + appJwt());
+            HttpRequest request = "GET".equals(method) ? builder.GET().build() : builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
             HttpResponse<String> response = sendWithRetry(request);
             return json.readTree(response.body());
         } catch (Exception exception) { throw new IllegalStateException("GitHub App token request failed", exception); }
@@ -64,7 +73,29 @@ public class GithubHttpApi implements GithubApi {
         long now = Instant.now().getEpochSecond(); String header = part("{\"alg\":\"RS256\",\"typ\":\"JWT\"}"); String claims = part("{\"iat\":" + (now - 30) + ",\"exp\":" + (now + 540) + ",\"iss\":\"" + appId + "\"}");
         Signature signer = Signature.getInstance("SHA256withRSA"); signer.initSign(key()); signer.update((header + "." + claims).getBytes(StandardCharsets.US_ASCII)); return header + "." + claims + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(signer.sign());
     }
-    private PrivateKey key() throws Exception { String pem = privateKey.replace("\\n", "\n").replaceAll("-----[^-]+-----", "").replaceAll("\\s", ""); return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(Base64.getDecoder().decode(pem))); }
+    /** GitHub downloads PKCS#1 RSA keys; PKCS#8 keys supplied by a secret manager also work. */
+    private PrivateKey key() throws Exception {
+        boolean pkcs1 = privateKey.contains("BEGIN RSA PRIVATE KEY");
+        String pem = privateKey.replace("\\n", "\n").replaceAll("-----[^-]+-----", "").replaceAll("\\s", "");
+        byte[] encoded = Base64.getDecoder().decode(pem);
+        return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(pkcs1 ? pkcs8(encoded) : encoded));
+    }
+    /** Wraps the PKCS#1 RSA private-key sequence in the standard PKCS#8 rsaEncryption envelope. */
+    private static byte[] pkcs8(byte[] pkcs1) {
+        byte[] algorithm = new byte[] { 0x30, 0x0d, 0x06, 0x09, 0x2a, (byte) 0x86, 0x48, (byte) 0x86, (byte) 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00 };
+        byte[] version = new byte[] { 0x02, 0x01, 0x00 };
+        byte[] octets = der(0x04, pkcs1);
+        byte[] body = new byte[version.length + algorithm.length + octets.length];
+        System.arraycopy(version, 0, body, 0, version.length); System.arraycopy(algorithm, 0, body, version.length, algorithm.length); System.arraycopy(octets, 0, body, version.length + algorithm.length, octets.length);
+        return der(0x30, body);
+    }
+    private static byte[] der(int tag, byte[] value) {
+        if (value.length < 128) { byte[] output = new byte[2 + value.length]; output[0] = (byte) tag; output[1] = (byte) value.length; System.arraycopy(value, 0, output, 2, value.length); return output; }
+        int lengthBytes = value.length < 256 ? 1 : 2;
+        byte[] output = new byte[2 + lengthBytes + value.length]; output[0] = (byte) tag; output[1] = (byte) (0x80 | lengthBytes);
+        for (int index = 0; index < lengthBytes; index++) output[2 + index] = (byte) (value.length >>> (8 * (lengthBytes - index - 1)));
+        System.arraycopy(value, 0, output, 2 + lengthBytes, value.length); return output;
+    }
     /** Retries only transient GitHub failures; permanent 4xx responses remain visible to reconciliation. */
     private HttpResponse<String> sendWithRetry(HttpRequest request) throws Exception {
         HttpResponse<String> response = null;

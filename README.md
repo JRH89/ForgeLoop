@@ -53,7 +53,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Signed, short-lived GitHub App callback state binds an installation to the initiating ForgeLoop organization before repository synchronization.
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
 - [x] GitHub App JWT signing, short-lived installation-token exchange, idempotent branch/file/check-run/draft-PR delivery records, and transient GitHub API retry handling.
-- [ ] Live GitHub App credential validation, remote reconciliation, and runner-produced verified changes wired into GitHub delivery.
+- [x] Live GitHub App credential validation, installation-token repository discovery, installation reconciliation, and signed GitHub Issue intake verified against the separate Ticketly repository.
+- [ ] Runner-produced verified changes wired into GitHub delivery, including a live draft-PR/check-run proof.
 - [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
 
 ### Current capability boundary

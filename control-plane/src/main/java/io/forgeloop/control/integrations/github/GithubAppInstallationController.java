@@ -19,9 +19,18 @@ public class GithubAppInstallationController {
     private final String appSlug;
     private final GithubInstallationState state;
     private final GithubInstallationRepository installations;
+    private final GithubInstallationRepositorySyncService synchronization;
     private final OperatorContext operators;
 
-    public GithubAppInstallationController(@Value("${forgeloop.github.app-slug:}") String appSlug, GithubInstallationState state, GithubInstallationRepository installations, OperatorContext operators) { this.appSlug = appSlug; this.state = state; this.installations = installations; this.operators = operators; }
+    public GithubAppInstallationController(@Value("${forgeloop.github.app-slug:}") String appSlug, GithubInstallationState state,
+                                           GithubInstallationRepository installations, GithubInstallationRepositorySyncService synchronization,
+                                           OperatorContext operators) {
+        this.appSlug = appSlug;
+        this.state = state;
+        this.installations = installations;
+        this.synchronization = synchronization;
+        this.operators = operators;
+    }
 
     @GetMapping("/install")
     public ResponseEntity<Void> install() {
@@ -36,7 +45,14 @@ public class GithubAppInstallationController {
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(@RequestParam("installation_id") long installationId, @RequestParam String state) {
         String organizationId = this.state.verify(state);
-        if (installations.findByInstallationId(installationId).isEmpty()) installations.save(new GithubInstallation(installationId, organizationId));
+        installations.findByInstallationId(installationId).ifPresentOrElse(existing -> {
+            if (!existing.getOrganizationId().equals(organizationId)) {
+                throw new IllegalArgumentException("GitHub installation is already owned by another organization");
+            }
+        }, () -> installations.save(new GithubInstallation(installationId, organizationId)));
+        // The callback is authoritative for ownership and also closes the race where GitHub sends the
+        // installation webhook before this browser redirect reaches ForgeLoop.
+        synchronization.synchronizeInstallation(installationId);
         return ResponseEntity.noContent().build();
     }
 }

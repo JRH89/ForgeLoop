@@ -31,6 +31,8 @@ public class FeatureRunService {
   @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); connections.requireEnabled(task.getRun().getRepository()); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
   @Transactional public FeatureRun recordGate(String runId, String gate, boolean passed) { FeatureRun run = get(runId); run.recordGate(gate, passed); audit.record("VERIFICATION_GATE_RECORDED", "FEATURE_RUN", runId, gate + "|" + passed); return run; }
   @Transactional public FeatureRun cancel(String runId) { FeatureRun run = get(runId); run.cancel(); audit.record("FEATURE_RUN_CANCELLED", "FEATURE_RUN", runId, run.getState().name()); return run; }
-  public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); connections.requireEnabled(run.getRepository()); return run; }
-  public List<FeatureRun> list() { return runs.findAll().stream().filter(run -> { try { connections.requireEnabled(run.getRepository()); return true; } catch (RuntimeException ignored) { return false; } }).toList(); }
+  @Transactional public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); initializeDisplayGraph(run); connections.requireEnabled(run.getRepository()); return run; }
+  @Transactional public List<FeatureRun> list() { return runs.findAll().stream().filter(run -> { try { initializeDisplayGraph(run); connections.requireEnabled(run.getRepository()); return true; } catch (RuntimeException ignored) { return false; } }).toList(); }
+  /** Initializes all three display collections before leaving the transaction; GraphQL must not lazy-load domain state. */
+  private static void initializeDisplayGraph(FeatureRun run) { run.getTasks(); run.getGates(); run.getCriteria(); }
 }
