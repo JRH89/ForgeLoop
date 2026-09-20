@@ -20,7 +20,7 @@ class FeatureRunVerificationGateTest {
   }
 
   @Test
-  void failedGateBlocksRunAndPassedGateCannotBeDowngraded() {
+    void failedGateBlocksRunAndPassedGateCannotBeDowngraded() {
     FeatureRun run = new FeatureRun("acme/widget", "main", "Add search", "spec", 10, "default", 1);
     run.addGate("unit");
 
@@ -31,5 +31,14 @@ class FeatureRunVerificationGateTest {
     passedRun.addGate("unit");
     passedRun.recordGate("unit", true);
     assertThrows(IllegalStateException.class, () -> passedRun.recordGate("unit", false));
+    }
+
+  @Test
+  void cancellationHoldsOutstandingTasks() {
+    FeatureRun run = new FeatureRun("acme/widget", "main", "Add search", "spec", 10, "default", 1);
+    run.addTask("IMPLEMENTATION", "Implement", "provider");
+    run.cancel();
+    assertEquals(RunState.CANCELLED, run.getState());
+    assertEquals(TaskState.HELD, run.getTasks().getFirst().getState());
   }
 }

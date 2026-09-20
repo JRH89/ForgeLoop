@@ -22,6 +22,7 @@ public class ControlPlaneController {
   @MutationMapping public Runner runnerHeartbeat(@Argument String runnerId, @Argument String credential) { return runners.heartbeat(runnerId, credential); }
   @MutationMapping public DeliveryTask transitionTask(@Argument String taskId, @Argument TaskState to) { return runs.transitionTask(taskId, to); }
   @MutationMapping public FeatureRun recordVerificationGate(@Argument String runId, @Argument String gate, @Argument boolean passed) { return runs.recordGate(runId, gate, passed); }
+  @MutationMapping public FeatureRun cancelFeatureRun(@Argument String runId) { return runs.cancel(runId); }
   public record SubmitFeatureInput(String repository, String sourceRef, String title, String specification, double budgetUsd) { }
   public record ConnectRepositoryInput(String repository, long installationId, String defaultBranch, String issueLabel, String harnessProfile, List<String> requiredGates, double maxBudgetUsd) { }
   public record RegisterRunnerInput(String token, String name, String version, List<String> capabilities) { }

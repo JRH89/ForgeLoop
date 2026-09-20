@@ -31,6 +31,8 @@ public class DeliveryTask {
         if (to == TaskState.REPAIR_QUEUED && ++attempts > attemptBudget) { state = TaskState.FAILED; return; }
         state = to;
     }
+    /** Prevents new execution claims while preserving completed task evidence for an operator cancellation. */
+    public void hold() { if (state != TaskState.VERIFIED && state != TaskState.FAILED) state = TaskState.HELD; }
 
     public String getId() { return id; } public String getRole() { return role; } public String getTitle() { return title; }
     public FeatureRun getRun() { return run; }
