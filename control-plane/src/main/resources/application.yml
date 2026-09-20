@@ -17,3 +17,8 @@ forgeloop:
   github:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
     app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"
+    default-policy:
+      issue-label: "${FORGELOOP_GITHUB_DEFAULT_ISSUE_LABEL:forgeloop}"
+      harness-profile: "${FORGELOOP_GITHUB_DEFAULT_HARNESS_PROFILE:GENERIC}"
+      required-gates: "${FORGELOOP_GITHUB_DEFAULT_REQUIRED_GATES:unit}"
+      max-budget-usd: "${FORGELOOP_GITHUB_DEFAULT_MAX_BUDGET_USD:25}"

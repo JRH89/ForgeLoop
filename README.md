@@ -46,7 +46,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Lease-bound container verification can execute and report named-gate evidence through the runner CLI; passing all required gates transitions a run to `READY_FOR_REVIEW`, while a failed gate blocks it.
 - [ ] Immutable evidence bundles, policy-selected gate orchestration, browser/security gates, and acceptance-criterion evidence.
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
-- [ ] GitHub App callback/repository synchronization, branch creation, check runs, draft PR creation, and reconciliation.
+- [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
+- [ ] GitHub App callback confirmation, installation-token exchange, branch creation, check runs, draft PR creation, and reconciliation.
 - [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
 
 ### Current capability boundary
