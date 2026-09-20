@@ -63,7 +63,8 @@ public class GithubWebhookController {
     }
 
     private void processIssue(JsonNode root) {
-        if (!"opened".equals(root.path("action").asText())) return;
+        String action = root.path("action").asText();
+        if (!"opened".equals(action) && !"labeled".equals(action)) return;
         String repository = root.path("repository").path("full_name").asText();
         long installationId = root.path("installation").path("id").asLong();
         List<String> labels = root.path("issue").path("labels").findValuesAsText("name");
@@ -73,7 +74,7 @@ public class GithubWebhookController {
         JsonNode issue = root.path("issue");
         String specification = issue.path("body").asText();
         if (specification.isBlank()) return;
-        runs.submit(new FeatureSubmission(repository, "issue-" + issue.path("number").asText(), issue.path("title").asText(), specification,
+        runs.submitIssue(new FeatureSubmission(repository, "issue-" + issue.path("number").asText(), issue.path("title").asText(), specification,
                 connection.getMaxBudgetUsd()));
     }
 }

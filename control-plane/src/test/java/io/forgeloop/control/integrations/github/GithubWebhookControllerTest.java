@@ -44,7 +44,7 @@ class GithubWebhookControllerTest {
 
         assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
         verify(deliveries).save(any());
-        verify(runs).submit(any());
+        verify(runs).submitIssue(any());
     }
 
     @Test

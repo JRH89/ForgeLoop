@@ -25,4 +25,9 @@ class FeatureRunServiceTest {
     when(connections.requireEnabled("acme/support")).thenReturn(new RepositoryConnection("acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile"), 10));
     assertThrows(IllegalArgumentException.class, () -> service.submit(new FeatureSubmission("acme/support", "issue-1", "Title", "- Criterion", 11)));
   }
+  @Test void issueIntakeReusesExistingSourceRun() {
+    FeatureRun existing = new FeatureRun("acme/support", "issue-142", "Assignment", "- criterion", 10, "JVM_REACT", 1);
+    when(runs.findByRepositoryAndSourceRef("acme/support", "issue-142")).thenReturn(java.util.Optional.of(existing));
+    assertEquals(existing, service.submitIssue(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- criterion", 10)));
+  }
 }
