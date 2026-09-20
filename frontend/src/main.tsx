@@ -2,11 +2,13 @@ import { FormEvent, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { loadRepositoryConnections, loadRuns, submitFeature, type FeatureRun, type RepositoryConnection } from './api';
 import forgeLoopLogo from './assets/logo.png';
+import processGraphic from './assets/forgeloop_process_infographic.png';
 import './styles.css';
 
 function RepositoryPage({ items }: { items: RepositoryConnection[] }) {
   return <>
     <section className="hero"><p className="eyebrow">Repository authorization</p><h1>Connect policy, not source code.</h1><p>Install the ForgeLoop GitHub App and choose the repositories it may access. ForgeLoop receives the installation identity from GitHub; users never type an installation ID.</p></section>
+    <img className="process-graphic" src={processGraphic} alt="ForgeLoop delivery process" />
     <section className="submission"><h2>Connect GitHub</h2><p>The App installation opens in GitHub, where an organization owner selects all or specific repositories.</p><a className="primary" href="/api/github/app/install">Install ForgeLoop GitHub App</a><p>After GitHub returns the selected repositories, ForgeLoop applies the repository policy and enables issue intake.</p></section>
     <section className="runs"><h2>Connected repositories</h2>{items.map(item => <div className="item" key={item.id}><div><b>{item.repository}</b><small>{item.defaultBranch} · {item.issueLabel} · {item.requiredGates.join(', ')}</small></div><span>Policy v{item.policyRevision}</span></div>)}</section>
   </>;
