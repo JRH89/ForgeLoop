@@ -14,7 +14,7 @@ public final class GitWorktreeManager {
 
     public Path create(Path repository, String baseRef, String taskId, Path workspaceRoot) throws IOException, InterruptedException {
         if (!taskId.matches("[A-Za-z0-9_-]{1,80}")) throw new IllegalArgumentException("Task identifier is unsafe");
-        if (!Files.isDirectory(repository.resolve(".git"))) throw new IllegalArgumentException("Repository must be a local Git worktree");
+        if (!Files.exists(repository.resolve(".git"))) throw new IllegalArgumentException("Repository must be a local Git worktree");
         Path root = workspaceRoot.toAbsolutePath().normalize();
         Path worktree = root.resolve(taskId).normalize();
         if (!worktree.startsWith(root)) throw new IllegalArgumentException("Worktree escapes runner workspace");
@@ -27,12 +27,20 @@ public final class GitWorktreeManager {
     /** Removes only a task worktree located underneath the runner-controlled workspace root. */
     public void remove(Path repository, String taskId, Path workspaceRoot) throws IOException, InterruptedException {
         if (!taskId.matches("[A-Za-z0-9_-]{1,80}")) throw new IllegalArgumentException("Task identifier is unsafe");
-        if (!Files.isDirectory(repository.resolve(".git"))) throw new IllegalArgumentException("Repository must be a local Git worktree");
+        if (!Files.exists(repository.resolve(".git"))) throw new IllegalArgumentException("Repository must be a local Git worktree");
         Path root = workspaceRoot.toAbsolutePath().normalize();
         Path worktree = root.resolve(taskId).normalize();
         if (!worktree.startsWith(root)) throw new IllegalArgumentException("Worktree escapes runner workspace");
         if (!Files.exists(worktree)) throw new IllegalArgumentException("Task worktree does not exist");
         run(repository, List.of("git", "worktree", "remove", "--force", worktree.toString()));
+    }
+
+    /** Commits an already policy-validated worktree without invoking a shell. */
+    public String commit(Path worktree, String message) throws IOException, InterruptedException {
+        if (!Files.exists(worktree.resolve(".git")) || message == null || message.isBlank() || message.length() > 200) throw new IllegalArgumentException("Git commit request is invalid");
+        run(worktree, List.of("git", "add", "--all"));
+        run(worktree, List.of("git", "commit", "--no-verify", "-m", message));
+        return output(worktree, List.of("git", "rev-parse", "HEAD"));
     }
 
     private void run(Path repository, List<String> command) throws IOException, InterruptedException {
@@ -45,5 +53,11 @@ public final class GitWorktreeManager {
         if (!process.waitFor(COMMAND_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) { process.destroyForcibly(); throw new IllegalStateException("Git worktree command timed out"); }
         String output = new String(process.getInputStream().readNBytes(4096), java.nio.charset.StandardCharsets.UTF_8).strip();
         if (process.exitValue() != 0) throw new IllegalStateException("Git worktree command failed: " + output);
+    }
+    private String output(Path repository, List<String> command) throws IOException, InterruptedException {
+        List<String> safe = new ArrayList<>(List.of("git", "-c", "safe.directory=" + repository.toAbsolutePath().normalize())); safe.addAll(command.subList(1, command.size()));
+        Process process = new ProcessBuilder(safe).directory(repository.toFile()).redirectErrorStream(true).start();
+        if (!process.waitFor(COMMAND_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) { process.destroyForcibly(); throw new IllegalStateException("Git command timed out"); }
+        String value = new String(process.getInputStream().readNBytes(4096), java.nio.charset.StandardCharsets.UTF_8).strip(); if (process.exitValue() != 0) throw new IllegalStateException("Git command failed: " + value); return value;
     }
 }
