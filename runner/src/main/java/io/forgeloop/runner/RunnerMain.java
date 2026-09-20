@@ -3,6 +3,8 @@ package io.forgeloop.runner;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -24,6 +26,10 @@ public final class RunnerMain {
         }
         if (arguments.length > 0 && "prepare-worktree".equals(arguments[0])) {
             prepareWorktree(arguments);
+            return;
+        }
+        if (arguments.length > 0 && "verify".equals(arguments[0])) {
+            verify(arguments);
             return;
         }
         RunnerConfig config = configFrom(arguments);
@@ -64,6 +70,15 @@ public final class RunnerMain {
         if (arguments.length != 5) throw new IllegalArgumentException("Usage: prepare-worktree <repository-path> <base-ref> <task-id> <workspace-root>");
         Path worktree = new GitWorktreeManager().create(Path.of(arguments[1]), arguments[2], arguments[3], Path.of(arguments[4]));
         System.out.println("Task worktree prepared: " + worktree);
+    }
+
+    private static void verify(String[] arguments) throws Exception {
+        if (arguments.length < 4) throw new IllegalArgumentException("Usage: verify <worktree-path> <timeout-seconds> <command> [arguments...]");
+        long timeoutSeconds = Long.parseLong(arguments[2]);
+        VerificationResult result = new VerificationExecutor().execute(Path.of(arguments[1]), Arrays.asList(arguments).subList(3, arguments.length), Duration.ofSeconds(timeoutSeconds));
+        System.out.println(result.passed() ? "Verification passed." : "Verification failed or timed out.");
+        System.out.print(result.output());
+        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
     }
 
     private static Path statePath() {
