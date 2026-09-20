@@ -33,6 +33,12 @@ The runner only accepts a local Git repository and a task ID containing letters,
 prepare-worktree /repositories/ticketly main task-123 /worktrees
 ```
 
+After evidence is uploaded, remove only the matching task workspace:
+
+```sh
+remove-worktree /repositories/ticketly task-123 /worktrees
+```
+
 ## Verification
 
 Commands are executed directly, never through a shell. The worktree must have been prepared by Git and the timeout cannot exceed one hour.

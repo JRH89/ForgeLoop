@@ -44,6 +44,10 @@ public final class RunnerMain {
             prepareWorktree(arguments);
             return;
         }
+        if (arguments.length > 0 && "remove-worktree".equals(arguments[0])) {
+            removeWorktree(arguments);
+            return;
+        }
         if (arguments.length > 0 && "verify".equals(arguments[0])) {
             verify(arguments);
             return;
@@ -119,6 +123,12 @@ public final class RunnerMain {
         if (arguments.length != 5) throw new IllegalArgumentException("Usage: prepare-worktree <repository-path> <base-ref> <task-id> <workspace-root>");
         Path worktree = new GitWorktreeManager().create(Path.of(arguments[1]), arguments[2], arguments[3], Path.of(arguments[4]));
         System.out.println("Task worktree prepared: " + worktree);
+    }
+
+    private static void removeWorktree(String[] arguments) throws Exception {
+        if (arguments.length != 4) throw new IllegalArgumentException("Usage: remove-worktree <repository-path> <task-id> <workspace-root>");
+        new GitWorktreeManager().remove(Path.of(arguments[1]), arguments[2], Path.of(arguments[3]));
+        System.out.println("Task worktree removed.");
     }
 
     private static void verify(String[] arguments) throws Exception {
