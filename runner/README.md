@@ -29,7 +29,16 @@ The runner does not yet clone repositories, choose policy checks, execute coding
 
 ## Provider boundary
 
-The runner includes a tested provider-neutral contract and an OpenAI Responses API adapter. It reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. The adapter classifies `429` and `5xx` responses as retryable, treats all returned text as untrusted until a task-specific schema validates it, and requests `store: false`. It is intentionally not wired into task execution until the task-output schema, path policy, and repair flow are complete.
+The runner includes a tested provider-neutral contract plus OpenAI Responses and Anthropic Messages API adapters. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. Both classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a task-specific schema validates it. The adapters are intentionally not wired into task execution until the task-output schema, path policy, and repair flow are complete.
+
+After building the runner image, validate an Anthropic key from the same PowerShell window that contains `ANTHROPIC_API_KEY`:
+
+```powershell
+docker build -t forgeloop-runner:local runner
+docker run --rm -e ANTHROPIC_API_KEY forgeloop-runner:local provider-health anthropic <your-Claude-model-id>
+```
+
+The command performs one minimal API request, prints only request/usage metadata, and never prints the key or prompt response.
 
 ## Claim and prepare a dispatched task
 
