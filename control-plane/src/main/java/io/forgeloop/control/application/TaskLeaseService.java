@@ -52,8 +52,10 @@ public class TaskLeaseService {
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Evidence requires an active acknowledged lease");
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
-        return evidence.save(new VerificationEvidence(task, runner, submission.kind(), submission.image(), submission.command(),
+        VerificationEvidence recorded = evidence.save(new VerificationEvidence(task, runner, submission.kind(), submission.gate(), submission.image(), submission.command(),
                 submission.exitCode(), submission.timedOut(), submission.output()));
+        if (submission.gate() != null) task.getRun().recordGate(submission.gate(), !submission.timedOut() && submission.exitCode() == 0);
+        return recorded;
     }
 
     private TaskLease validatedLease(String leaseId, String runnerId, String nonce) {

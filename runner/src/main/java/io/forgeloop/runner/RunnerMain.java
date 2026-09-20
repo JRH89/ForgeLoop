@@ -60,6 +60,10 @@ public final class RunnerMain {
             verifyContainerAndRecord(arguments);
             return;
         }
+        if (arguments.length > 0 && "verify-container-gate-and-record".equals(arguments[0])) {
+            verifyContainerGateAndRecord(arguments);
+            return;
+        }
         RunnerConfig config = configFrom(arguments);
         RunnerIdentity identity = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
         Path statePath = statePath();
@@ -188,8 +192,31 @@ public final class RunnerMain {
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
         RunnerLease lease = new RunnerLeaseStore().load(Path.of(arguments[3]));
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).recordEvidence(identity, lease,
-                new VerificationEvidenceReport("CONTAINER", arguments[7], String.join(" ", command), result));
+                new VerificationEvidenceReport("CONTAINER", null, arguments[7], String.join(" ", command), result));
         System.out.println(result.passed() ? "Container verification recorded as passed." : "Container verification recorded as failed.");
+        System.out.print(result.output());
+        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
+    }
+
+    /** Runs a named required gate and lets the control plane update its run-level state from the signed lease report. */
+    private static void verifyContainerGateAndRecord(String[] arguments) throws Exception {
+        if (arguments.length < 11) {
+            throw new IllegalArgumentException("Usage: verify-container-gate-and-record <control-plane-url> <identity-file> <lease-file> <gate> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
+        }
+        boolean allowNetwork = switch (arguments[7]) {
+            case "none" -> false;
+            case "allow" -> true;
+            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
+        };
+        Path worktree = Path.of(arguments[5]);
+        List<String> command = Arrays.asList(arguments).subList(9, arguments.length);
+        VerificationResult result = new ContainerVerificationExecutor().execute(
+                worktree, dockerVisibleWorktree(worktree), arguments[8], command, Duration.ofSeconds(Long.parseLong(arguments[6])), allowNetwork);
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerLease lease = new RunnerLeaseStore().load(Path.of(arguments[3]));
+        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).recordEvidence(identity, lease,
+                new VerificationEvidenceReport("CONTAINER", arguments[4], arguments[8], String.join(" ", command), result));
+        System.out.println(result.passed() ? "Verification gate recorded as passed." : "Verification gate recorded as failed.");
         System.out.print(result.output());
         if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
     }

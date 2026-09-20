@@ -38,7 +38,7 @@ public final class RunnerClient {
         VerificationResult result = report.result();
         String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
                 + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
-                + "\",\"input\":{\"kind\":\"" + escape(report.kind()) + "\",\"image\":" + nullable(report.image())
+                + "\",\"input\":{\"kind\":\"" + escape(report.kind()) + "\",\"gate\":" + nullable(report.gate()) + ",\"image\":" + nullable(report.image())
                 + ",\"command\":\"" + escape(report.command()) + "\",\"exitCode\":" + result.exitCode()
                 + ",\"timedOut\":" + result.timedOut() + ",\"output\":\"" + escape(result.output()) + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);

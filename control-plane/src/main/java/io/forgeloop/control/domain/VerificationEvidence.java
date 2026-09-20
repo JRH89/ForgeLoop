@@ -18,6 +18,7 @@ public class VerificationEvidence {
     @ManyToOne(optional = false) private DeliveryTask task;
     @ManyToOne(optional = false) private Runner runner;
     @Column(nullable = false, length = 80) private String kind;
+    @Column(length = 120) private String gate;
     @Column(length = 255) private String image;
     @Column(nullable = false, length = 4000) private String command;
     private int exitCode;
@@ -28,16 +29,16 @@ public class VerificationEvidence {
 
     protected VerificationEvidence() { }
 
-    public VerificationEvidence(DeliveryTask task, Runner runner, String kind, String image, String command,
+    public VerificationEvidence(DeliveryTask task, Runner runner, String kind, String gate, String image, String command,
                                 int exitCode, boolean timedOut, String output) {
-        this.task = task; this.runner = runner; this.kind = kind; this.image = image; this.command = command;
+        this.task = task; this.runner = runner; this.kind = kind; this.gate = gate; this.image = image; this.command = command;
         this.exitCode = exitCode; this.timedOut = timedOut; this.output = output; this.recordedAt = Instant.now();
-        this.digest = digest(kind, image, command, exitCode, timedOut, output);
+        this.digest = digest(kind, gate, image, command, exitCode, timedOut, output);
     }
 
-    private String digest(String kind, String image, String command, int exitCode, boolean timedOut, String output) {
+    private String digest(String kind, String gate, String image, String command, int exitCode, boolean timedOut, String output) {
         try {
-            String material = String.join("\u0000", kind, image == null ? "" : image, command,
+            String material = String.join("\u0000", kind, gate == null ? "" : gate, image == null ? "" : image, command,
                     Integer.toString(exitCode), Boolean.toString(timedOut), output);
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(material.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception exception) { throw new IllegalStateException("SHA-256 unavailable", exception); }
@@ -45,6 +46,7 @@ public class VerificationEvidence {
 
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public String getRunnerId() { return runner.getId(); } public String getKind() { return kind; }
+    public String getGate() { return gate; }
     public String getImage() { return image; } public String getCommand() { return command; }
     public int getExitCode() { return exitCode; } public boolean isTimedOut() { return timedOut; }
     public String getOutput() { return output; } public String getDigest() { return digest; }

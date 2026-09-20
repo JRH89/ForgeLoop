@@ -1,0 +1,1 @@
+ALTER TABLE verification_evidence ADD COLUMN IF NOT EXISTS gate VARCHAR(120);

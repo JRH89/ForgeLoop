@@ -37,21 +37,21 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
 - [x] Disposable, read-only Docker verification executor with task worktree mounts, bounded output and timeouts, and deny-by-default network isolation. Docker socket access remains an explicit runner-operator capability.
-- [x] Authenticated, lease-bound persistence of bounded verification evidence with a control-plane-generated integrity digest.
+- [x] Authenticated, lease-bound persistence of bounded verification evidence with a control-plane-generated integrity digest and optional required-gate attribution.
 - [ ] Git clone, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
 
 ### Evidence and repository delivery
 
-- [x] Lease-bound container verification can execute and report result evidence through the runner CLI; policy selection and browser/security gates remain outstanding.
-- [ ] Immutable evidence bundles and a gate-enforced `READY_FOR_REVIEW` transition.
+- [x] Lease-bound container verification can execute and report named-gate evidence through the runner CLI; passing all required gates transitions a run to `READY_FOR_REVIEW`, while a failed gate blocks it.
+- [ ] Immutable evidence bundles, policy-selected gate orchestration, browser/security gates, and acceptance-criterion evidence.
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
 - [ ] GitHub App callback/repository synchronization, branch creation, check runs, draft PR creation, and reconciliation.
 - [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
 
 ### Current capability boundary
 
-ForgeLoop can persist and display policy-bound delivery runs and repository connections. It **cannot yet execute an issue against a repository, call a model, run tests, or create a pull request**; those capabilities remain unchecked until the runner and GitHub delivery paths are implemented and verified.
+ForgeLoop can persist and display policy-bound delivery runs and repository connections, and a self-hosted runner can execute an operator-selected container verification command and record its named gate. It **cannot yet autonomously execute a GitHub issue against a repository, call a model, select the required verification commands, or create a pull request**; those capabilities remain unchecked until the runner orchestration and GitHub delivery paths are implemented and verified.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 

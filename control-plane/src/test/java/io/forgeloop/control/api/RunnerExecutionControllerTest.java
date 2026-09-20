@@ -33,7 +33,7 @@ class RunnerExecutionControllerTest {
 
     @Test
     void authenticatesRunnerBeforeRecordingEvidence() {
-        VerificationEvidenceSubmission report = new VerificationEvidenceSubmission("CONTAINER", "node:22-alpine", "node --version", 0, false, "ok");
+        VerificationEvidenceSubmission report = new VerificationEvidenceSubmission("CONTAINER", "unit", "node:22-alpine", "node --version", 0, false, "ok");
 
         controller.recordVerificationEvidence("lease-1", "runner-1", "nonce", "runner-credential", report);
 
