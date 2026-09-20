@@ -26,6 +26,7 @@ public class FeatureRunService {
     return runs.save(run);
   }
   @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); task.transition(state); return task; }
+  @Transactional public FeatureRun recordGate(String runId, String gate, boolean passed) { FeatureRun run = get(runId); run.recordGate(gate, passed); return run; }
   public FeatureRun get(String id) { return runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); }
   public List<FeatureRun> list() { return runs.findAll(); }
 }
