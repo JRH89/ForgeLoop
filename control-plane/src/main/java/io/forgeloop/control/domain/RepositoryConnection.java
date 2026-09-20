@@ -30,6 +30,7 @@ public class RepositoryConnection {
     this.harnessProfile = harnessProfile; this.requiredGates = String.join(",", requiredGates); this.maxBudgetUsd = maxBudgetUsd; this.enabled = true; this.policyRevision = 1;
   }
   public boolean acceptsIssueLabel(String label) { return enabled && issueLabel.equals(label); }
+  public boolean isInstalledAs(long candidateInstallationId) { return installationId == candidateInstallationId; }
   public boolean permitsBudget(double requestedBudgetUsd) { return enabled && requestedBudgetUsd <= maxBudgetUsd; }
   public void disable() { enabled = false; }
   public String getId() { return id; } public String getRepository() { return repository; } public long getInstallationId() { return installationId; }

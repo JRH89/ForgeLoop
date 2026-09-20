@@ -25,9 +25,10 @@ class GithubWebhookControllerTest {
     private final GithubDeliveryRepository deliveries = Mockito.mock(GithubDeliveryRepository.class);
     private final FeatureRunService runs = Mockito.mock(FeatureRunService.class);
     private final RepositoryConnectionRepository connections = Mockito.mock(RepositoryConnectionRepository.class);
+    private final GithubInstallationRepositorySyncService installations = Mockito.mock(GithubInstallationRepositorySyncService.class);
     private final String secret = "webhook-test-secret";
     private final GithubWebhookController controller = new GithubWebhookController(
-            new GithubWebhookVerifier(), deliveries, runs, connections, new ObjectMapper(), secret);
+            new GithubWebhookVerifier(), deliveries, runs, connections, installations, new ObjectMapper(), secret);
 
     @Test
     void createsRunOnlyForNewSignedLabeledIssue() throws Exception {
@@ -53,6 +54,19 @@ class GithubWebhookControllerTest {
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         verify(deliveries, never()).save(any());
         verify(runs, never()).submit(any());
+    }
+
+    @Test
+    void synchronizesRepositoriesFromSignedInstallationDelivery() throws Exception {
+        String body = """
+                {"action":"added","installation":{"id":7},"repositories_added":[{"full_name":"JRH89/Ticketly","default_branch":"master"}]}
+                """;
+        when(deliveries.existsByDeliveryId("delivery-install")).thenReturn(false);
+
+        ResponseEntity<Void> response = controller.receive("delivery-install", "installation_repositories", signature(body), body);
+
+        assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
+        verify(installations).synchronizeAddedRepositories(any());
     }
 
     private String signature(String body) throws Exception {
