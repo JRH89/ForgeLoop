@@ -31,4 +31,12 @@ public class OperatorContext {
     public void requireOrganization(String organizationId) {
         if (!organizationId().equals(organizationId)) throw new AccessDeniedException("Cross-organization access is forbidden");
     }
+    /** Administrative control-plane actions require a role minted by the OIDC provider, never a client argument. */
+    public void requireAdministrator() {
+        if ("development".equals(mode)) return;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities().stream().noneMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()))) {
+            throw new AccessDeniedException("Organization administrator role is required");
+        }
+    }
 }
