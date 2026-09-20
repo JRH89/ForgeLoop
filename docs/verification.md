@@ -21,3 +21,9 @@ verify-container-gate-and-record <control-plane-url> <identity-file> <lease-file
 ```
 
 The control plane records the command evidence before deriving the gate result from the bounded container outcome. Exit code `0` without a timeout passes the named gate; every other result fails it. A failed gate blocks the owning run. A run reaches `READY_FOR_REVIEW` only after every required gate has passed. Gate names must already be present in the run policy; arbitrary runner-supplied names are rejected. This is a reporting primitive, not policy orchestration: the control plane does not yet select commands or automatically dispatch those gates.
+
+For local retention before an upload integration is configured, the runner can produce an atomic JSON artifact plus SHA-256 manifest without sending repository source or runner credentials off-host:
+
+```text
+verify-container-and-bundle <bundle-directory> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]
+```
