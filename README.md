@@ -50,8 +50,11 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Local runner writes atomic JSON verification evidence with SHA-256 manifests for off-host upload or retention.
 - [ ] Immutable object-store evidence bundles, policy-selected gate orchestration, browser/security gates, and acceptance-criterion evidence.
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
+- [x] Signed, short-lived GitHub App callback state binds an installation to the initiating ForgeLoop organization before repository synchronization.
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
-- [ ] GitHub App callback confirmation, installation-token exchange, branch creation, check runs, draft PR creation, and reconciliation.
+- [x] GitHub App JWT signing, short-lived installation-token exchange, idempotent branch/file/check-run/draft-PR delivery records, and transient GitHub API retry handling.
+- [x] Live GitHub App credential validation, installation-token repository discovery, installation reconciliation, and signed GitHub Issue intake verified against the separate Ticketly repository.
+- [ ] Runner-produced verified changes wired into GitHub delivery, including a live draft-PR/check-run proof.
 - [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
 
 ### Current capability boundary

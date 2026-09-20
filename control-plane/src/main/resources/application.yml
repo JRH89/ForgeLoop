@@ -24,6 +24,10 @@ forgeloop:
   github:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
     app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"
+    app-id: "${FORGELOOP_GITHUB_APP_ID:}"
+    private-key: "${FORGELOOP_GITHUB_PRIVATE_KEY:}"
+    installation-state-secret: "${FORGELOOP_GITHUB_INSTALLATION_STATE_SECRET:}"
+    api-url: "${FORGELOOP_GITHUB_API_URL:https://api.github.com}"
     default-policy:
       organization-id: "${FORGELOOP_GITHUB_DEFAULT_ORGANIZATION_ID:local-development}"
       issue-label: "${FORGELOOP_GITHUB_DEFAULT_ISSUE_LABEL:forgeloop}"

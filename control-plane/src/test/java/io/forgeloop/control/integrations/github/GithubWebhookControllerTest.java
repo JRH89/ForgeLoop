@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.forgeloop.control.application.FeatureRunService;
 import io.forgeloop.control.domain.GithubDeliveryRepository;
+import io.forgeloop.control.domain.GithubInstallationRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
 import java.nio.charset.StandardCharsets;
@@ -25,10 +26,11 @@ class GithubWebhookControllerTest {
     private final GithubDeliveryRepository deliveries = Mockito.mock(GithubDeliveryRepository.class);
     private final FeatureRunService runs = Mockito.mock(FeatureRunService.class);
     private final RepositoryConnectionRepository connections = Mockito.mock(RepositoryConnectionRepository.class);
+    private final GithubInstallationRepository installationOwners = Mockito.mock(GithubInstallationRepository.class);
     private final GithubInstallationRepositorySyncService installations = Mockito.mock(GithubInstallationRepositorySyncService.class);
     private final String secret = "webhook-test-secret";
     private final GithubWebhookController controller = new GithubWebhookController(
-            new GithubWebhookVerifier(), deliveries, runs, connections, installations, new ObjectMapper(), secret);
+            new GithubWebhookVerifier(), deliveries, runs, connections, installationOwners, installations, new ObjectMapper(), secret);
 
     @Test
     void createsRunOnlyForNewSignedLabeledIssue() throws Exception {
@@ -67,6 +69,16 @@ class GithubWebhookControllerTest {
 
         assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
         verify(installations).synchronizeAddedRepositories(any());
+    }
+
+    @Test
+    void defersInitialInstallationSyncUntilTheSignedCallbackOwnsIt() throws Exception {
+        String body = "{\"action\":\"created\",\"installation\":{\"id\":7}}";
+        when(deliveries.existsByDeliveryId("delivery-created")).thenReturn(false);
+        when(installationOwners.findByInstallationId(7L)).thenReturn(java.util.Optional.empty());
+
+        assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-created", "installation", signature(body), body).getStatusCode());
+        verify(installations, never()).synchronizeInstallation(7L);
     }
 
     private String signature(String body) throws Exception {

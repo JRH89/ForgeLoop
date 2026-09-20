@@ -4,11 +4,11 @@ This is the execution plan for the production product, not a demo plan. A slice 
 
 ## Current position
 
-ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signed GitHub webhook intake, installed-repository synchronization, runner registration/leases, isolated container verification, named gate state transitions, local checksummed evidence bundles, a basic operator console, persisted tenant roles, OIDC issuer/audience enforcement outside explicit development mode, production configuration validation, and tenant-scoped digest-only control-plane audit events.
+ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signed GitHub webhook intake, installed-repository synchronization, live GitHub App JWT and installation-token validation, runner registration/leases, isolated container verification, named gate state transitions, local checksummed evidence bundles, a basic operator console, persisted tenant roles, OIDC issuer/audience enforcement outside explicit development mode, production configuration validation, and tenant-scoped digest-only control-plane audit events.
 
 Ticketly is now a separate support SaaS repository. It has no ForgeLoop delivery dashboard, fabricated agent runs, fabricated cost data, or fabricated verification data. It remains the primary target application for the eventual real GitHub issue-to-PR validation.
 
-The product does **not** yet autonomously plan or modify repositories, invoke a model, create a branch/PR/check run, select and dispatch policy commands, persist object-store artifacts, enforce organizations/RBAC, or complete an end-to-end issue-to-PR loop. These are the critical path.
+The product does **not** yet autonomously plan or modify repositories, invoke a model, create a branch/PR/check run from runner-produced work, select and dispatch policy commands, persist object-store artifacts, or complete an end-to-end issue-to-PR loop. These are the critical path.
 
 ## Slice 1 — Multi-tenant security and auditable operations — complete
 
@@ -35,6 +35,8 @@ Turn intake into a usable repository-delivery integration.
 - Add GitHub API fake/contract tests for retries, duplicate deliveries, failed writes, and reconciliation.
 
 Exit criteria: a signed issue event creates exactly one run, a synthetic completed change produces exactly one draft PR/check run, and all GitHub identifiers are persisted and reconciled.
+
+Progress evidence: the Ticketly GitHub App installation has been authenticated with a real App JWT and installation token, synchronized from GitHub, and a signed `issues` webhook created Ticketly issue run `issue-1`. The remaining exit criterion depends on Slice 3 producing a verified change for the existing idempotent GitHub delivery adapter.
 
 ## Slice 3 — Runner execution lifecycle
 

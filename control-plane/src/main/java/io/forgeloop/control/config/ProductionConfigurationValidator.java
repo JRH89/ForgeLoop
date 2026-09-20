@@ -16,6 +16,9 @@ public class ProductionConfigurationValidator implements SmartInitializingSingle
     private final String ddlAuto;
     private final String artifactStorageUri;
     private final String encryptionKey;
+    private final String githubAppId;
+    private final String githubPrivateKey;
+    private final String installationStateSecret;
 
     public ProductionConfigurationValidator(@Value("${forgeloop.security.mode:production}") String mode,
                                             @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}") String issuerUri,
@@ -24,8 +27,11 @@ public class ProductionConfigurationValidator implements SmartInitializingSingle
                                             @Value("${spring.datasource.url:}") String datasourceUrl,
                                             @Value("${spring.jpa.hibernate.ddl-auto:validate}") String ddlAuto,
                                             @Value("${forgeloop.artifacts.storage-uri:}") String artifactStorageUri,
-                                            @Value("${forgeloop.security.encryption-key:}") String encryptionKey) {
-        this.mode = mode; this.issuerUri = issuerUri; this.audience = audience; this.webhookSecret = webhookSecret; this.datasourceUrl = datasourceUrl; this.ddlAuto = ddlAuto; this.artifactStorageUri = artifactStorageUri; this.encryptionKey = encryptionKey;
+                                            @Value("${forgeloop.security.encryption-key:}") String encryptionKey,
+                                            @Value("${forgeloop.github.app-id:}") String githubAppId,
+                                            @Value("${forgeloop.github.private-key:}") String githubPrivateKey,
+                                            @Value("${forgeloop.github.installation-state-secret:}") String installationStateSecret) {
+        this.mode = mode; this.issuerUri = issuerUri; this.audience = audience; this.webhookSecret = webhookSecret; this.datasourceUrl = datasourceUrl; this.ddlAuto = ddlAuto; this.artifactStorageUri = artifactStorageUri; this.encryptionKey = encryptionKey; this.githubAppId = githubAppId; this.githubPrivateKey = githubPrivateKey; this.installationStateSecret = installationStateSecret;
     }
     @Override public void afterSingletonsInstantiated() { if ("production".equals(mode)) validate(); }
     void validate() {
@@ -37,6 +43,8 @@ public class ProductionConfigurationValidator implements SmartInitializingSingle
         if (!"validate".equals(ddlAuto)) missing.add("SPRING_JPA_DDL_AUTO=validate");
         if (artifactStorageUri.isBlank() || !(artifactStorageUri.startsWith("s3://") || artifactStorageUri.startsWith("gs://") || artifactStorageUri.startsWith("azure://"))) missing.add("FORGELOOP_ARTIFACT_STORAGE_URI");
         if (encryptionKey.length() < 32) missing.add("FORGELOOP_ENCRYPTION_KEY (minimum 32 characters)");
+        if (githubAppId.isBlank() || githubPrivateKey.isBlank()) missing.add("GitHub App ID and private key");
+        if (installationStateSecret.length() < 32) missing.add("FORGELOOP_GITHUB_INSTALLATION_STATE_SECRET (minimum 32 characters)");
         if (!missing.isEmpty()) throw new IllegalStateException("Production configuration is incomplete: " + String.join(", ", missing));
     }
 }

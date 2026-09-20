@@ -34,6 +34,8 @@ public class RepositoryConnection {
   public boolean belongsTo(String candidateOrganizationId) { return organizationId.equals(candidateOrganizationId); }
   public boolean acceptsIssueLabel(String label) { return enabled && issueLabel.equals(label); }
   public boolean isInstalledAs(long candidateInstallationId) { return installationId == candidateInstallationId; }
+  /** Rebinds a pre-existing policy to its verified GitHub App installation without changing the policy itself. */
+  public void reconcileInstallation(long verifiedInstallationId) { if (verifiedInstallationId <= 0) throw new IllegalArgumentException("GitHub installation id must be positive"); installationId = verifiedInstallationId; }
   public boolean permitsBudget(double requestedBudgetUsd) { return enabled && requestedBudgetUsd <= maxBudgetUsd; }
   public void disable() { enabled = false; }
   public String getId() { return id; } public String getOrganizationId() { return organizationId; } public String getRepository() { return repository; } public long getInstallationId() { return installationId; }
