@@ -29,7 +29,8 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, and nonce-backed lease acknowledgement; it does not yet discover, clone, or execute leased work.
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
-- [ ] Git clone, isolated containers, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
+- [x] Disposable, read-only Docker verification executor with task worktree mounts, bounded output and timeouts, and deny-by-default network isolation. Docker socket access remains an explicit runner-operator capability.
+- [ ] Git clone, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
 
 ### Evidence and repository delivery

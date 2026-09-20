@@ -5,7 +5,9 @@ RUN wget -q https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3
 COPY src src
 RUN /opt/apache-maven-3.9.12/bin/mvn -q test package
 FROM eclipse-temurin:21-jre-alpine
-RUN apk add --no-cache git && addgroup -S forgeloop && adduser -S forgeloop -G forgeloop
+# The Docker CLI is used only for policy-selected disposable verification containers.
+# Operators must explicitly mount a daemon socket when enabling this capability.
+RUN apk add --no-cache docker-cli git && addgroup -S forgeloop && adduser -S forgeloop -G forgeloop
 WORKDIR /app
 COPY --from=build /app/target/runner-0.1.0.jar runner.jar
 RUN mkdir /state && chown forgeloop:forgeloop /state
