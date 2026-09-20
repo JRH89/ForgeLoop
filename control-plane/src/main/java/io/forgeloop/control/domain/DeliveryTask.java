@@ -33,6 +33,7 @@ public class DeliveryTask {
     }
 
     public String getId() { return id; } public String getRole() { return role; } public String getTitle() { return title; }
+    public FeatureRun getRun() { return run; }
     public String getRequiredCapability() { return requiredCapability; } public TaskState getState() { return state; }
     public int getAttemptBudget() { return attemptBudget; } public int getAttempts() { return attempts; }
 }
