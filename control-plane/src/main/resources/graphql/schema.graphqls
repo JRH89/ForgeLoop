@@ -12,7 +12,7 @@ type Runner { id: ID!, organizationId: String!, name: String!, version: String!,
 type RunnerEnrollment { runner: Runner!, credential: String! }
 type TaskLease { id: ID!, taskId: ID!, runnerId: ID!, expiresAt: String!, acknowledged: Boolean!, completed: Boolean! }
 type LeaseGrant { lease: TaskLease!, nonce: String! }
-type Task { id: ID!, role: String!, title: String!, state: TaskState!, attemptBudget: Int!, attempts: Int! }
+type Task { id: ID!, role: String!, title: String!, requiredCapability: String!, state: TaskState!, attemptBudget: Int!, attempts: Int! }
 type VerificationGate { id: ID!, name: String!, required: Boolean!, state: String! }
 type AcceptanceCriterion { id: ID!, statement: String!, coverageState: String! }
 type VerificationEvidence { id: ID!, taskId: ID!, runnerId: ID!, kind: String!, image: String, command: String!, exitCode: Int!, timedOut: Boolean!, output: String!, digest: String!, recordedAt: String! }

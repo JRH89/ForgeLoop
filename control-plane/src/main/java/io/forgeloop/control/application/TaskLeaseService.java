@@ -28,6 +28,7 @@ public class TaskLeaseService {
         DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
         if (!runner.isEnabled()) throw new IllegalStateException("Runner is disabled");
+        if (!runner.hasCapability(task.getRequiredCapability())) throw new IllegalStateException("Runner lacks the task capability");
         if (task.getState() != TaskState.PENDING && task.getState() != TaskState.REPAIR_QUEUED) throw new IllegalStateException("Task is not claimable");
         TaskLease existing = leases.findByTask_Id(taskId).orElse(null);
         if (existing != null && existing.active()) throw new IllegalStateException("Task already has an active lease");

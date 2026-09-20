@@ -18,7 +18,9 @@ public class FeatureRunService {
     RepositoryConnection connection = connections.requireEnabled(input.repository());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
     FeatureRun run = new FeatureRun(input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getPolicyRevision());
-    run.addTask("PLANNER", "Derive acceptance criteria and task DAG"); run.addTask("IMPLEMENTATION", "Implement scoped repository changes"); run.addTask("INDEPENDENT_TEST", "Derive independent verification from acceptance criteria");
+    run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
+    run.addTask("IMPLEMENTATION", "Implement scoped repository changes", "provider");
+    run.addTask("INDEPENDENT_TEST", "Derive independent verification from acceptance criteria", "docker");
     for (String gate : connection.getRequiredGates()) run.addGate(gate);
     input.specification().lines().filter(line -> line.strip().startsWith("- ")).map(line -> line.strip().substring(2)).forEach(run::addCriterion);
     return runs.save(run);

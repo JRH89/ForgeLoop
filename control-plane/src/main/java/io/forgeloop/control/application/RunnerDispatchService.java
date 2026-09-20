@@ -3,6 +3,7 @@ package io.forgeloop.control.application;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.DeliveryTaskRepository;
 import io.forgeloop.control.domain.TaskState;
+import io.forgeloop.control.domain.Runner;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +14,9 @@ public class RunnerDispatchService {
 
     public RunnerDispatchService(DeliveryTaskRepository tasks) { this.tasks = tasks; }
 
-    public List<DeliveryTask> available() {
-        return tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED));
+    public List<DeliveryTask> available(Runner runner) {
+        return tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED)).stream()
+                .filter(task -> runner.hasCapability(task.getRequiredCapability()))
+                .toList();
     }
 }
