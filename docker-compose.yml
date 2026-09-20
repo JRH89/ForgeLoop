@@ -18,6 +18,8 @@ services:
       SPRING_DATASOURCE_USERNAME: forgeloop
       SPRING_DATASOURCE_PASSWORD: forgeloop
       SPRING_JPA_DDL_AUTO: update
+      FORGELOOP_GITHUB_APP_SLUG: ${FORGELOOP_GITHUB_APP_SLUG:-}
+      FORGELOOP_GITHUB_WEBHOOK_SECRET: ${FORGELOOP_GITHUB_WEBHOOK_SECRET:-}
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
