@@ -24,12 +24,20 @@ public final class RunnerMain {
             availableTasks(arguments);
             return;
         }
+        if (arguments.length > 0 && "claim-task".equals(arguments[0])) {
+            claimTask(arguments);
+            return;
+        }
         if (arguments.length > 0 && "acknowledge-lease".equals(arguments[0])) {
             acknowledgeLease(arguments);
             return;
         }
         if (arguments.length > 0 && "complete-lease".equals(arguments[0])) {
             completeLease(arguments);
+            return;
+        }
+        if (arguments.length > 0 && "acknowledge-claimed-lease".equals(arguments[0])) {
+            acknowledgeClaimedLease(arguments);
             return;
         }
         if (arguments.length > 0 && "prepare-worktree".equals(arguments[0])) {
@@ -73,6 +81,14 @@ public final class RunnerMain {
         System.out.println(new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).availableTasks(identity));
     }
 
+    private static void claimTask(String[] arguments) throws Exception {
+        if (arguments.length != 5) throw new IllegalArgumentException("Usage: claim-task <control-plane-url> <identity-file> <task-id> <lease-file>");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerLease lease = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).claimTask(identity, arguments[3]);
+        new RunnerLeaseStore().save(Path.of(arguments[4]), lease);
+        System.out.println("Task lease claimed: " + lease.leaseId());
+    }
+
     private static void acknowledgeLease(String[] arguments) throws Exception {
         if (arguments.length != 5) throw new IllegalArgumentException("Usage: acknowledge-lease <control-plane-url> <state-file> <lease-id> <nonce>");
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
@@ -89,6 +105,14 @@ public final class RunnerMain {
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).completeLease(identity, arguments[3], arguments[4], passed);
         System.out.println("Task lease completion accepted.");
+    }
+
+    private static void acknowledgeClaimedLease(String[] arguments) throws Exception {
+        if (arguments.length != 4) throw new IllegalArgumentException("Usage: acknowledge-claimed-lease <control-plane-url> <identity-file> <lease-file>");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerLease lease = new RunnerLeaseStore().load(Path.of(arguments[3]));
+        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        System.out.println("Task lease acknowledged.");
     }
 
     private static void prepareWorktree(String[] arguments) throws Exception {

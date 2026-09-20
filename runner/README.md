@@ -10,6 +10,7 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Acknowledges a leased task with both the local runner credential and the one-time lease nonce.
 * Completes an acknowledged lease with a verified pass/fail result.
 * Retrieves authenticated pending task metadata before a runner attempts a lease claim.
+* Claims a task and keeps the lease nonce in a local state file rather than printing it.
 * Provides a guarded Git worktree manager for task-scoped repository isolation.
 * Runs policy-selected verification commands directly (never through a shell) with a one-hour maximum timeout and bounded output.
 * Runs as a non-root container image.
