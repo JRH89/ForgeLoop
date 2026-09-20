@@ -44,6 +44,10 @@ public final class RunnerMain {
             prepareWorktree(arguments);
             return;
         }
+        if (arguments.length > 0 && "claim-and-prepare-task".equals(arguments[0])) {
+            claimAndPrepareTask(arguments);
+            return;
+        }
         if (arguments.length > 0 && "remove-worktree".equals(arguments[0])) {
             removeWorktree(arguments);
             return;
@@ -98,7 +102,9 @@ public final class RunnerMain {
     private static void availableTasks(String[] arguments) throws Exception {
         if (arguments.length != 3) throw new IllegalArgumentException("Usage: available-tasks <control-plane-url> <state-file>");
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
-        System.out.println(new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).availableTasks(identity));
+        for (RunnerTask task : new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).availableTasks(identity)) {
+            System.out.println(task.id() + " " + task.role() + " " + task.repository() + "@" + task.baseBranch());
+        }
     }
 
     private static void claimTask(String[] arguments) throws Exception {
@@ -139,6 +145,28 @@ public final class RunnerMain {
         if (arguments.length != 5) throw new IllegalArgumentException("Usage: prepare-worktree <repository-path> <base-ref> <task-id> <workspace-root>");
         Path worktree = new GitWorktreeManager().create(Path.of(arguments[1]), arguments[2], arguments[3], Path.of(arguments[4]));
         System.out.println("Task worktree prepared: " + worktree);
+    }
+
+    /** Claims exactly one server-advertised task, then creates its isolated worktree from a pre-cloned local checkout. */
+    private static void claimAndPrepareTask(String[] arguments) throws Exception {
+        if (arguments.length != 7) {
+            throw new IllegalArgumentException("Usage: claim-and-prepare-task <control-plane-url> <identity-file> <task-id> <lease-file> <repositories-root> <workspace-root>");
+        }
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
+        RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
+        RunnerLease lease = client.claimTask(identity, task.id());
+        try {
+            Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(arguments[5]), task.repository());
+            Path worktree = new GitWorktreeManager().create(repository, task.baseBranch(), task.id(), Path.of(arguments[6]));
+            new RunnerLeaseStore().save(Path.of(arguments[4]), lease);
+            client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+            System.out.println("Task worktree prepared: " + worktree);
+        } catch (Exception exception) {
+            // No nonce is persisted on failure; the control plane will safely expire and repair/requeue the lease.
+            throw exception;
+        }
     }
 
     private static void removeWorktree(String[] arguments) throws Exception {

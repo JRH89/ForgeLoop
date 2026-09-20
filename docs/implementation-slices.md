@@ -49,6 +49,8 @@ Make the self-hosted runner safely execute assigned work, not merely verify an o
 
 Exit criteria: two runners claim distinct compatible tasks, a killed runner is recovered safely, worktrees are cleaned, and artifacts verify before the control plane accepts results.
 
+Implementation progress: dispatch now gives authenticated runners structured, policy-derived repository, base-branch, source-reference, and capability context. The runner can claim one eligible task and prepare an isolated detached worktree from only a pre-cloned checkout beneath its configured repository root. Automatic provider execution, policy-selected commands, and lifecycle reconciliation remain in progress.
+
 ## Slice 4 — Provider contracts and guarded agent workers
 
 Implement real coding-agent execution as a replaceable, runner-local capability.

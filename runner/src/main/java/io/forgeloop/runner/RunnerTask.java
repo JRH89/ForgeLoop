@@ -1,0 +1,12 @@
+package io.forgeloop.runner;
+
+/** Immutable, server-derived work context a runner needs before it can safely prepare a worktree. */
+public record RunnerTask(String id, String role, String title, String repository, String baseBranch,
+                         String sourceRef, String requiredCapability) {
+    public RunnerTask {
+        if (id == null || id.isBlank() || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+                || baseBranch == null || baseBranch.isBlank() || requiredCapability == null || requiredCapability.isBlank()) {
+            throw new IllegalArgumentException("Runner task context is incomplete");
+        }
+    }
+}
