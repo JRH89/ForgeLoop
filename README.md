@@ -33,7 +33,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Runner credential required to claim or acknowledge a task lease, in addition to the lease's one-time nonce.
 - [x] Exact capability matching for runner discovery and server-side task-claim enforcement.
 - [x] Scheduled lease-expiry recovery into the bounded repair queue.
-- [ ] Operator cancellation.
+- [x] Operator cancellation holds non-terminal tasks, records an audit event, and is exposed in the operator console.
 - [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, and nonce-backed lease acknowledgement; it does not yet discover, clone, or execute leased work.
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
@@ -45,7 +45,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 ### Evidence and repository delivery
 
 - [x] Lease-bound container verification can execute and report named-gate evidence through the runner CLI; passing all required gates transitions a run to `READY_FOR_REVIEW`, while a failed gate blocks it.
-- [ ] Immutable evidence bundles, policy-selected gate orchestration, browser/security gates, and acceptance-criterion evidence.
+- [x] Local runner writes atomic JSON verification evidence with SHA-256 manifests for off-host upload or retention.
+- [ ] Immutable object-store evidence bundles, policy-selected gate orchestration, browser/security gates, and acceptance-criterion evidence.
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
 - [ ] GitHub App callback confirmation, installation-token exchange, branch creation, check runs, draft PR creation, and reconciliation.
