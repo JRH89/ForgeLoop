@@ -18,7 +18,7 @@ public class FeatureRunService {
     if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
     RepositoryConnection connection = connections.requireEnabled(input.repository());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
-    FeatureRun run = new FeatureRun(input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getPolicyRevision());
+    FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getPolicyRevision());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
     run.addTask("IMPLEMENTATION", "Implement scoped repository changes", "provider");
     run.addTask("INDEPENDENT_TEST", "Derive independent verification from acceptance criteria", "docker");
@@ -31,6 +31,6 @@ public class FeatureRunService {
   @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
   @Transactional public FeatureRun recordGate(String runId, String gate, boolean passed) { FeatureRun run = get(runId); run.recordGate(gate, passed); audit.record("VERIFICATION_GATE_RECORDED", "FEATURE_RUN", runId, gate + "|" + passed); return run; }
   @Transactional public FeatureRun cancel(String runId) { FeatureRun run = get(runId); run.cancel(); audit.record("FEATURE_RUN_CANCELLED", "FEATURE_RUN", runId, run.getState().name()); return run; }
-  public FeatureRun get(String id) { return runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); }
-  public List<FeatureRun> list() { return runs.findAll(); }
+  public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); connections.requireEnabled(run.getRepository()); return run; }
+  public List<FeatureRun> list() { return runs.findAll().stream().filter(run -> { try { connections.requireEnabled(run.getRepository()); return true; } catch (RuntimeException ignored) { return false; } }).toList(); }
 }

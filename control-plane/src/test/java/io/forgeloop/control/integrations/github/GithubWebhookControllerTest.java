@@ -36,7 +36,7 @@ class GithubWebhookControllerTest {
                 {"action":"opened","repository":{"full_name":"JRH89/Ticketly"},
                  "issue":{"number":42,"title":"Fix login","body":"- Users can sign in","labels":[{"name":"forgeloop"}]}}
                 """;
-        RepositoryConnection connection = new RepositoryConnection("JRH89/Ticketly", 1, "master", "forgeloop", "GENERIC", List.of("unit"), 20);
+        RepositoryConnection connection = new RepositoryConnection("local-development", "JRH89/Ticketly", 1, "master", "forgeloop", "GENERIC", List.of("unit"), 20);
         when(deliveries.existsByDeliveryId("delivery-1")).thenReturn(false);
         when(connections.findByRepository("JRH89/Ticketly")).thenReturn(java.util.Optional.of(connection));
 

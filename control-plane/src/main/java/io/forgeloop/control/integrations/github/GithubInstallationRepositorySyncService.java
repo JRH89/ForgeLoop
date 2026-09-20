@@ -14,17 +14,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class GithubInstallationRepositorySyncService {
     private final RepositoryConnectionRepository connections;
     private final String issueLabel;
+    private final String organizationId;
     private final String harnessProfile;
     private final List<String> requiredGates;
     private final double maxBudgetUsd;
 
     public GithubInstallationRepositorySyncService(
             RepositoryConnectionRepository connections,
+            @Value("${forgeloop.github.default-policy.organization-id:local-development}") String organizationId,
             @Value("${forgeloop.github.default-policy.issue-label:forgeloop}") String issueLabel,
             @Value("${forgeloop.github.default-policy.harness-profile:GENERIC}") String harnessProfile,
             @Value("${forgeloop.github.default-policy.required-gates:unit}") String requiredGates,
             @Value("${forgeloop.github.default-policy.max-budget-usd:25}") double maxBudgetUsd) {
         this.connections = connections;
+        this.organizationId = require(organizationId, "default organization id");
         this.issueLabel = require(issueLabel, "issue label");
         this.harnessProfile = require(harnessProfile, "harness profile");
         this.requiredGates = Arrays.stream(requiredGates.split(",")).map(String::trim).filter(value -> !value.isEmpty()).toList();
@@ -44,7 +47,7 @@ public class GithubInstallationRepositorySyncService {
         String fullName = require(repository.path("full_name").asText(), "repository full name");
         if (connections.findByRepository(fullName).isPresent()) return;
         String defaultBranch = repository.path("default_branch").asText("main");
-        connections.save(new RepositoryConnection(fullName, installationId, defaultBranch, issueLabel, harnessProfile, requiredGates, maxBudgetUsd));
+        connections.save(new RepositoryConnection(organizationId, fullName, installationId, defaultBranch, issueLabel, harnessProfile, requiredGates, maxBudgetUsd));
     }
 
     private static String require(String value, String field) {
