@@ -24,6 +24,10 @@ public final class RunnerMain {
             acknowledgeLease(arguments);
             return;
         }
+        if (arguments.length > 0 && "complete-lease".equals(arguments[0])) {
+            completeLease(arguments);
+            return;
+        }
         if (arguments.length > 0 && "prepare-worktree".equals(arguments[0])) {
             prepareWorktree(arguments);
             return;
@@ -64,6 +68,14 @@ public final class RunnerMain {
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).acknowledgeLease(identity, arguments[3], arguments[4]);
         System.out.println("Task lease acknowledged.");
+    }
+
+    private static void completeLease(String[] arguments) throws Exception {
+        if (arguments.length != 6) throw new IllegalArgumentException("Usage: complete-lease <control-plane-url> <state-file> <lease-id> <nonce> <passed>");
+        boolean passed = Boolean.parseBoolean(arguments[5]);
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).completeLease(identity, arguments[3], arguments[4], passed);
+        System.out.println("Task lease completion accepted.");
     }
 
     private static void prepareWorktree(String[] arguments) throws Exception {
