@@ -20,6 +20,10 @@ public final class RunnerMain {
             heartbeat(arguments);
             return;
         }
+        if (arguments.length > 0 && "available-tasks".equals(arguments[0])) {
+            availableTasks(arguments);
+            return;
+        }
         if (arguments.length > 0 && "acknowledge-lease".equals(arguments[0])) {
             acknowledgeLease(arguments);
             return;
@@ -61,6 +65,12 @@ public final class RunnerMain {
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).heartbeat(identity);
         System.out.println("Runner heartbeat accepted.");
+    }
+
+    private static void availableTasks(String[] arguments) throws Exception {
+        if (arguments.length != 3) throw new IllegalArgumentException("Usage: available-tasks <control-plane-url> <state-file>");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        System.out.println(new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).availableTasks(identity));
     }
 
     private static void acknowledgeLease(String[] arguments) throws Exception {
