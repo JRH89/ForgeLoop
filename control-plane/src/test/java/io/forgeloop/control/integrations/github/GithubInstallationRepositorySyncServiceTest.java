@@ -8,17 +8,21 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
+import io.forgeloop.control.domain.GithubInstallationRepository;
+import io.forgeloop.control.domain.GithubInstallation;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class GithubInstallationRepositorySyncServiceTest {
     private final RepositoryConnectionRepository connections = mock(RepositoryConnectionRepository.class);
+    private final GithubInstallationRepository installations = mock(GithubInstallationRepository.class);
     private final GithubInstallationRepositorySyncService service = new GithubInstallationRepositorySyncService(
-            connections, "local-development", "forgeloop", "GENERIC", "unit,browser", 25);
+            connections, installations, "forgeloop", "GENERIC", "unit,browser", 25);
 
     @Test
     void createsConservativeConnectionForNewInstalledRepository() throws Exception {
         when(connections.findByRepository("JRH89/Ticketly")).thenReturn(Optional.empty());
+        when(installations.findByInstallationId(9)).thenReturn(Optional.of(new GithubInstallation(9, "local-development")));
 
         service.synchronizeAddedRepositories(new ObjectMapper().readTree("""
                 {"installation":{"id":9},"repositories_added":[{"full_name":"JRH89/Ticketly","default_branch":"master"}]}

@@ -3,6 +3,7 @@ package io.forgeloop.control.integrations.github;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
+import io.forgeloop.control.domain.GithubInstallationRepository;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,21 +14,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class GithubInstallationRepositorySyncService {
     private final RepositoryConnectionRepository connections;
+    private final GithubInstallationRepository installations;
     private final String issueLabel;
-    private final String organizationId;
     private final String harnessProfile;
     private final List<String> requiredGates;
     private final double maxBudgetUsd;
 
     public GithubInstallationRepositorySyncService(
             RepositoryConnectionRepository connections,
-            @Value("${forgeloop.github.default-policy.organization-id:local-development}") String organizationId,
+            GithubInstallationRepository installations,
             @Value("${forgeloop.github.default-policy.issue-label:forgeloop}") String issueLabel,
             @Value("${forgeloop.github.default-policy.harness-profile:GENERIC}") String harnessProfile,
             @Value("${forgeloop.github.default-policy.required-gates:unit}") String requiredGates,
             @Value("${forgeloop.github.default-policy.max-budget-usd:25}") double maxBudgetUsd) {
         this.connections = connections;
-        this.organizationId = require(organizationId, "default organization id");
+        this.installations = installations;
         this.issueLabel = require(issueLabel, "issue label");
         this.harnessProfile = require(harnessProfile, "harness profile");
         this.requiredGates = Arrays.stream(requiredGates.split(",")).map(String::trim).filter(value -> !value.isEmpty()).toList();
@@ -47,6 +48,7 @@ public class GithubInstallationRepositorySyncService {
         String fullName = require(repository.path("full_name").asText(), "repository full name");
         if (connections.findByRepository(fullName).isPresent()) return;
         String defaultBranch = repository.path("default_branch").asText("main");
+        String organizationId = installations.findByInstallationId(installationId).orElseThrow(() -> new IllegalArgumentException("GitHub installation has no verified organization owner")).getOrganizationId();
         connections.save(new RepositoryConnection(organizationId, fullName, installationId, defaultBranch, issueLabel, harnessProfile, requiredGates, maxBudgetUsd));
     }
 

@@ -1,10 +1,14 @@
 package io.forgeloop.control.integrations.github;
 
 import java.net.URI;
+import io.forgeloop.control.domain.GithubInstallation;
+import io.forgeloop.control.domain.GithubInstallationRepository;
+import io.forgeloop.control.security.OperatorContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,8 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/github/app")
 public class GithubAppInstallationController {
     private final String appSlug;
+    private final GithubInstallationState state;
+    private final GithubInstallationRepository installations;
+    private final OperatorContext operators;
 
-    public GithubAppInstallationController(@Value("${forgeloop.github.app-slug:}") String appSlug) { this.appSlug = appSlug; }
+    public GithubAppInstallationController(@Value("${forgeloop.github.app-slug:}") String appSlug, GithubInstallationState state, GithubInstallationRepository installations, OperatorContext operators) { this.appSlug = appSlug; this.state = state; this.installations = installations; this.operators = operators; }
 
     @GetMapping("/install")
     public ResponseEntity<Void> install() {
@@ -22,7 +29,14 @@ public class GithubAppInstallationController {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create("https://github.com/apps/" + appSlug + "/installations/new"))
+                .location(URI.create("https://github.com/apps/" + appSlug + "/installations/new?state=" + state.issue(operators.organizationId())))
                 .build();
+    }
+    /** GitHub redirects here after installation; signed state prevents cross-tenant installation ownership. */
+    @GetMapping("/callback")
+    public ResponseEntity<Void> callback(@RequestParam("installation_id") long installationId, @RequestParam String state) {
+        String organizationId = this.state.verify(state);
+        if (installations.findByInstallationId(installationId).isEmpty()) installations.save(new GithubInstallation(installationId, organizationId));
+        return ResponseEntity.noContent().build();
     }
 }

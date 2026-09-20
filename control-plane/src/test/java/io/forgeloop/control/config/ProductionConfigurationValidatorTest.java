@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test;
 
 class ProductionConfigurationValidatorTest {
     @Test void rejectsMissingProductionRequirements() {
-        assertThrows(IllegalStateException.class, () -> new ProductionConfigurationValidator("production", "", "", "", "jdbc:h2:mem:test", "update", "", "").validate());
+        assertThrows(IllegalStateException.class, () -> new ProductionConfigurationValidator("production", "", "", "", "jdbc:h2:mem:test", "update", "", "", "", "", "").validate());
     }
     @Test void acceptsSafeProductionRequirements() {
-        assertDoesNotThrow(() -> new ProductionConfigurationValidator("production", "https://issuer.example", "forgeloop-api", "secret", "jdbc:postgresql://db/forgeloop", "validate", "s3://forgeloop-evidence", "a".repeat(32)).validate());
+        assertDoesNotThrow(() -> new ProductionConfigurationValidator("production", "https://issuer.example", "forgeloop-api", "secret", "jdbc:postgresql://db/forgeloop", "validate", "s3://forgeloop-evidence", "a".repeat(32), "123", "private-key", "b".repeat(32)).validate());
     }
 }
