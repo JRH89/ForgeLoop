@@ -40,6 +40,7 @@ public class DeliveryTask {
     public String getRepository() { return run.getRepository(); }
     public String getBaseBranch() { return run.getBaseBranch(); }
     public String getSourceRef() { return run.getSourceRef(); }
+    public String getSpecification() { return run.getSpecification(); }
     public String getRequiredCapability() { return requiredCapability; } public TaskState getState() { return state; }
     public int getAttemptBudget() { return attemptBudget; } public int getAttempts() { return attempts; }
 }

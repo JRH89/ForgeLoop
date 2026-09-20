@@ -17,7 +17,7 @@ type AuditLedgerEntry { id: ID!, actor: String!, action: String!, resourceType: 
 type GithubPublication { id: ID!, featureRunId: ID!, repository: String!, branch: String!, idempotencyKey: String!, headSha: String, checkRunId: Float, pullRequestNumber: Float, deliveredAt: String }
 type TaskLease { id: ID!, taskId: ID!, runnerId: ID!, expiresAt: String!, acknowledged: Boolean!, completed: Boolean! }
 type LeaseGrant { lease: TaskLease!, nonce: String! }
-type Task { id: ID!, role: String!, title: String!, repository: String!, baseBranch: String!, sourceRef: String!, requiredCapability: String!, state: TaskState!, attemptBudget: Int!, attempts: Int! }
+type Task { id: ID!, role: String!, title: String!, repository: String!, baseBranch: String!, sourceRef: String!, specification: String!, requiredCapability: String!, state: TaskState!, attemptBudget: Int!, attempts: Int! }
 type VerificationGate { id: ID!, name: String!, required: Boolean!, state: String! }
 type AcceptanceCriterion { id: ID!, statement: String!, coverageState: String! }
 type VerificationEvidence { id: ID!, taskId: ID!, runnerId: ID!, kind: String!, gate: String, image: String, command: String!, exitCode: Int!, timedOut: Boolean!, output: String!, digest: String!, recordedAt: String! }
