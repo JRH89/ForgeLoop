@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import io.forgeloop.control.application.RunnerService;
 import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.TaskLeaseService;
+import io.forgeloop.control.application.VerificationEvidenceSubmission;
 import org.junit.jupiter.api.Test;
 
 class RunnerExecutionControllerTest {
@@ -28,5 +29,15 @@ class RunnerExecutionControllerTest {
 
         verify(runners).authenticated("runner-1", "runner-credential");
         verify(leases).acknowledge("lease-1", "runner-1", "nonce");
+    }
+
+    @Test
+    void authenticatesRunnerBeforeRecordingEvidence() {
+        VerificationEvidenceSubmission report = new VerificationEvidenceSubmission("CONTAINER", "node:22-alpine", "node --version", 0, false, "ok");
+
+        controller.recordVerificationEvidence("lease-1", "runner-1", "nonce", "runner-credential", report);
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).recordEvidence("lease-1", "runner-1", "nonce", report);
     }
 }

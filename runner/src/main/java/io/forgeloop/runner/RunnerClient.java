@@ -33,6 +33,28 @@ public final class RunnerClient {
     public String acknowledgeLease(RunnerIdentity identity, String leaseId, String nonce) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){acknowledgeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){id acknowledged}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
     /** Completes an acknowledged lease and records whether its runner verification passed. */
     public String completeLease(RunnerIdentity identity, String leaseId, String nonce, boolean passed) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$passed:Boolean!){completeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,passed:$passed){id completed}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"passed\":" + passed + "}"); }
+    /** Records immutable evidence before a lease is completed, while its nonce is still valid. */
+    public String recordEvidence(RunnerIdentity identity, RunnerLease lease, VerificationEvidenceReport report) throws Exception {
+        VerificationResult result = report.result();
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"input\":{\"kind\":\"" + escape(report.kind()) + "\",\"image\":" + nullable(report.image())
+                + ",\"command\":\"" + escape(report.command()) + "\",\"exitCode\":" + result.exitCode()
+                + ",\"timedOut\":" + result.timedOut() + ",\"output\":\"" + escape(result.output()) + "\"}}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);
+    }
     private String post(String query, String variables) throws Exception { String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}"; HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed"); return response.body(); }
-    private static String escape(String value) { return value.replace("\\", "\\\\").replace("\"", "\\\""); }
+    private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }
+    private static String escape(String value) {
+        StringBuilder escaped = new StringBuilder(value.length() + 16);
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            switch (character) {
+                case '\\' -> escaped.append("\\\\"); case '"' -> escaped.append("\\\""); case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f"); case '\n' -> escaped.append("\\n"); case '\r' -> escaped.append("\\r"); case '\t' -> escaped.append("\\t");
+                default -> { if (character < 0x20) escaped.append(String.format("\\u%04x", (int) character)); else escaped.append(character); }
+            }
+        }
+        return escaped.toString();
+    }
 }
