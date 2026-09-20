@@ -14,6 +14,7 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Provides a guarded Git worktree manager for task-scoped repository isolation.
 * Runs policy-selected verification commands directly (never through a shell) with a one-hour maximum timeout and bounded output.
 * Runs disposable Docker verification containers with a read-only task mount, a read-only root filesystem, capped temporary storage, and deny-by-default networking.
+* Can submit bounded, lease-bound verification evidence to the control plane; the control plane calculates its integrity digest.
 * Runs as a non-root container image.
 
 ## Container build

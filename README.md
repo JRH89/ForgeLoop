@@ -30,6 +30,7 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
 - [x] Disposable, read-only Docker verification executor with task worktree mounts, bounded output and timeouts, and deny-by-default network isolation. Docker socket access remains an explicit runner-operator capability.
+- [x] Authenticated, lease-bound persistence of bounded verification evidence with a control-plane-generated integrity digest.
 - [ ] Git clone, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
 - [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
 
