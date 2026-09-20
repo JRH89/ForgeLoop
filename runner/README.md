@@ -29,3 +29,11 @@ The runner only accepts a local Git repository and a task ID containing letters,
 ```sh
 prepare-worktree /repositories/ticketly main task-123 /worktrees
 ```
+
+## Verification
+
+Commands are executed directly, never through a shell. The worktree must have been prepared by Git and the timeout cannot exceed one hour.
+
+```sh
+verify /worktrees/task-123 900 npm test
+```
