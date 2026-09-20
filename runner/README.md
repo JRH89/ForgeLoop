@@ -9,6 +9,7 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Sends an authenticated runner heartbeat through the control-plane GraphQL API.
 * Acknowledges a leased task with both the local runner credential and the one-time lease nonce.
 * Provides a guarded Git worktree manager for task-scoped repository isolation.
+* Runs policy-selected verification commands directly (never through a shell) with a one-hour maximum timeout and bounded output.
 * Runs as a non-root container image.
 
 ## Container build
