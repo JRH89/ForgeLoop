@@ -69,3 +69,9 @@ docker run --rm \
 ```
 
 `FORGELOOP_DOCKER_HOST_WORKSPACE_ROOT` must name the same location as seen by the Docker daemon, not the runner container. The runner rejects partial mapping configuration and worktrees outside the configured runner workspace root.
+
+To attach the result to an already acknowledged lease before explicit completion, use `verify-container-and-record`. The runner sends bounded output and a control-plane-calculated integrity digest; it does not mark the task complete by itself.
+
+```sh
+verify-container-and-record http://control-plane:8090 /state/runner /state/lease /worktrees/task-123 900 none node:22-alpine node --version
+```
