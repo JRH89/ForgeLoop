@@ -10,24 +10,33 @@ import org.springframework.stereotype.Component;
 public class ProductionConfigurationValidator implements SmartInitializingSingleton {
     private final String mode;
     private final String issuerUri;
+    private final String audience;
     private final String webhookSecret;
     private final String datasourceUrl;
     private final String ddlAuto;
+    private final String artifactStorageUri;
+    private final String encryptionKey;
 
     public ProductionConfigurationValidator(@Value("${forgeloop.security.mode:production}") String mode,
                                             @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:}") String issuerUri,
+                                            @Value("${forgeloop.security.oidc-audience:}") String audience,
                                             @Value("${forgeloop.github.webhook-secret:}") String webhookSecret,
                                             @Value("${spring.datasource.url:}") String datasourceUrl,
-                                            @Value("${spring.jpa.hibernate.ddl-auto:validate}") String ddlAuto) {
-        this.mode = mode; this.issuerUri = issuerUri; this.webhookSecret = webhookSecret; this.datasourceUrl = datasourceUrl; this.ddlAuto = ddlAuto;
+                                            @Value("${spring.jpa.hibernate.ddl-auto:validate}") String ddlAuto,
+                                            @Value("${forgeloop.artifacts.storage-uri:}") String artifactStorageUri,
+                                            @Value("${forgeloop.security.encryption-key:}") String encryptionKey) {
+        this.mode = mode; this.issuerUri = issuerUri; this.audience = audience; this.webhookSecret = webhookSecret; this.datasourceUrl = datasourceUrl; this.ddlAuto = ddlAuto; this.artifactStorageUri = artifactStorageUri; this.encryptionKey = encryptionKey;
     }
     @Override public void afterSingletonsInstantiated() { if ("production".equals(mode)) validate(); }
     void validate() {
         List<String> missing = new java.util.ArrayList<>();
         if (issuerUri.isBlank()) missing.add("SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI");
+        if (audience.isBlank()) missing.add("FORGELOOP_OIDC_AUDIENCE");
         if (webhookSecret.isBlank()) missing.add("FORGELOOP_GITHUB_WEBHOOK_SECRET");
         if (datasourceUrl.isBlank() || datasourceUrl.startsWith("jdbc:h2:")) missing.add("production PostgreSQL datasource");
         if (!"validate".equals(ddlAuto)) missing.add("SPRING_JPA_DDL_AUTO=validate");
+        if (artifactStorageUri.isBlank() || !(artifactStorageUri.startsWith("s3://") || artifactStorageUri.startsWith("gs://") || artifactStorageUri.startsWith("azure://"))) missing.add("FORGELOOP_ARTIFACT_STORAGE_URI");
+        if (encryptionKey.length() < 32) missing.add("FORGELOOP_ENCRYPTION_KEY (minimum 32 characters)");
         if (!missing.isEmpty()) throw new IllegalStateException("Production configuration is incomplete: " + String.join(", ", missing));
     }
 }

@@ -5,6 +5,7 @@ import io.forgeloop.control.domain.AuditLedgerEntryRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,10 @@ public class AuditLedgerService {
     public AuditLedgerService(AuditLedgerEntryRepository entries) { this.entries = entries; }
     public void record(String action, String resourceType, String resourceId, String material) {
         entries.save(new AuditLedgerEntry(actor(), action, resourceType, resourceId, digest(material)));
+    }
+    /** Returns the immutable history for an already-authorized resource. */
+    public List<AuditLedgerEntry> events(String resourceType, String resourceId) {
+        return entries.findByResourceTypeAndResourceIdOrderByOccurredAtAsc(resourceType, resourceId);
     }
     private static String actor() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

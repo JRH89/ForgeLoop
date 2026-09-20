@@ -28,7 +28,7 @@ public class FeatureRunService {
   }
   /** Idempotent GitHub issue intake protects against event retries and label changes. */
   @Transactional public FeatureRun submitIssue(FeatureSubmission input) { return runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).orElseGet(() -> submit(input)); }
-  @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
+  @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); connections.requireEnabled(task.getRun().getRepository()); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
   @Transactional public FeatureRun recordGate(String runId, String gate, boolean passed) { FeatureRun run = get(runId); run.recordGate(gate, passed); audit.record("VERIFICATION_GATE_RECORDED", "FEATURE_RUN", runId, gate + "|" + passed); return run; }
   @Transactional public FeatureRun cancel(String runId) { FeatureRun run = get(runId); run.cancel(); audit.record("FEATURE_RUN_CANCELLED", "FEATURE_RUN", runId, run.getState().name()); return run; }
   public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); connections.requireEnabled(run.getRepository()); return run; }

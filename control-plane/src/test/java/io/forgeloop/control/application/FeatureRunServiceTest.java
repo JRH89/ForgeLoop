@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 import io.forgeloop.control.domain.DeliveryTaskRepository;
+import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.FeatureRunRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
@@ -29,5 +31,14 @@ class FeatureRunServiceTest {
     FeatureRun existing = new FeatureRun("acme/support", "issue-142", "Assignment", "- criterion", 10, "JVM_REACT", 1);
     when(runs.findByRepositoryAndSourceRef("acme/support", "issue-142")).thenReturn(java.util.Optional.of(existing));
     assertEquals(existing, service.submitIssue(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- criterion", 10)));
+  }
+  @Test void transitionRequiresAccessToTheTaskRunRepository() {
+    FeatureRun run = new FeatureRun("local-development", "acme/support", "issue-1", "Title", "- criterion", 10, "JVM_REACT", 1);
+    run.addTask("IMPLEMENTATION", "Implement", "provider");
+    DeliveryTask task = run.getTasks().getFirst();
+    when(tasks.findById("task-1")).thenReturn(java.util.Optional.of(task));
+    doThrow(new IllegalStateException("Repository connection is unavailable")).when(connections).requireEnabled("acme/support");
+    assertThrows(IllegalStateException.class, () -> service.transitionTask("task-1", io.forgeloop.control.domain.TaskState.RUNNING));
+    verify(connections).requireEnabled("acme/support");
   }
 }

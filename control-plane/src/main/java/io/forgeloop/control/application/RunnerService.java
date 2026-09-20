@@ -1,4 +1,5 @@
 package io.forgeloop.control.application;
+
 import io.forgeloop.control.domain.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -9,4 +10,17 @@ import java.util.HexFormat;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-@Service public class RunnerService { private final RunnerRepository runners; private final RunnerRegistrationTokenRepository tokens; private final SecureRandom random=new SecureRandom(); public RunnerService(RunnerRepository runners,RunnerRegistrationTokenRepository tokens){this.runners=runners;this.tokens=tokens;} @Transactional public String issueRegistrationToken(String organizationId){if(organizationId==null||organizationId.isBlank())throw new IllegalArgumentException("Organization is required");String raw=secret();tokens.save(new RunnerRegistrationToken(hash(raw),organizationId,Instant.now().plus(Duration.ofMinutes(15))));return raw;} @Transactional public RunnerEnrollment register(RunnerRegistration request){RunnerRegistrationToken token=tokens.findByTokenHash(hash(request.token())).orElseThrow(()->new IllegalArgumentException("Invalid registration token"));token.consume();String credential=secret();Runner runner=runners.save(new Runner(token.getOrganizationId(),request.name(),request.version(),request.capabilities(),hash(credential)));return new RunnerEnrollment(runner,credential);} @Transactional public Runner heartbeat(String runnerId,String credential){Runner runner=authenticated(runnerId,credential);runner.heartbeat();return runner;} public Runner authenticated(String runnerId,String credential){Runner runner=runners.findById(runnerId).orElseThrow(()->new IllegalArgumentException("Runner not found"));if(credential==null||credential.isBlank()||!runner.matchesCredentialHash(hash(credential)))throw new IllegalArgumentException("Runner credentials are invalid");return runner;} public List<Runner> list(String organizationId){return runners.findByOrganizationId(organizationId);} private String secret(){byte[] bytes=new byte[32];random.nextBytes(bytes);return HexFormat.of().formatHex(bytes);} private String hash(String raw){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException("SHA-256 unavailable",ex);}} }
+
+/** Controls one-time runner enrollment and preserves auditability without logging raw credentials. */
+@Service
+public class RunnerService {
+  private final RunnerRepository runners; private final RunnerRegistrationTokenRepository tokens; private final AuditLedgerService audit; private final SecureRandom random=new SecureRandom();
+  public RunnerService(RunnerRepository runners,RunnerRegistrationTokenRepository tokens,AuditLedgerService audit){this.runners=runners;this.tokens=tokens;this.audit=audit;}
+  @Transactional public String issueRegistrationToken(String organizationId){if(organizationId==null||organizationId.isBlank())throw new IllegalArgumentException("Organization is required");String raw=secret();tokens.save(new RunnerRegistrationToken(hash(raw),organizationId,Instant.now().plus(Duration.ofMinutes(15))));audit.record("RUNNER_REGISTRATION_TOKEN_ISSUED","ORGANIZATION",organizationId,"one-time-token");return raw;}
+  @Transactional public RunnerEnrollment register(RunnerRegistration request){RunnerRegistrationToken token=tokens.findByTokenHash(hash(request.token())).orElseThrow(()->new IllegalArgumentException("Invalid registration token"));token.consume();String credential=secret();Runner runner=runners.save(new Runner(token.getOrganizationId(),request.name(),request.version(),request.capabilities(),hash(credential)));audit.record("RUNNER_REGISTERED","RUNNER",runner.getId()==null?request.name():runner.getId(),runner.getOrganizationId()+"|"+request.version());return new RunnerEnrollment(runner,credential);}
+  @Transactional public Runner heartbeat(String runnerId,String credential){Runner runner=authenticated(runnerId,credential);runner.heartbeat();return runner;}
+  public Runner authenticated(String runnerId,String credential){Runner runner=runners.findById(runnerId).orElseThrow(()->new IllegalArgumentException("Runner not found"));if(credential==null||credential.isBlank()||!runner.matchesCredentialHash(hash(credential)))throw new IllegalArgumentException("Runner credentials are invalid");return runner;}
+  public List<Runner> list(String organizationId){return runners.findByOrganizationId(organizationId);}
+  private String secret(){byte[] bytes=new byte[32];random.nextBytes(bytes);return HexFormat.of().formatHex(bytes);}
+  private String hash(String raw){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8)));}catch(Exception ex){throw new IllegalStateException("SHA-256 unavailable",ex);}}
+}
