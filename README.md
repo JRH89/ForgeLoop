@@ -26,7 +26,8 @@ This checklist is maintained as implementation progresses. A checked item is imp
 - [x] Runner-scoped credential issued once at registration, stored only as a hash by the control plane, and required for runner heartbeats.
 - [x] Runner credential required to claim or acknowledge a task lease, in addition to the lease's one-time nonce.
 - [x] Exact capability matching for runner discovery and server-side task-claim enforcement.
-- [ ] Cancellation and recovery.
+- [x] Scheduled lease-expiry recovery into the bounded repair queue.
+- [ ] Operator cancellation.
 - [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, and nonce-backed lease acknowledgement; it does not yet discover, clone, or execute leased work.
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
