@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 /** Minimal GraphQL transport; never writes credentials or source content to stdout. */
 public final class RunnerClient {
     private static final Pattern ENROLLMENT = Pattern.compile("(?s)\\\"runner\\\"\\s*:\\s*\\{.*?\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\".*?}.*?\\\"credential\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
+    private static final Pattern LEASE_GRANT = Pattern.compile("(?s)\\\"lease\\\"\\s*:\\s*\\{.*?\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\".*?}.*?\\\"nonce\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
     private final HttpClient http;
     private final URI endpoint;
 
@@ -27,6 +28,7 @@ public final class RunnerClient {
     public String heartbeat(RunnerIdentity identity) throws Exception { return post("mutation($runnerId:ID!,$credential:String!){runnerHeartbeat(runnerId:$runnerId,credential:$credential){id lastHeartbeatAt}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     public String availableTasks(RunnerIdentity identity) throws Exception { return post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role title state}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
+    public RunnerLease claimTask(RunnerIdentity identity, String taskId) throws Exception { Matcher match = LEASE_GRANT.matcher(post("mutation($taskId:ID!,$runnerId:ID!,$credential:String!){claimTaskLease(taskId:$taskId,runnerId:$runnerId,credential:$credential){lease{id} nonce}}", "{\"taskId\":\"" + escape(taskId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}")); if (!match.find()) throw new IllegalStateException("Control-plane lease response was malformed"); return new RunnerLease(match.group(1), match.group(2)); }
     /** Acknowledges a one-time lease nonce with the enrolled runner credential. */
     public String acknowledgeLease(RunnerIdentity identity, String leaseId, String nonce) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){acknowledgeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){id acknowledged}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
     /** Completes an acknowledged lease and records whether its runner verification passed. */
