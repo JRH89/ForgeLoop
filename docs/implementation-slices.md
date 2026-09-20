@@ -49,6 +49,8 @@ Make the self-hosted runner safely execute assigned work, not merely verify an o
 
 Exit criteria: two runners claim distinct compatible tasks, a killed runner is recovered safely, worktrees are cleaned, and artifacts verify before the control plane accepts results.
 
+Implementation progress: dispatch now gives authenticated runners structured, policy-derived repository, base-branch, source-reference, and capability context. The runner can claim one eligible task and prepare an isolated detached worktree from only a pre-cloned checkout beneath its configured repository root. Automatic provider execution, policy-selected commands, and lifecycle reconciliation remain in progress.
+
 ## Slice 4 — Provider contracts and guarded agent workers
 
 Implement real coding-agent execution as a replaceable, runner-local capability.
@@ -59,6 +61,8 @@ Implement real coding-agent execution as a replaceable, runner-local capability.
 - Keep provider keys and repository source on the runner; persist only redacted metadata, digests, usage, and evidence references.
 
 Exit criteria: a provider can be replaced by policy; malformed or timed-out provider output cannot advance work; a provider outage creates actionable evidence rather than a false success.
+
+Implementation progress: a runner-local provider contract and OpenAI Responses API adapter now normalize output, token usage, request identity, and retryability without exposing runner credentials to the control plane. Task-output schema validation and actual worker execution remain in progress; no provider credential has been configured for a live call.
 
 ## Slice 5 — Planner, DAG scheduler, and bounded repair loop
 

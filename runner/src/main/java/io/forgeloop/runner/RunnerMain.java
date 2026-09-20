@@ -24,6 +24,10 @@ public final class RunnerMain {
             availableTasks(arguments);
             return;
         }
+        if (arguments.length > 0 && "provider-health".equals(arguments[0])) {
+            providerHealth(arguments);
+            return;
+        }
         if (arguments.length > 0 && "claim-task".equals(arguments[0])) {
             claimTask(arguments);
             return;
@@ -42,6 +46,10 @@ public final class RunnerMain {
         }
         if (arguments.length > 0 && "prepare-worktree".equals(arguments[0])) {
             prepareWorktree(arguments);
+            return;
+        }
+        if (arguments.length > 0 && "claim-and-prepare-task".equals(arguments[0])) {
+            claimAndPrepareTask(arguments);
             return;
         }
         if (arguments.length > 0 && "remove-worktree".equals(arguments[0])) {
@@ -98,7 +106,9 @@ public final class RunnerMain {
     private static void availableTasks(String[] arguments) throws Exception {
         if (arguments.length != 3) throw new IllegalArgumentException("Usage: available-tasks <control-plane-url> <state-file>");
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
-        System.out.println(new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).availableTasks(identity));
+        for (RunnerTask task : new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).availableTasks(identity)) {
+            System.out.println(task.id() + " " + task.role() + " " + task.repository() + "@" + task.baseBranch());
+        }
     }
 
     private static void claimTask(String[] arguments) throws Exception {
@@ -139,6 +149,40 @@ public final class RunnerMain {
         if (arguments.length != 5) throw new IllegalArgumentException("Usage: prepare-worktree <repository-path> <base-ref> <task-id> <workspace-root>");
         Path worktree = new GitWorktreeManager().create(Path.of(arguments[1]), arguments[2], arguments[3], Path.of(arguments[4]));
         System.out.println("Task worktree prepared: " + worktree);
+    }
+
+    /** Executes one bounded, non-repository provider request to prove runner-local credentials work without exposing them. */
+    private static void providerHealth(String[] arguments) throws Exception {
+        if (arguments.length != 3) throw new IllegalArgumentException("Usage: provider-health <anthropic|openai> <model>");
+        ProviderClient provider = switch (arguments[1]) {
+            case "anthropic" -> new AnthropicMessagesProviderClient(HttpClient.newHttpClient(), URI.create("https://api.anthropic.com/v1/messages"), requiredEnvironment("ANTHROPIC_API_KEY"));
+            case "openai" -> new OpenAiResponsesProviderClient(HttpClient.newHttpClient(), URI.create("https://api.openai.com/v1/responses"), requiredEnvironment("OPENAI_API_KEY"));
+            default -> throw new IllegalArgumentException("Provider must be anthropic or openai");
+        };
+        ProviderResult result = provider.execute(new ProviderRequest(arguments[2], "You are a credential health check.", "Reply with exactly: ForgeLoop provider ready.", 128));
+        System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
+    }
+
+    /** Claims exactly one server-advertised task, then creates its isolated worktree from a pre-cloned local checkout. */
+    private static void claimAndPrepareTask(String[] arguments) throws Exception {
+        if (arguments.length != 7) {
+            throw new IllegalArgumentException("Usage: claim-and-prepare-task <control-plane-url> <identity-file> <task-id> <lease-file> <repositories-root> <workspace-root>");
+        }
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
+        RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
+        RunnerLease lease = client.claimTask(identity, task.id());
+        try {
+            Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(arguments[5]), task.repository());
+            Path worktree = new GitWorktreeManager().create(repository, task.baseBranch(), task.id(), Path.of(arguments[6]));
+            new RunnerLeaseStore().save(Path.of(arguments[4]), lease);
+            client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+            System.out.println("Task worktree prepared: " + worktree);
+        } catch (Exception exception) {
+            // No nonce is persisted on failure; the control plane will safely expire and repair/requeue the lease.
+            throw exception;
+        }
     }
 
     private static void removeWorktree(String[] arguments) throws Exception {
@@ -270,6 +314,12 @@ public final class RunnerMain {
     private static Path statePath() {
         String configured = System.getenv("FORGELOOP_RUNNER_STATE_FILE");
         return configured == null || configured.isBlank() ? Path.of("forgeloop-runner.state") : Path.of(configured);
+    }
+
+    private static String requiredEnvironment(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) throw new IllegalStateException(name + " is not set in this runner process");
+        return value;
     }
 
 }

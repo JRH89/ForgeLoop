@@ -18,7 +18,7 @@ public class FeatureRunService {
     if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
     RepositoryConnection connection = connections.requireEnabled(input.repository());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
-    FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getPolicyRevision());
+    FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
     run.addTask("IMPLEMENTATION", "Implement scoped repository changes", "provider");
     run.addTask("INDEPENDENT_TEST", "Derive independent verification from acceptance criteria", "docker");

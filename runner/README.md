@@ -1,6 +1,6 @@
 # ForgeLoop Runner
 
-The runner executes inside customer-controlled infrastructure. It registers with the ForgeLoop control plane using a one-time token, then will claim scoped work only after lease and capability checks are implemented.
+The runner executes inside customer-controlled infrastructure. It registers with the ForgeLoop control plane using a one-time token, then claims only capability-compatible work under a short-lived, nonce-bound lease.
 
 ## Current capabilities
 
@@ -9,9 +9,9 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Sends an authenticated runner heartbeat through the control-plane GraphQL API.
 * Acknowledges a leased task with both the local runner credential and the one-time lease nonce.
 * Completes an acknowledged lease with a verified pass/fail result.
-* Retrieves authenticated pending task metadata before a runner attempts a lease claim.
+* Retrieves structured, authenticated pending-task context (repository, policy base branch, source reference, and capability) before a runner attempts a lease claim.
 * Claims a task and keeps the lease nonce in a local state file rather than printing it.
-* Provides a guarded Git worktree manager for task-scoped repository isolation.
+* Provides a guarded Git worktree manager and an atomic claim-and-prepare flow for task-scoped repository isolation from pre-cloned local checkouts.
 * Runs policy-selected verification commands directly (never through a shell) with a one-hour maximum timeout and bounded output.
 * Runs disposable Docker verification containers with a read-only task mount, a read-only root filesystem, capped temporary storage, and deny-by-default networking.
 * Can submit bounded, lease-bound verification evidence to the control plane; the control plane calculates its integrity digest.
@@ -25,7 +25,30 @@ docker build -t forgeloop-runner:local runner
 
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
-The runner does not yet clone repositories, choose policy checks, execute coding providers, upload evidence, or create pull requests. It can create guarded, detached task worktrees from a locally available repository, retrieve and claim dispatchable tasks, and execute operator-selected verification commands.
+The runner does not yet clone repositories, choose policy checks, execute coding providers, upload evidence, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, and execute operator-selected verification commands.
+
+## Provider boundary
+
+The runner includes a tested provider-neutral contract plus OpenAI Responses and Anthropic Messages API adapters. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. Both classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a task-specific schema validates it. The adapters are intentionally not wired into task execution until the task-output schema, path policy, and repair flow are complete.
+
+After building the runner image, validate an Anthropic key from the same PowerShell window that contains `ANTHROPIC_API_KEY`:
+
+```powershell
+docker build -t forgeloop-runner:local runner
+docker run --rm -e ANTHROPIC_API_KEY forgeloop-runner:local provider-health anthropic <your-Claude-model-id>
+```
+
+The command performs one minimal API request, prints only request/usage metadata, and never prints the key or prompt response.
+
+## Claim and prepare a dispatched task
+
+Keep trusted pre-cloned repositories below a runner-owned root using their GitHub `owner/repository` path. The runner resolves only that exact path and rejects traversal, missing checkouts, and arbitrary filesystem paths.
+
+```sh
+claim-and-prepare-task http://control-plane:8090 /state/runner <task-id> /state/lease /repositories /worktrees
+```
+
+This claims only a task returned by the authenticated control plane, prepares a detached worktree from its policy-pinned base branch, persists the nonce locally, and acknowledges the lease. If preparation fails, no nonce is persisted and normal lease expiry recovery handles the unacknowledged lease.
 
 ## Worktree preparation
 
