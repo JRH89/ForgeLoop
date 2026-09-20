@@ -20,3 +20,11 @@ docker build -t forgeloop-runner:local runner
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
 The runner does not yet clone repositories or execute tools. It can create guarded, detached task worktrees from a locally available repository, but task discovery and execution are deliberately deferred until the scheduler and execution policies are verified.
+
+## Worktree preparation
+
+The runner only accepts a local Git repository and a task ID containing letters, numbers, `_`, or `-`.
+
+```sh
+prepare-worktree /repositories/ticketly main task-123 /worktrees
+```

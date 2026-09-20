@@ -22,6 +22,10 @@ public final class RunnerMain {
             acknowledgeLease(arguments);
             return;
         }
+        if (arguments.length > 0 && "prepare-worktree".equals(arguments[0])) {
+            prepareWorktree(arguments);
+            return;
+        }
         RunnerConfig config = configFrom(arguments);
         RunnerIdentity identity = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
         Path statePath = statePath();
@@ -54,6 +58,12 @@ public final class RunnerMain {
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
         new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).acknowledgeLease(identity, arguments[3], arguments[4]);
         System.out.println("Task lease acknowledged.");
+    }
+
+    private static void prepareWorktree(String[] arguments) throws Exception {
+        if (arguments.length != 5) throw new IllegalArgumentException("Usage: prepare-worktree <repository-path> <base-ref> <task-id> <workspace-root>");
+        Path worktree = new GitWorktreeManager().create(Path.of(arguments[1]), arguments[2], arguments[3], Path.of(arguments[4]));
+        System.out.println("Task worktree prepared: " + worktree);
     }
 
     private static Path statePath() {
