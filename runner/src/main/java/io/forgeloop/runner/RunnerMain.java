@@ -52,6 +52,10 @@ public final class RunnerMain {
             verify(arguments);
             return;
         }
+        if (arguments.length > 0 && "verify-container".equals(arguments[0])) {
+            verifyContainer(arguments);
+            return;
+        }
         RunnerConfig config = configFrom(arguments);
         RunnerIdentity identity = new RunnerClient(HttpClient.newHttpClient(), config.controlPlane()).register(config);
         Path statePath = statePath();
@@ -138,6 +142,50 @@ public final class RunnerMain {
         System.out.println(result.passed() ? "Verification passed." : "Verification failed or timed out.");
         System.out.print(result.output());
         if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
+    }
+
+    private static void verifyContainer(String[] arguments) throws Exception {
+        if (arguments.length < 6) {
+            throw new IllegalArgumentException(
+                    "Usage: verify-container <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
+        }
+        boolean allowNetwork = switch (arguments[3]) {
+            case "none" -> false;
+            case "allow" -> true;
+            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
+        };
+        long timeoutSeconds = Long.parseLong(arguments[2]);
+        VerificationResult result = new ContainerVerificationExecutor().execute(
+                Path.of(arguments[1]),
+                dockerVisibleWorktree(Path.of(arguments[1])),
+                arguments[4],
+                Arrays.asList(arguments).subList(5, arguments.length),
+                Duration.ofSeconds(timeoutSeconds),
+                allowNetwork);
+        System.out.println(result.passed() ? "Container verification passed." : "Container verification failed or timed out.");
+        System.out.print(result.output());
+        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
+    }
+
+    /**
+     * Maps the runner-container path to the path understood by the Docker daemon. Both roots must
+     * be configured together, which avoids accidentally mounting an arbitrary daemon-host path.
+     */
+    static Path dockerVisibleWorktree(Path worktree) {
+        String runnerRoot = System.getenv("FORGELOOP_RUNNER_WORKSPACE_ROOT");
+        String dockerHostRoot = System.getenv("FORGELOOP_DOCKER_HOST_WORKSPACE_ROOT");
+        if ((runnerRoot == null || runnerRoot.isBlank()) && (dockerHostRoot == null || dockerHostRoot.isBlank())) {
+            return worktree.toAbsolutePath().normalize();
+        }
+        if (runnerRoot == null || runnerRoot.isBlank() || dockerHostRoot == null || dockerHostRoot.isBlank()) {
+            throw new IllegalArgumentException("Both runner and Docker-host workspace roots must be configured together");
+        }
+        Path normalizedRunnerRoot = Path.of(runnerRoot).toAbsolutePath().normalize();
+        Path normalizedWorktree = worktree.toAbsolutePath().normalize();
+        if (!normalizedWorktree.startsWith(normalizedRunnerRoot)) {
+            throw new IllegalArgumentException("Task worktree is outside the configured runner workspace root");
+        }
+        return Path.of(dockerHostRoot).toAbsolutePath().normalize().resolve(normalizedRunnerRoot.relativize(normalizedWorktree));
     }
 
     private static Path statePath() {
