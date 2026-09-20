@@ -16,10 +16,12 @@ management:
 forgeloop:
   security:
     mode: "${FORGELOOP_SECURITY_MODE:production}"
+    development-organization-id: "${FORGELOOP_DEVELOPMENT_ORGANIZATION_ID:local-development}"
   github:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
     app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"
     default-policy:
+      organization-id: "${FORGELOOP_GITHUB_DEFAULT_ORGANIZATION_ID:local-development}"
       issue-label: "${FORGELOOP_GITHUB_DEFAULT_ISSUE_LABEL:forgeloop}"
       harness-profile: "${FORGELOOP_GITHUB_DEFAULT_HARNESS_PROFILE:GENERIC}"
       required-gates: "${FORGELOOP_GITHUB_DEFAULT_REQUIRED_GATES:unit}"

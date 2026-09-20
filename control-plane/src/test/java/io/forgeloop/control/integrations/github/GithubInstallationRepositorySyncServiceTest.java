@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 class GithubInstallationRepositorySyncServiceTest {
     private final RepositoryConnectionRepository connections = mock(RepositoryConnectionRepository.class);
     private final GithubInstallationRepositorySyncService service = new GithubInstallationRepositorySyncService(
-            connections, "forgeloop", "GENERIC", "unit,browser", 25);
+            connections, "local-development", "forgeloop", "GENERIC", "unit,browser", 25);
 
     @Test
     void createsConservativeConnectionForNewInstalledRepository() throws Exception {
@@ -30,7 +30,7 @@ class GithubInstallationRepositorySyncServiceTest {
     @Test
     void preservesExistingRepositoryPolicy() throws Exception {
         when(connections.findByRepository("JRH89/Ticketly")).thenReturn(Optional.of(
-                new RepositoryConnection("JRH89/Ticketly", 9, "master", "custom", "CUSTOM", java.util.List.of("security"), 10)));
+                new RepositoryConnection("local-development", "JRH89/Ticketly", 9, "master", "custom", "CUSTOM", java.util.List.of("security"), 10)));
 
         service.synchronizeAddedRepositories(new ObjectMapper().readTree("""
                 {"installation":{"id":9},"repositories_added":[{"full_name":"JRH89/Ticketly","default_branch":"master"}]}
