@@ -27,6 +27,10 @@ Registration tokens and runner credentials are secrets. Provide registration tok
 
 The runner does not yet clone repositories, choose policy checks, execute coding providers, upload evidence, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, and execute operator-selected verification commands.
 
+## Provider boundary
+
+The runner includes a tested provider-neutral contract and an OpenAI Responses API adapter. It reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. The adapter classifies `429` and `5xx` responses as retryable, treats all returned text as untrusted until a task-specific schema validates it, and requests `store: false`. It is intentionally not wired into task execution until the task-output schema, path policy, and repair flow are complete.
+
 ## Claim and prepare a dispatched task
 
 Keep trusted pre-cloned repositories below a runner-owned root using their GitHub `owner/repository` path. The runner resolves only that exact path and rejects traversal, missing checkouts, and arbitrary filesystem paths.

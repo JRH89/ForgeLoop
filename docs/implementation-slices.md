@@ -62,6 +62,8 @@ Implement real coding-agent execution as a replaceable, runner-local capability.
 
 Exit criteria: a provider can be replaced by policy; malformed or timed-out provider output cannot advance work; a provider outage creates actionable evidence rather than a false success.
 
+Implementation progress: a runner-local provider contract and OpenAI Responses API adapter now normalize output, token usage, request identity, and retryability without exposing runner credentials to the control plane. Task-output schema validation and actual worker execution remain in progress; no provider credential has been configured for a live call.
+
 ## Slice 5 — Planner, DAG scheduler, and bounded repair loop
 
 Connect a specification to coordinated multi-agent work.
