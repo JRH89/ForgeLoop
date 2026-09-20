@@ -23,5 +23,10 @@ export function submitFeature(input: SubmitFeature): Promise<FeatureRun> {
   return request<{ submitFeature: FeatureRun }>('mutation($input: SubmitFeatureInput!) { submitFeature(input: $input) { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement state } } }', { input }).then(data => data.submitFeature);
 }
 
+/** Cancels an in-flight run through the audited operator mutation. */
+export function cancelFeatureRun(runId: string): Promise<FeatureRun> {
+  return request<{ cancelFeatureRun: FeatureRun }>('mutation($runId: ID!) { cancelFeatureRun(runId: $runId) { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement state } } }', { runId }).then(data => data.cancelFeatureRun);
+}
+
 export function loadRepositoryConnections(): Promise<RepositoryConnection[]> { return request<{ repositoryConnections?: RepositoryConnection[] }>('query { repositoryConnections { id repository installationId enabled defaultBranch issueLabel harnessProfile requiredGates maxBudgetUsd policyRevision } }').then(data => data.repositoryConnections ?? []); }
 export function connectRepository(input: ConnectRepository): Promise<RepositoryConnection> { return request<{ connectRepository: RepositoryConnection }>('mutation($input: ConnectRepositoryInput!) { connectRepository(input: $input) { id repository installationId enabled defaultBranch issueLabel harnessProfile requiredGates maxBudgetUsd policyRevision } }', { input }).then(data => data.connectRepository); }
