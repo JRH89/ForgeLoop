@@ -43,7 +43,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Authenticated, lease-bound persistence of bounded verification evidence with a control-plane-generated integrity digest and optional required-gate attribution.
 - [ ] Git clone, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
-- [ ] Planner output, bounded task DAG scheduling, integration coordination, repair routing, review orchestration, and approvals.
+- [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
+- [ ] Review-agent orchestration, human escalation, and approval controls.
 
 ### Evidence and repository delivery
 
@@ -60,7 +61,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 ### Current capability boundary
 
-ForgeLoop can persist and display policy-bound delivery runs and repository connections. A self-hosted runner can execute a policy-selected model against an eligible task, create a schema- and path-validated worktree commit, record redacted provider telemetry, and execute an operator-selected container verification command. It **cannot yet autonomously plan an entire GitHub issue, integrate parallel commits, select the required verification commands, or create a pull request**; those capabilities remain unchecked until the scheduler, verification-policy, and GitHub delivery paths are connected and verified.
+ForgeLoop can persist and display policy-bound delivery runs and repository connections. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch dependency-ready non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, and route failures through bounded task-owned repair context. It records redacted provider telemetry and can execute an operator-selected container verification command. It **cannot yet select all required verification commands from repository policy, complete review/approval orchestration, or publish runner-produced work as a pull request**; those capabilities remain unchecked until the verification-policy and GitHub delivery paths are connected and verified.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 
@@ -752,20 +753,20 @@ The priority is reliable closed-loop execution rather than maximizing the number
 
 * [x] verification gates
 * [x] structured failure evidence
-* [ ] autonomous repair
+* [x] autonomous repair
 * [x] retry budgets
 * [ ] human escalation
 * [x] evidence bundles
 
 ### Phase 4: Multi-Agent Orchestration
 
-* [ ] planner agent
-* [ ] task DAG
-* [ ] dependency scheduling
-* [ ] parallel workers
+* [x] planner agent
+* [x] task DAG
+* [x] dependency scheduling
+* [x] parallel workers
 * [x] isolated agent workspaces
-* [ ] integration stage
-* [ ] conflict handling
+* [x] integration stage
+* [x] conflict handling
 
 ### Phase 5: Full-System Verification
 

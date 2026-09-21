@@ -64,7 +64,7 @@ Exit criteria: a provider can be replaced by policy; malformed or timed-out prov
 
 Completed evidence: runner-local Anthropic Messages, OpenAI Responses, Gemini generateContent, and local OpenAI-compatible adapters share a normalized contract. A strict runner-local role policy chooses the adapter, model, and one-to-three-attempt retry budget without storing credentials in the control plane. Code-producing roles validate an exact JSON patch schema, reject duplicate or out-of-policy paths and symbolic-link traversal, use atomic file replacement, and commit only inside an isolated worktree. Every authenticated execution records redacted request digests, exact attempt count, token usage, explicit known/unknown cost, outcome, and failure category through its active lease. A valid patch stops at `CHANGE_READY`; it cannot claim verification. Malformed output and provider exhaustion fail the lease with no false success. Automated evidence: 46 runner tests, 52 control-plane tests, a healthy Compose deployment bootstrapped from an empty database through Flyway schema 15, and a live Anthropic credential health check.
 
-## Slice 5 — Planner, DAG scheduler, and bounded repair loop
+## Slice 5 — Planner, DAG scheduler, and bounded repair loop — complete
 
 Connect a specification to coordinated multi-agent work.
 
@@ -74,6 +74,8 @@ Connect a specification to coordinated multi-agent work.
 - Track attempts, budget/cost, transitions, cancellation, and terminal failure consistently across runs, tasks, and gates.
 
 Exit criteria: a controlled failure repairs only its owning task; attempt/budget exhaustion blocks the run; all graph transitions are restart-safe and tested.
+
+Completed evidence: the runner's planner role now accepts only an exact JSON plan contract and performs semantic validation before submission; the control plane repeats validation transactionally before materializing criteria, stable task keys, dependencies, owned paths, capabilities, attempt limits, and micro-dollar budgets. Run-scoped pessimistic locking makes competing claims restart-safe, while dependency, path-overlap, capability, task-budget, and run-budget checks determine dispatch eligibility. Independent backend/frontend nodes are concurrently eligible; dependent integration and verification nodes remain blocked. Integration cherry-picks only server-declared dependency SHAs and atomically marks only those dependencies integrated. Failed or expired work increments the owning task's fixed attempt budget, creates bounded repair context from change/evidence identities and criteria, redispatches under the `REPAIR` role, and blocks the run after exhaustion. Automated evidence includes cycle/traversal/budget rejection, dependency and conflict scheduling, repair isolation/exhaustion, integration state transitions, real Git integration, an authenticated live planner-lease/DAG submission, and a clean PostgreSQL migration through Flyway schema 16.
 
 ## Slice 6 — Policy-selected verification and evidence
 
