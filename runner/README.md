@@ -29,7 +29,7 @@ The runner does not yet clone repositories, choose policy checks, execute coding
 
 ## Provider boundary
 
-The runner includes a tested provider-neutral contract plus OpenAI Responses and Anthropic Messages API adapters. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. Both classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a task-specific schema validates it. The adapters are intentionally not wired into task execution until the task-output schema, path policy, and repair flow are complete.
+The runner includes a tested provider-neutral contract plus OpenAI Responses and Anthropic Messages API adapters. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. Both classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a task-specific schema validates it. The guarded `generate-patch` command currently invokes Anthropic only after receiving explicit worktree and allowed-path arguments; policy-selected task execution and repair orchestration remain unfinished.
 
 After building the runner image, validate an Anthropic key from the same PowerShell window that contains `ANTHROPIC_API_KEY`:
 
