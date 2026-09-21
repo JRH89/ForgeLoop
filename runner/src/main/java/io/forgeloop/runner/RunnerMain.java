@@ -169,13 +169,15 @@ public final class RunnerMain {
 
     /** Generates and commits a schema-validated Claude patch only within operator-supplied policy prefixes. */
     private static void generatePatch(String[] arguments) throws Exception {
-        if (arguments.length != 6) throw new IllegalArgumentException("Usage: generate-patch <model> <worktree> <allowed-prefixes> <title> <specification>");
-        ProviderClient provider = new AnthropicMessagesProviderClient(HttpClient.newHttpClient(), URI.create("https://api.anthropic.com/v1/messages"), requiredEnvironment("ANTHROPIC_API_KEY"));
+        if (arguments.length != 8) throw new IllegalArgumentException("Usage: generate-patch <anthropic|openai> <model> <max-attempts> <worktree> <allowed-prefixes> <title> <specification>");
+        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], Integer.parseInt(arguments[3]));
+        ProviderClient provider = new ProviderClientFactory().create(policy);
         String instructions = "Return JSON only: {summary:string,changes:[{path:string,content:string,message:string}]}. "
                 + "Propose complete file contents only. Do not use paths outside the allowed prefixes.";
-        String input = "Task: " + arguments[4] + "\nAllowed prefixes: " + arguments[3] + "\nSpecification:\n" + arguments[5];
-        PatchPlan plan = PatchPlan.parse(provider.execute(new ProviderRequest(arguments[1], instructions, input, 8192)).output());
-        Path worktree = Path.of(arguments[2]); List<String> prefixes = List.of(arguments[3].split(","));
+        String input = "Task: " + arguments[6] + "\nAllowed prefixes: " + arguments[5] + "\nSpecification:\n" + arguments[7];
+        ProviderResult result = new ProviderExecutionService().execute(provider, new ProviderRequest(policy.model(), instructions, input, 8192), policy.maxAttempts());
+        PatchPlan plan = PatchPlan.parse(result.output());
+        Path worktree = Path.of(arguments[4]); List<String> prefixes = List.of(arguments[5].split(","));
         new PatchWriter().apply(worktree, plan, prefixes);
         String sha = new GitWorktreeManager().commit(worktree, "forgeloop: " + plan.summary());
         System.out.println("Validated patch committed: " + sha);
