@@ -47,6 +47,12 @@ public final class RunnerClient {
     public String acknowledgeLease(RunnerIdentity identity, String leaseId, String nonce) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){acknowledgeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){id acknowledged}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
     /** Completes an acknowledged lease and records whether its runner verification passed. */
     public String completeLease(RunnerIdentity identity, String leaseId, String nonce, boolean passed) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$passed:Boolean!){completeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,passed:$passed){id completed}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"passed\":" + passed + "}"); }
+    /** Marks agent-authored work ready for independent integration and verification, never verified. */
+    public String completeProviderWork(RunnerIdentity identity, RunnerLease lease) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){completeProviderTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){id completed}}", variables);
+    }
     /** Records immutable evidence before a lease is completed, while its nonce is still valid. */
     public String recordEvidence(RunnerIdentity identity, RunnerLease lease, VerificationEvidenceReport report) throws Exception {
         VerificationResult result = report.result();
@@ -56,6 +62,18 @@ public final class RunnerClient {
                 + ",\"command\":\"" + escape(report.command()) + "\",\"exitCode\":" + result.exitCode()
                 + ",\"timedOut\":" + result.timedOut() + ",\"output\":\"" + escape(result.output()) + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);
+    }
+    /** Sends metadata-only provider evidence through the same authenticated lease boundary as verification evidence. */
+    public String recordProviderAttempt(RunnerIdentity identity, RunnerLease lease, ProviderAttemptReport report) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"input\":{\"provider\":\"" + escape(report.provider()) + "\",\"model\":\"" + escape(report.model())
+                + "\",\"requestIdDigest\":\"" + escape(report.requestIdDigest()) + "\",\"inputTokens\":" + report.inputTokens()
+                + ",\"outputTokens\":" + report.outputTokens() + ",\"attemptCount\":" + report.attemptCount()
+                + ",\"estimatedCostMicros\":" + report.estimatedCostMicros() + ",\"costKnown\":" + report.costKnown()
+                + ",\"outcome\":\"" + escape(report.outcome()) + "\",\"retryable\":" + report.retryable()
+                + ",\"category\":\"" + escape(report.category()) + "\"}}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:ProviderAttemptInput!){recordProviderAttempt(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id requestIdDigest outcome}}", variables);
     }
     private String post(String query, String variables) throws Exception { String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}"; HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed"); return response.body(); }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }

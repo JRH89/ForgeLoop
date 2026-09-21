@@ -1,0 +1,42 @@
+{
+  "PLANNER": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
+  },
+  "IMPLEMENTATION": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
+  },
+  "BACKEND": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
+  },
+  "FRONTEND": {
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "maxAttempts": 2
+  },
+  "INDEPENDENT_TEST": {
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "maxAttempts": 2
+  },
+  "INTEGRATION": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
+  },
+  "REPAIR": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
+  },
+  "REVIEW": {
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "maxAttempts": 2
+  }
+}

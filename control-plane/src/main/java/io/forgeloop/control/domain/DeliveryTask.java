@@ -7,6 +7,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import java.util.ArrayList;
+import java.util.List;
 
 /** One schedulable delivery step, explicitly constrained to a runner capability. */
 @Entity
@@ -19,6 +22,7 @@ public class DeliveryTask {
     @Enumerated(EnumType.STRING) private TaskState state;
     private int attemptBudget = 2;
     private int attempts;
+    @OneToMany(mappedBy = "task") private List<ProviderAttempt> providerAttempts = new ArrayList<>();
 
     protected DeliveryTask() { }
     DeliveryTask(FeatureRun run, String role, String title, String requiredCapability) {
@@ -43,4 +47,5 @@ public class DeliveryTask {
     public String getSpecification() { return run.getSpecification(); }
     public String getRequiredCapability() { return requiredCapability; } public TaskState getState() { return state; }
     public int getAttemptBudget() { return attemptBudget; } public int getAttempts() { return attempts; }
+    public List<ProviderAttempt> getProviderAttempts() { return List.copyOf(providerAttempts); }
 }

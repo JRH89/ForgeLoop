@@ -17,7 +17,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/forgeloop
       SPRING_DATASOURCE_USERNAME: forgeloop
       SPRING_DATASOURCE_PASSWORD: forgeloop
-      SPRING_JPA_DDL_AUTO: update
+      # Flyway owns schema changes; Hibernate only verifies the migrated schema.
+      SPRING_JPA_DDL_AUTO: validate
       FORGELOOP_SECURITY_MODE: development
       FORGELOOP_DEVELOPMENT_ORGANIZATION_ID: ${FORGELOOP_DEVELOPMENT_ORGANIZATION_ID:-local-development}
       FORGELOOP_GITHUB_APP_SLUG: ${FORGELOOP_GITHUB_APP_SLUG:-}

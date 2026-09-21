@@ -29,6 +29,11 @@ public class TaskLease {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         task.transition(passed ? TaskState.VERIFIED : TaskState.RETRYABLE_FAILURE); completedAt = Instant.now();
     }
+    /** Completes code generation without treating an agent-authored patch as verification evidence. */
+    public void completeChangeReady() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        task.transition(TaskState.CHANGE_READY); completedAt = Instant.now();
+    }
     /** Requeues expired work; the caller removes this lease so the task can be safely re-claimed. */
     public void recover() {
         if (completedAt != null || Instant.now().isBefore(expiresAt)) throw new IllegalStateException("Only expired incomplete leases can be recovered");

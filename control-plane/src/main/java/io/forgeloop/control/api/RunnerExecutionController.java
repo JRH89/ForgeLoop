@@ -5,7 +5,9 @@ import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.RunnerService;
 import io.forgeloop.control.application.TaskLeaseService;
 import io.forgeloop.control.application.VerificationEvidenceSubmission;
+import io.forgeloop.control.application.ProviderAttemptSubmission;
 import io.forgeloop.control.domain.DeliveryTask;
+import io.forgeloop.control.domain.ProviderAttempt;
 import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.VerificationEvidence;
 import java.util.List;
@@ -37,10 +39,19 @@ public class RunnerExecutionController {
     @MutationMapping public TaskLease completeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument boolean passed) {
         runners.authenticated(runnerId, credential); return leases.complete(leaseId, runnerId, nonce, passed);
     }
+    @MutationMapping public TaskLease completeProviderTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
+        runners.authenticated(runnerId, credential); return leases.completeProviderWork(leaseId, runnerId, nonce);
+    }
     @MutationMapping public VerificationEvidence recordVerificationEvidence(@Argument String leaseId, @Argument String runnerId,
                                                                               @Argument String nonce, @Argument String credential,
                                                                               @Argument VerificationEvidenceSubmission input) {
         runners.authenticated(runnerId, credential);
         return leases.recordEvidence(leaseId, runnerId, nonce, input);
+    }
+    @MutationMapping public ProviderAttempt recordProviderAttempt(@Argument String leaseId, @Argument String runnerId,
+                                                                   @Argument String nonce, @Argument String credential,
+                                                                   @Argument ProviderAttemptSubmission input) {
+        runners.authenticated(runnerId, credential);
+        return leases.recordProviderAttempt(leaseId, runnerId, nonce, input);
     }
 }

@@ -36,13 +36,14 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Exact capability matching for runner discovery and server-side task-claim enforcement.
 - [x] Scheduled lease-expiry recovery into the bounded repair queue.
 - [x] Operator cancellation holds non-terminal tasks, records an audit event, and is exposed in the operator console.
-- [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, and nonce-backed lease acknowledgement; it does not yet discover, clone, or execute leased work.
+- [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, nonce-backed lease acknowledgement, authenticated task discovery, and policy-selected provider execution against pre-cloned repositories.
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
 - [x] Disposable, read-only Docker verification executor with task worktree mounts, bounded output and timeouts, and deny-by-default network isolation. Docker socket access remains an explicit runner-operator capability.
 - [x] Authenticated, lease-bound persistence of bounded verification evidence with a control-plane-generated integrity digest and optional required-gate attribution.
 - [ ] Git clone, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
-- [ ] Provider adapters, planner, bounded task DAG scheduling, integration, repair, model selection, token/cost tracking, and approvals.
+- [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
+- [ ] Planner output, bounded task DAG scheduling, integration coordination, repair routing, review orchestration, and approvals.
 
 ### Evidence and repository delivery
 
@@ -59,7 +60,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 ### Current capability boundary
 
-ForgeLoop can persist and display policy-bound delivery runs and repository connections, and a self-hosted runner can execute an operator-selected container verification command and record its named gate. It **cannot yet autonomously execute a GitHub issue against a repository, call a model, select the required verification commands, or create a pull request**; those capabilities remain unchecked until the runner orchestration and GitHub delivery paths are implemented and verified.
+ForgeLoop can persist and display policy-bound delivery runs and repository connections. A self-hosted runner can execute a policy-selected model against an eligible task, create a schema- and path-validated worktree commit, record redacted provider telemetry, and execute an operator-selected container verification command. It **cannot yet autonomously plan an entire GitHub issue, integrate parallel commits, select the required verification commands, or create a pull request**; those capabilities remain unchecked until the scheduler, verification-policy, and GitHub delivery paths are connected and verified.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 
@@ -728,33 +729,33 @@ The priority is reliable closed-loop execution rather than maximizing the number
 
 ### Phase 1: Control Plane + Runner
 
-* [ ] Spring Boot control plane
-* [ ] React dashboard
-* [ ] PostgreSQL persistence
-* [ ] authentication and organizations
-* [ ] repository registration
-* [ ] runner registration
-* [ ] task dispatch
+* [x] Spring Boot control plane
+* [x] React dashboard
+* [x] PostgreSQL persistence
+* [x] authentication and organizations
+* [x] repository registration
+* [x] runner registration
+* [x] task dispatch
 * [ ] live runner events
 
 ### Phase 2: Agent Execution
 
 * [ ] repository context builder
-* [ ] provider abstraction
-* [ ] structured agent tasks
-* [ ] Git worktree isolation
-* [ ] filesystem tools
-* [ ] build/test execution
-* [ ] execution artifacts
+* [x] provider abstraction
+* [x] structured agent tasks
+* [x] Git worktree isolation
+* [x] filesystem tools
+* [x] build/test execution
+* [x] execution artifacts
 
 ### Phase 3: Closed Loops
 
-* [ ] verification gates
-* [ ] structured failure evidence
+* [x] verification gates
+* [x] structured failure evidence
 * [ ] autonomous repair
-* [ ] retry budgets
+* [x] retry budgets
 * [ ] human escalation
-* [ ] evidence bundles
+* [x] evidence bundles
 
 ### Phase 4: Multi-Agent Orchestration
 
@@ -762,15 +763,15 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [ ] task DAG
 * [ ] dependency scheduling
 * [ ] parallel workers
-* [ ] isolated agent workspaces
+* [x] isolated agent workspaces
 * [ ] integration stage
 * [ ] conflict handling
 
 ### Phase 5: Full-System Verification
 
-* [ ] Docker Compose execution
-* [ ] service health checks
-* [ ] Playwright
+* [x] Docker Compose execution
+* [x] service health checks
+* [x] Playwright
 * [ ] screenshots
 * [ ] independent verification agent
 * [ ] acceptance-criteria review
@@ -780,9 +781,9 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [ ] reusable harness definitions
 * [ ] organization rules
 * [ ] MCP configuration
-* [ ] per-agent tool permissions
-* [ ] multiple model providers
-* [ ] runner-managed BYOK
+* [x] per-agent tool permissions
+* [x] multiple model providers
+* [x] runner-managed BYOK
 * [ ] run analytics
 * [ ] model/harness comparisons
 

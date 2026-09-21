@@ -25,11 +25,23 @@ docker build -t forgeloop-runner:local runner
 
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
-The runner does not yet clone repositories, choose policy checks, execute coding providers, upload evidence, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, and execute operator-selected verification commands.
+The runner does not yet clone repositories, choose verification commands, upload evidence to an object store, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, execute a policy-selected coding provider, persist redacted attempt metadata, and run operator-selected verification commands.
 
 ## Provider boundary
 
-The runner includes a tested provider-neutral contract plus OpenAI Responses and Anthropic Messages API adapters. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. Both classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a task-specific schema validates it. The adapters are intentionally not wired into task execution until the task-output schema, path policy, and repair flow are complete.
+The runner includes tested Anthropic Messages, OpenAI Responses, Gemini generateContent, and local OpenAI-compatible adapters behind one contract. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. All adapters classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a strict task schema validates it.
+
+`execute-policy-task` is the production provider-worker entry point. It resolves provider, model, and a one-to-three-attempt retry ceiling from a reviewed runner-local JSON policy, then claims and acknowledges the task lease, creates an isolated worktree, invokes the provider, validates every output field and path before writing, commits atomically written files, submits redacted usage/failure evidence, and completes the lease. Unsupported roles are rejected before a lease is claimed.
+
+All delivery roles have explicit least-privilege manifests. Implementation, backend, frontend, independent-test, and repair roles may use the schema-guarded patch worker. Planner, integration, and review roles remain read-only and cannot use that worker; their coordinated execution is part of the task-graph slice. A successful coding worker transitions only to `CHANGE_READY`, never `VERIFIED`.
+
+```text
+execute-policy-task <control-plane-url> <identity-file> <task-id> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <lease-file>
+```
+
+Copy `provider-policy.example.json` outside the repository and choose only models enabled for that runner. Provider credentials use `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`. A local adapter uses `FORGELOOP_LOCAL_PROVIDER_URL` and optional `FORGELOOP_LOCAL_PROVIDER_API_KEY`; non-loopback endpoints require `FORGELOOP_LOCAL_PROVIDER_ALLOW_REMOTE=true`.
+
+Cost estimates are enabled per provider/model with environment variables derived from upper-cased names, for example `FORGELOOP_ANTHROPIC_CLAUDE_SONNET_5_INPUT_MICROS_PER_MILLION` and the matching `_OUTPUT_MICROS_PER_MILLION`. Values are micro-dollars per million tokens. When either rate is absent, usage is persisted with `costKnown=false` instead of a fabricated estimate.
 
 After building the runner image, validate an Anthropic key from the same PowerShell window that contains `ANTHROPIC_API_KEY`:
 

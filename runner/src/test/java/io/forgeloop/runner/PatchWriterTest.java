@@ -19,4 +19,10 @@ class PatchWriterTest {
         Files.createDirectories(temporaryDirectory.resolve(".git"));
         assertThrows(IllegalArgumentException.class, () -> new PatchWriter().apply(temporaryDirectory, new PatchPlan("x", List.of(new ProposedChange("README.md", "x", "test"))), List.of("src/")));
     }
+    @Test void validatesEveryPathBeforeWritingAnyFile() throws Exception {
+        Files.createDirectories(temporaryDirectory.resolve(".git"));
+        PatchPlan plan = new PatchPlan("x", List.of(new ProposedChange("src/ok.txt", "ok", "ok"), new ProposedChange("src-escape/no.txt", "no", "no")));
+        assertThrows(IllegalArgumentException.class, () -> new PatchWriter().apply(temporaryDirectory, plan, List.of("src")));
+        org.junit.jupiter.api.Assertions.assertFalse(Files.exists(temporaryDirectory.resolve("src/ok.txt")));
+    }
 }

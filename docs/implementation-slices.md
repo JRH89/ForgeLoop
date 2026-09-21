@@ -8,7 +8,7 @@ ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signe
 
 Ticketly is now a separate support SaaS repository. It has no ForgeLoop delivery dashboard, fabricated agent runs, fabricated cost data, or fabricated verification data. It remains the primary target application for the eventual real GitHub issue-to-PR validation.
 
-The product does **not** yet autonomously plan or modify repositories, invoke a model, create a branch/PR/check run from runner-produced work, select and dispatch policy commands, persist object-store artifacts, or complete an end-to-end issue-to-PR loop. These are the critical path.
+The product can now invoke policy-selected models and create guarded, task-scoped commits in an existing runner checkout. It does **not** yet autonomously generate the task graph, integrate those commits, select verification commands, create a branch/PR/check run from runner-produced work, persist object-store artifacts, or complete an end-to-end issue-to-PR loop. These are the critical path.
 
 ## Slice 1 — Multi-tenant security and auditable operations — complete
 
@@ -51,18 +51,18 @@ Exit criteria: two runners claim distinct compatible tasks, a killed runner is r
 
 Implementation progress: dispatch now gives authenticated runners structured, policy-derived repository, base-branch, source-reference, and capability context. The runner can claim one eligible task and prepare an isolated detached worktree from only a pre-cloned checkout beneath its configured repository root. Automatic provider execution, policy-selected commands, and lifecycle reconciliation remain in progress.
 
-## Slice 4 — Provider contracts and guarded agent workers
+## Slice 4 — Provider contracts and guarded agent workers — complete
 
 Implement real coding-agent execution as a replaceable, runner-local capability.
 
 - Define normalized provider contracts, model-selection policy, token/cost records, JSON-schema output validation, timeout/retry classification, and redaction.
 - Implement OpenAI-compatible and Anthropic adapters first; add Gemini/local adapters behind the same contract.
-- Build planner, implementation, independent-test, integration, repair, and review worker roles with least-privilege tool manifests.
+- Define least-privilege manifests for planner, implementation, backend, frontend, independent-test, integration, repair, and review roles. Execute code-producing roles through the guarded patch worker; task-graph and integration coordination remain in Slice 5.
 - Keep provider keys and repository source on the runner; persist only redacted metadata, digests, usage, and evidence references.
 
 Exit criteria: a provider can be replaced by policy; malformed or timed-out provider output cannot advance work; a provider outage creates actionable evidence rather than a false success.
 
-Implementation progress: a runner-local provider contract and OpenAI Responses API adapter now normalize output, token usage, request identity, and retryability without exposing runner credentials to the control plane. Task-output schema validation and actual worker execution remain in progress; no provider credential has been configured for a live call.
+Completed evidence: runner-local Anthropic Messages, OpenAI Responses, Gemini generateContent, and local OpenAI-compatible adapters share a normalized contract. A strict runner-local role policy chooses the adapter, model, and one-to-three-attempt retry budget without storing credentials in the control plane. Code-producing roles validate an exact JSON patch schema, reject duplicate or out-of-policy paths and symbolic-link traversal, use atomic file replacement, and commit only inside an isolated worktree. Every authenticated execution records redacted request digests, exact attempt count, token usage, explicit known/unknown cost, outcome, and failure category through its active lease. A valid patch stops at `CHANGE_READY`; it cannot claim verification. Malformed output and provider exhaustion fail the lease with no false success. Automated evidence: 46 runner tests, 52 control-plane tests, a healthy Compose deployment bootstrapped from an empty database through Flyway schema 15, and a live Anthropic credential health check.
 
 ## Slice 5 — Planner, DAG scheduler, and bounded repair loop
 

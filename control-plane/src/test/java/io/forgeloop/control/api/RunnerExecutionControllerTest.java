@@ -7,6 +7,7 @@ import io.forgeloop.control.application.RunnerService;
 import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.TaskLeaseService;
 import io.forgeloop.control.application.VerificationEvidenceSubmission;
+import io.forgeloop.control.application.ProviderAttemptSubmission;
 import org.junit.jupiter.api.Test;
 
 class RunnerExecutionControllerTest {
@@ -39,5 +40,23 @@ class RunnerExecutionControllerTest {
 
         verify(runners).authenticated("runner-1", "runner-credential");
         verify(leases).recordEvidence("lease-1", "runner-1", "nonce", report);
+    }
+
+    @Test
+    void authenticatesRunnerBeforeRecordingProviderAttempt() {
+        ProviderAttemptSubmission report = new ProviderAttemptSubmission("anthropic", "claude", "a".repeat(64), 1, 2, 1, "SUCCEEDED", 0, false, false, "COMPLETED");
+
+        controller.recordProviderAttempt("lease-1", "runner-1", "nonce", "runner-credential", report);
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).recordProviderAttempt("lease-1", "runner-1", "nonce", report);
+    }
+
+    @Test
+    void authenticatesRunnerBeforeCompletingProviderWork() {
+        controller.completeProviderTaskLease("lease-1", "runner-1", "nonce", "runner-credential");
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).completeProviderWork("lease-1", "runner-1", "nonce");
     }
 }
