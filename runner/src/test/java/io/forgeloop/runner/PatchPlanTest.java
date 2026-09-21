@@ -13,4 +13,8 @@ class PatchPlanTest {
         assertThrows(IllegalArgumentException.class, () -> PatchPlan.parse("{\"summary\":\"x\",\"changes\":[{\"path\":\"../secret\",\"content\":\"x\",\"message\":\"x\"}]}"));
         assertThrows(IllegalArgumentException.class, () -> PatchPlan.parse("not json"));
     }
+    @Test void rejectsUnexpectedFieldsAndDuplicatePaths() {
+        assertThrows(IllegalArgumentException.class, () -> PatchPlan.parse("{\"summary\":\"x\",\"changes\":[{\"path\":\"src/a\",\"content\":\"x\",\"message\":\"x\",\"shell\":\"rm\"}]}"));
+        assertThrows(IllegalArgumentException.class, () -> PatchPlan.parse("{\"summary\":\"x\",\"changes\":[{\"path\":\"src/a\",\"content\":\"x\",\"message\":\"x\"},{\"path\":\"src/a\",\"content\":\"y\",\"message\":\"y\"}]}"));
+    }
 }

@@ -32,6 +32,14 @@ public final class RunnerMain {
             generatePatch(arguments);
             return;
         }
+        if (arguments.length > 0 && "execute-provider-task".equals(arguments[0])) {
+            executeProviderTask(arguments);
+            return;
+        }
+        if (arguments.length > 0 && "execute-policy-task".equals(arguments[0])) {
+            executePolicyTask(arguments);
+            return;
+        }
         if (arguments.length > 0 && "claim-task".equals(arguments[0])) {
             claimTask(arguments);
             return;
@@ -157,38 +165,87 @@ public final class RunnerMain {
 
     /** Executes one bounded, non-repository provider request to prove runner-local credentials work without exposing them. */
     private static void providerHealth(String[] arguments) throws Exception {
-        if (arguments.length != 3) throw new IllegalArgumentException("Usage: provider-health <anthropic|openai> <model>");
-        ProviderClient provider = switch (arguments[1]) {
-            case "anthropic" -> new AnthropicMessagesProviderClient(HttpClient.newHttpClient(), URI.create("https://api.anthropic.com/v1/messages"), requiredEnvironment("ANTHROPIC_API_KEY"));
-            case "openai" -> new OpenAiResponsesProviderClient(HttpClient.newHttpClient(), URI.create("https://api.openai.com/v1/responses"), requiredEnvironment("OPENAI_API_KEY"));
-            default -> throw new IllegalArgumentException("Provider must be anthropic or openai");
-        };
+        if (arguments.length != 3) throw new IllegalArgumentException("Usage: provider-health <anthropic|openai|gemini|local> <model>");
+        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], 1);
+        ProviderClient provider = new ProviderClientFactory().create(policy);
         ProviderResult result = provider.execute(new ProviderRequest(arguments[2], "You are a credential health check.", "Reply with exactly: ForgeLoop provider ready.", 128));
         System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
     }
 
     /** Generates and commits a schema-validated Claude patch only within operator-supplied policy prefixes. */
     private static void generatePatch(String[] arguments) throws Exception {
-        if (arguments.length != 8) throw new IllegalArgumentException("Usage: generate-patch <anthropic|openai> <model> <max-attempts> <worktree> <allowed-prefixes> <title> <specification>");
+        if (arguments.length != 8) throw new IllegalArgumentException("Usage: generate-patch <anthropic|openai|gemini|local> <model> <max-attempts> <worktree> <allowed-prefixes> <title> <specification>");
         ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], Integer.parseInt(arguments[3]));
         ProviderClient provider = new ProviderClientFactory().create(policy);
         String instructions = "Return JSON only: {summary:string,changes:[{path:string,content:string,message:string}]}. "
                 + "Propose complete file contents only. Do not use paths outside the allowed prefixes.";
         String input = "Task: " + arguments[6] + "\nAllowed prefixes: " + arguments[5] + "\nSpecification:\n" + arguments[7];
-        ProviderResult result;
+        ProviderExecutionResult execution;
         try {
-            result = new ProviderExecutionService().execute(provider, new ProviderRequest(policy.model(), instructions, input, 8192), policy.maxAttempts());
-        } catch (ProviderException failure) {
-            ProviderFailureEvidence evidence = ProviderFailureEvidence.from(policy, failure);
+            execution = new ProviderExecutionService().executeDetailed(provider, new ProviderRequest(policy.model(), instructions, input, 8192), policy.maxAttempts());
+        } catch (ProviderExecutionFailure failure) {
+            ProviderFailureEvidence evidence = ProviderFailureEvidence.from(policy, failure, java.util.UUID.randomUUID().toString());
             System.err.println("Provider execution blocked: category=" + evidence.category() + " retryable=" + evidence.retryable());
             throw failure;
         }
+        ProviderResult result = execution.result();
         PatchPlan plan = PatchPlan.parse(result.output());
         Path worktree = Path.of(arguments[4]); List<String> prefixes = List.of(arguments[5].split(","));
         new PatchWriter().apply(worktree, plan, prefixes);
         String sha = new GitWorktreeManager().commit(worktree, "forgeloop: " + plan.summary());
-        ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, result);
+        ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution);
         System.out.println("Validated patch committed: " + sha + " provider=" + usage.provider() + " inputTokens=" + usage.inputTokens() + " outputTokens=" + usage.outputTokens());
+    }
+
+    /** Runs the entire authenticated provider-task lifecycle and fails the lease on every unsafe output path. */
+    private static void executeProviderTask(String[] arguments) throws Exception {
+        if (arguments.length != 11) throw new IllegalArgumentException("Usage: execute-provider-task <control-plane-url> <identity-file> <task-id> <repositories-root> <workspace-root> <anthropic|openai|gemini|local> <model> <max-attempts> <allowed-prefixes> <lease-file>");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
+        RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
+        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[6], arguments[7], Integer.parseInt(arguments[8]));
+        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, arguments[9], arguments[10]);
+    }
+
+    /** Production entry point: provider and model come from a runner-local reviewed policy file, not task input. */
+    private static void executePolicyTask(String[] arguments) throws Exception {
+        if (arguments.length != 9) throw new IllegalArgumentException("Usage: execute-policy-task <control-plane-url> <identity-file> <task-id> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <lease-file>");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
+        RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
+        ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[6])).select(task.role());
+        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, arguments[7], arguments[8]);
+    }
+
+    private static void executeProviderTask(String controlPlane, String identityFile, RunnerTask task, String repositoriesRoot,
+                                            String workspaceRoot, ProviderExecutionPolicy policy, String allowedPrefixes,
+                                            String leaseFile) throws Exception {
+        if (!GuardedPatchWorker.supports(task.role())) throw new IllegalArgumentException("Task role is not supported by the guarded patch worker");
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(identityFile));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(controlPlane));
+        RunnerLease lease = client.claimTask(identity, task.id());
+        new RunnerLeaseStore().save(Path.of(leaseFile), lease);
+        Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot), task.repository());
+        Path worktree = new GitWorktreeManager().create(repository, task.baseBranch(), task.id(), Path.of(workspaceRoot));
+        client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        GuardedPatchResult result;
+        try {
+            result = new GuardedPatchWorker().execute(policy, new ProviderClientFactory().create(policy), task.role(),
+                    task.title(), task.specification(), worktree, List.of(allowedPrefixes.split(",")), lease.leaseId());
+        } catch (ProviderExecutionFailure failure) {
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
+        } catch (GuardedPatchFailure unsafeOutput) {
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(unsafeOutput.usage(), unsafeOutput.category()));
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw unsafeOutput;
+        }
+        client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
+        client.completeProviderWork(identity, lease);
+        System.out.println("Provider task completed: commit=" + result.commitSha());
     }
 
     /** Claims exactly one server-advertised task, then creates its isolated worktree from a pre-cloned local checkout. */
@@ -342,12 +399,6 @@ public final class RunnerMain {
     private static Path statePath() {
         String configured = System.getenv("FORGELOOP_RUNNER_STATE_FILE");
         return configured == null || configured.isBlank() ? Path.of("forgeloop-runner.state") : Path.of(configured);
-    }
-
-    private static String requiredEnvironment(String name) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) throw new IllegalStateException(name + " is not set in this runner process");
-        return value;
     }
 
 }
