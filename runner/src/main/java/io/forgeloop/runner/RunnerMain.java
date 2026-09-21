@@ -175,7 +175,14 @@ public final class RunnerMain {
         String instructions = "Return JSON only: {summary:string,changes:[{path:string,content:string,message:string}]}. "
                 + "Propose complete file contents only. Do not use paths outside the allowed prefixes.";
         String input = "Task: " + arguments[6] + "\nAllowed prefixes: " + arguments[5] + "\nSpecification:\n" + arguments[7];
-        ProviderResult result = new ProviderExecutionService().execute(provider, new ProviderRequest(policy.model(), instructions, input, 8192), policy.maxAttempts());
+        ProviderResult result;
+        try {
+            result = new ProviderExecutionService().execute(provider, new ProviderRequest(policy.model(), instructions, input, 8192), policy.maxAttempts());
+        } catch (ProviderException failure) {
+            ProviderFailureEvidence evidence = ProviderFailureEvidence.from(policy, failure);
+            System.err.println("Provider execution blocked: category=" + evidence.category() + " retryable=" + evidence.retryable());
+            throw failure;
+        }
         PatchPlan plan = PatchPlan.parse(result.output());
         Path worktree = Path.of(arguments[4]); List<String> prefixes = List.of(arguments[5].split(","));
         new PatchWriter().apply(worktree, plan, prefixes);
