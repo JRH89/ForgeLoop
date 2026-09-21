@@ -180,7 +180,8 @@ public final class RunnerMain {
         Path worktree = Path.of(arguments[4]); List<String> prefixes = List.of(arguments[5].split(","));
         new PatchWriter().apply(worktree, plan, prefixes);
         String sha = new GitWorktreeManager().commit(worktree, "forgeloop: " + plan.summary());
-        System.out.println("Validated patch committed: " + sha);
+        ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, result);
+        System.out.println("Validated patch committed: " + sha + " provider=" + usage.provider() + " inputTokens=" + usage.inputTokens() + " outputTokens=" + usage.outputTokens());
     }
 
     /** Claims exactly one server-advertised task, then creates its isolated worktree from a pre-cloned local checkout. */
