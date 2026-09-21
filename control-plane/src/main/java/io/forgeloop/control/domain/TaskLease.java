@@ -27,17 +27,36 @@ public class TaskLease {
     public void acknowledge() { if (!active()) throw new IllegalStateException("Lease is expired"); acknowledgedAt = Instant.now(); }
     public void complete(boolean passed) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        task.transition(passed ? TaskState.VERIFIED : TaskState.RETRYABLE_FAILURE); completedAt = Instant.now();
+        task.transition(passed ? TaskState.VERIFIED : TaskState.REPAIR_QUEUED);
+        if (task.getState() == TaskState.FAILED) task.getRun().block();
+        completedAt = Instant.now();
     }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */
-    public void completeChangeReady() {
+    public void completeChangeReady(String changeSha) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        task.recordChangeSha(changeSha);
         task.transition(TaskState.CHANGE_READY); completedAt = Instant.now();
+    }
+    /** Closes a planner lease after its graph was materialized in the same transaction. */
+    public void completePlanning() {
+        if (!active() || acknowledgedAt == null || task.getState() != TaskState.VERIFIED) {
+            throw new IllegalStateException("Planner lease can close only after an acknowledged, verified plan");
+        }
+        completedAt = Instant.now();
+    }
+    /** Atomically records the integration head and advances only its declared dependencies. */
+    public void completeIntegration(String integratedSha) {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        task.integrateDependencies();
+        task.recordChangeSha(integratedSha);
+        task.transition(TaskState.INTEGRATED);
+        completedAt = Instant.now();
     }
     /** Requeues expired work; the caller removes this lease so the task can be safely re-claimed. */
     public void recover() {
         if (completedAt != null || Instant.now().isBefore(expiresAt)) throw new IllegalStateException("Only expired incomplete leases can be recovered");
         task.transition(TaskState.REPAIR_QUEUED);
+        if (task.getState() == TaskState.FAILED) task.getRun().block();
     }
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public String getRunnerId() { return runner.getId(); } public String getExpiresAt() { return expiresAt.toString(); }

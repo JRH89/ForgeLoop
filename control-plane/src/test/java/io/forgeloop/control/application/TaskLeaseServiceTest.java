@@ -13,6 +13,7 @@ import io.forgeloop.control.domain.RunState;
 import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.domain.RunnerRepository;
 import io.forgeloop.control.domain.ProviderAttemptRepository;
+import io.forgeloop.control.domain.RepairPackageRepository;
 import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.TaskLeaseRepository;
 import io.forgeloop.control.domain.TaskState;
@@ -27,15 +28,19 @@ class TaskLeaseServiceTest {
     TaskLeaseRepository leases = mock(TaskLeaseRepository.class);
     VerificationEvidenceRepository evidence = mock(VerificationEvidenceRepository.class);
     ProviderAttemptRepository providerAttempts = mock(ProviderAttemptRepository.class);
-    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts);
+    RepairPackageRepository repairPackages = mock(RepairPackageRepository.class);
+    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts, repairPackages);
 
     @Test
     void claimCreatesExpiringSingleOwnerLease() {
         FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "- x", 1, "GENERIC", 1);
         run.addTask("IMPLEMENTATION", "x", "git");
+        run.beginPlanning();
+        run.queuePlannedWork();
         DeliveryTask task = run.getTasks().getFirst();
         Runner runner = new Runner("org", "node", "1", List.of("git"), "credential-hash");
         when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(tasks.findAllForUpdateByRunId(null)).thenReturn(List.of(task));
         when(runners.findById("runner")).thenReturn(Optional.of(runner));
         when(leases.findByTask_Id("task")).thenReturn(Optional.empty());
         when(leases.save(any())).thenAnswer(call -> call.getArgument(0));
@@ -102,8 +107,8 @@ class TaskLeaseServiceTest {
         when(lease.belongsTo("runner")).thenReturn(true);
         when(lease.matchesNonceHash(any())).thenReturn(true);
 
-        service.completeProviderWork("lease", "runner", "nonce");
+        service.completeProviderWork("lease", "runner", "nonce", "a".repeat(40));
 
-        verify(lease).completeChangeReady();
+        verify(lease).completeChangeReady("a".repeat(40));
     }
 }

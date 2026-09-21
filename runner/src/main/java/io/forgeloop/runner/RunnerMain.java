@@ -205,7 +205,8 @@ public final class RunnerMain {
         RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
         ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[6], arguments[7], Integer.parseInt(arguments[8]));
-        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, arguments[9], arguments[10]);
+        String policyPrefixes = task.ownedPaths().isEmpty() ? arguments[9] : String.join(",", task.ownedPaths());
+        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[10]);
     }
 
     /** Production entry point: provider and model come from a runner-local reviewed policy file, not task input. */
@@ -216,7 +217,57 @@ public final class RunnerMain {
         RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
         ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[6])).select(task.role());
-        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, arguments[7], arguments[8]);
+        if ("INTEGRATION".equals(task.role())) {
+            executeIntegrationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
+            return;
+        }
+        if ("PLANNER".equals(task.role())) {
+            executePlannerTask(client, identity, task, policy, Path.of(arguments[8]));
+            return;
+        }
+        String policyPrefixes = task.ownedPaths().isEmpty() ? arguments[7] : String.join(",", task.ownedPaths());
+        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[8]);
+    }
+
+    /** Cherry-picks only dependency commits declared by the validated task graph. */
+    private static void executeIntegrationTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
+                                               String repositoriesRoot, String workspaceRoot, Path leaseFile) throws Exception {
+        if (task.dependencyChangeShas().isEmpty()) throw new IllegalArgumentException("Integration task has no dependency changes");
+        RunnerLease lease = client.claimTask(identity, task.id());
+        new RunnerLeaseStore().save(leaseFile, lease);
+        Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot), task.repository());
+        Path worktree = new GitWorktreeManager().create(repository, task.baseBranch(), task.id(), Path.of(workspaceRoot));
+        client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        try {
+            String integratedSha = new GitWorktreeManager().integrate(worktree, task.dependencyChangeShas());
+            client.completeIntegration(identity, lease, integratedSha);
+            System.out.println("Integration task completed: commit=" + integratedSha);
+        } catch (Exception conflict) {
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw conflict;
+        }
+    }
+
+    /** Executes a non-writing planner under the same authenticated lease and telemetry boundary. */
+    private static void executePlannerTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
+                                           ProviderExecutionPolicy policy, Path leaseFile) throws Exception {
+        RunnerLease lease = client.claimTask(identity, task.id());
+        new RunnerLeaseStore().save(leaseFile, lease);
+        client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        try {
+            PlannerResult result = new PlannerWorker().execute(policy, new ProviderClientFactory().create(policy), task, lease.leaseId());
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
+            client.submitTaskPlan(identity, lease, result.plan());
+            System.out.println("Planner task completed: tasks=" + result.plan().tasks().size());
+        } catch (ProviderExecutionFailure failure) {
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
+        } catch (PlannerOutputFailure invalidOutput) {
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(invalidOutput.usage(), "INVALID_PLAN_SCHEMA"));
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw invalidOutput;
+        }
     }
 
     private static void executeProviderTask(String controlPlane, String identityFile, RunnerTask task, String repositoriesRoot,
@@ -244,7 +295,7 @@ public final class RunnerMain {
             throw unsafeOutput;
         }
         client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
-        client.completeProviderWork(identity, lease);
+        client.completeProviderWork(identity, lease, result.commitSha());
         System.out.println("Provider task completed: commit=" + result.commitSha());
     }
 

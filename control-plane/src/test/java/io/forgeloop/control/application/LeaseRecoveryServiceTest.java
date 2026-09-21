@@ -24,6 +24,7 @@ class LeaseRecoveryServiceTest {
         run.addTask("IMPLEMENTATION", "Implement", "provider");
         TaskLease expired = new TaskLease(run.getTasks().getFirst(), new Runner("org", "runner", "1", List.of("provider"), "hash"),
                 "nonce-hash", Instant.now().minusSeconds(1));
+        run.getTasks().getFirst().transition(TaskState.LEASED);
         when(leases.findByCompletedAtIsNullAndExpiresAtBefore(Mockito.any())).thenReturn(List.of(expired));
 
         recovery.recoverExpiredLeases();

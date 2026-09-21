@@ -14,7 +14,8 @@ class RunnerExecutionControllerTest {
     private final TaskLeaseService leases = mock(TaskLeaseService.class);
     private final RunnerService runners = mock(RunnerService.class);
     private final RunnerDispatchService dispatch = mock(RunnerDispatchService.class);
-    private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch);
+    private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch,
+            mock(io.forgeloop.control.application.TaskPlanningService.class));
 
     @Test
     void authenticatesRunnerBeforeClaimingLease() {
@@ -54,9 +55,17 @@ class RunnerExecutionControllerTest {
 
     @Test
     void authenticatesRunnerBeforeCompletingProviderWork() {
-        controller.completeProviderTaskLease("lease-1", "runner-1", "nonce", "runner-credential");
+        controller.completeProviderTaskLease("lease-1", "runner-1", "nonce", "runner-credential", "a".repeat(40));
 
         verify(runners).authenticated("runner-1", "runner-credential");
-        verify(leases).completeProviderWork("lease-1", "runner-1", "nonce");
+        verify(leases).completeProviderWork("lease-1", "runner-1", "nonce", "a".repeat(40));
+    }
+
+    @Test
+    void authenticatesRunnerBeforeIntegrationCompletion() {
+        controller.completeIntegrationTaskLease("lease-1", "runner-1", "nonce", "runner-credential", "b".repeat(40));
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).completeIntegration("lease-1", "runner-1", "nonce", "b".repeat(40));
     }
 }

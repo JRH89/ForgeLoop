@@ -21,7 +21,7 @@ class FeatureRunServiceTest {
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile", "browser"), 25);
     when(connections.requireEnabled("acme/support")).thenReturn(connection); when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
     FeatureRun run = service.submit(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- Admin can assign\n- Cross org is denied", 25));
-    assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(1, run.getPolicyRevision()); assertEquals(3, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(2, run.getCriteria().size()); verify(runs).save(run);
+    assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(1, run.getPolicyRevision()); assertEquals(1, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(0, run.getCriteria().size()); assertEquals(io.forgeloop.control.domain.RunState.PLANNING, run.getState()); verify(runs).save(run);
   }
   @Test void rejectsBudgetAboveRepositoryPolicy() {
     when(connections.requireEnabled("acme/support")).thenReturn(new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile"), 10));

@@ -6,6 +6,9 @@ import io.forgeloop.control.application.RunnerService;
 import io.forgeloop.control.application.TaskLeaseService;
 import io.forgeloop.control.application.VerificationEvidenceSubmission;
 import io.forgeloop.control.application.ProviderAttemptSubmission;
+import io.forgeloop.control.application.TaskPlanSubmission;
+import io.forgeloop.control.application.TaskPlanningService;
+import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.ProviderAttempt;
 import io.forgeloop.control.domain.TaskLease;
@@ -22,9 +25,10 @@ public class RunnerExecutionController {
     private final TaskLeaseService leases;
     private final RunnerService runners;
     private final RunnerDispatchService dispatch;
+    private final TaskPlanningService planning;
 
-    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch) {
-        this.leases = leases; this.runners = runners; this.dispatch = dispatch;
+    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning) {
+        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning;
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
@@ -39,8 +43,11 @@ public class RunnerExecutionController {
     @MutationMapping public TaskLease completeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument boolean passed) {
         runners.authenticated(runnerId, credential); return leases.complete(leaseId, runnerId, nonce, passed);
     }
-    @MutationMapping public TaskLease completeProviderTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
-        runners.authenticated(runnerId, credential); return leases.completeProviderWork(leaseId, runnerId, nonce);
+    @MutationMapping public TaskLease completeProviderTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String changeSha) {
+        runners.authenticated(runnerId, credential); return leases.completeProviderWork(leaseId, runnerId, nonce, changeSha);
+    }
+    @MutationMapping public TaskLease completeIntegrationTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String integratedSha) {
+        runners.authenticated(runnerId, credential); return leases.completeIntegration(leaseId, runnerId, nonce, integratedSha);
     }
     @MutationMapping public VerificationEvidence recordVerificationEvidence(@Argument String leaseId, @Argument String runnerId,
                                                                               @Argument String nonce, @Argument String credential,
@@ -53,5 +60,11 @@ public class RunnerExecutionController {
                                                                    @Argument ProviderAttemptSubmission input) {
         runners.authenticated(runnerId, credential);
         return leases.recordProviderAttempt(leaseId, runnerId, nonce, input);
+    }
+    @MutationMapping public FeatureRun submitTaskPlan(@Argument String leaseId, @Argument String runnerId,
+                                                       @Argument String nonce, @Argument String credential,
+                                                       @Argument TaskPlanSubmission input) {
+        runners.authenticated(runnerId, credential);
+        return planning.submit(leases.requireActiveTaskId(leaseId, runnerId, nonce), input);
     }
 }
