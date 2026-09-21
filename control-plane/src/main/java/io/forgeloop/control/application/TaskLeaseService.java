@@ -17,11 +17,12 @@ public class TaskLeaseService {
     private final RunnerRepository runners;
     private final TaskLeaseRepository leases;
     private final VerificationEvidenceRepository evidence;
+    private final ProviderAttemptRepository providerAttempts;
     private final SecureRandom random = new SecureRandom();
 
     public TaskLeaseService(DeliveryTaskRepository tasks, RunnerRepository runners, TaskLeaseRepository leases,
-                            VerificationEvidenceRepository evidence) {
-        this.tasks = tasks; this.runners = runners; this.leases = leases; this.evidence = evidence;
+                            VerificationEvidenceRepository evidence, ProviderAttemptRepository providerAttempts) {
+        this.tasks = tasks; this.runners = runners; this.leases = leases; this.evidence = evidence; this.providerAttempts = providerAttempts;
     }
 
     @Transactional public LeaseGrant claim(String taskId, String runnerId) {
@@ -46,6 +47,10 @@ public class TaskLeaseService {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.complete(passed); return lease;
     }
 
+    @Transactional public TaskLease completeProviderWork(String leaseId, String runnerId, String nonce) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.completeChangeReady(); return lease;
+    }
+
     @Transactional public VerificationEvidence recordEvidence(String leaseId, String runnerId, String nonce,
                                                                   VerificationEvidenceSubmission submission) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
@@ -56,6 +61,19 @@ public class TaskLeaseService {
                 submission.exitCode(), submission.timedOut(), submission.output()));
         if (submission.gate() != null) task.getRun().recordGate(submission.gate(), !submission.timedOut() && submission.exitCode() == 0);
         return recorded;
+    }
+
+    /** Accepts idempotent, redacted provider telemetry only from the active worker that owns the task lease. */
+    @Transactional public ProviderAttempt recordProviderAttempt(String leaseId, String runnerId, String nonce,
+                                                                 ProviderAttemptSubmission submission) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Provider evidence requires an active acknowledged lease");
+        DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
+        return providerAttempts.findByTask_IdAndRequestIdDigest(task.getId(), submission.requestIdDigest()).orElseGet(() ->
+                providerAttempts.save(new ProviderAttempt(task, runner, submission.provider(), submission.model(), submission.requestIdDigest(),
+                        submission.inputTokens(), submission.outputTokens(), submission.attemptCount(), submission.estimatedCostMicros(),
+                        submission.costKnown(), submission.outcome(), submission.retryable(), submission.category())));
     }
 
     private TaskLease validatedLease(String leaseId, String runnerId, String nonce) {
