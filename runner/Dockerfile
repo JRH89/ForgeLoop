@@ -1,9 +1,10 @@
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM maven:3.9.12-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 COPY pom.xml .
-RUN wget -q https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.12/apache-maven-3.9.12-bin.tar.gz -O /tmp/maven.tgz && tar -xzf /tmp/maven.tgz -C /opt
+# The worktree integration test exercises the same Git primitive used by a runner.
+RUN apk add --no-cache git
 COPY src src
-RUN /opt/apache-maven-3.9.12/bin/mvn -q test package
+RUN mvn -q test package
 FROM eclipse-temurin:21-jre-alpine
 # The Docker CLI is used only for policy-selected disposable verification containers.
 # Operators must explicitly mount a daemon socket when enabling this capability.
