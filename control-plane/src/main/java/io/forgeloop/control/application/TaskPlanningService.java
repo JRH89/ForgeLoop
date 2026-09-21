@@ -46,6 +46,8 @@ public class TaskPlanningService {
         run.queuePlannedWork();
         FeatureRun saved = runs.save(run);
         audit.record("TASK_GRAPH_MATERIALIZED", "FEATURE_RUN", run.getId(), "tasks=" + plan.tasks().size() + "|criteria=" + plan.acceptanceCriteria().size());
+        saved.getCriteria();
+        saved.getTasks().forEach(task -> { task.getDependencies(); task.getProviderAttempts(); task.getRepairPackages(); });
         return saved;
     }
 }

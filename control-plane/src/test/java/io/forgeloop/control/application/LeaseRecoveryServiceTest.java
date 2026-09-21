@@ -9,6 +9,7 @@ import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.TaskLeaseRepository;
 import io.forgeloop.control.domain.TaskState;
+import io.forgeloop.control.domain.RepairPackageRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,8 @@ import org.mockito.Mockito;
 
 class LeaseRecoveryServiceTest {
     private final TaskLeaseRepository leases = Mockito.mock(TaskLeaseRepository.class);
-    private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases);
+    private final RepairPackageRepository repairs = Mockito.mock(RepairPackageRepository.class);
+    private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases, repairs);
 
     @Test
     void returnsExpiredLeaseTaskToRepairQueueAndRemovesLease() {
@@ -30,6 +32,7 @@ class LeaseRecoveryServiceTest {
         recovery.recoverExpiredLeases();
 
         assertEquals(TaskState.REPAIR_QUEUED, run.getTasks().getFirst().getState());
+        verify(repairs).save(Mockito.any());
         verify(leases).deleteAll(List.of(expired));
     }
 }

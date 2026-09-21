@@ -59,6 +59,7 @@ public class TaskLease {
         if (task.getState() == TaskState.FAILED) task.getRun().block();
     }
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
+    public DeliveryTask getTask() { return task; }
     public String getRunnerId() { return runner.getId(); } public String getExpiresAt() { return expiresAt.toString(); }
     public boolean isAcknowledged() { return acknowledgedAt != null; } public boolean isCompleted() { return completedAt != null; }
 }
