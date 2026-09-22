@@ -1,0 +1,2 @@
+ALTER TABLE feature_run ADD COLUMN approved_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE feature_run ADD COLUMN approved_by VARCHAR(255);

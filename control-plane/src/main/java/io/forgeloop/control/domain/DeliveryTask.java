@@ -93,6 +93,15 @@ public class DeliveryTask {
     /** Prevents new execution claims while preserving completed task evidence for an operator cancellation. */
     public void hold() { if (state != TaskState.VERIFIED && state != TaskState.FAILED) state = TaskState.HELD; }
 
+    /** Grants exactly one additional, audited repair attempt after an operator reviews a failure. */
+    public void retryByOperator() {
+        if (state != TaskState.FAILED && state != TaskState.HELD && state != TaskState.RETRYABLE_FAILURE) {
+            throw new IllegalStateException("Only failed or held tasks can be retried");
+        }
+        attemptBudget++;
+        state = TaskState.REPAIR_QUEUED;
+    }
+
     public String getId() { return id; } public String getPlanKey() { return planKey; } public String getRole() { return role; } public String getTitle() { return title; }
     public String getExecutionRole() { return state == TaskState.REPAIR_QUEUED && !"VERIFICATION".equals(role) ? "REPAIR" : role; }
     public FeatureRun getRun() { return run; }

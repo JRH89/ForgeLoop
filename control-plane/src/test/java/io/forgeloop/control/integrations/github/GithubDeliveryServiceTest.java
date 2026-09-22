@@ -19,7 +19,7 @@ class GithubDeliveryServiceTest {
         GithubPublicationRepository publications = mock(GithubPublicationRepository.class);
         GithubApi api = mock(GithubApi.class); AuditLedgerService audit = mock(AuditLedgerService.class);
         FeatureRun run = mock(FeatureRun.class);
-        when(run.getId()).thenReturn("run-1"); when(run.getRepository()).thenReturn("acme/ticketly"); when(run.getSourceRef()).thenReturn("main"); when(run.getTitle()).thenReturn("Assign tickets"); when(run.getState()).thenReturn(RunState.READY_FOR_REVIEW);
+        when(run.getId()).thenReturn("run-1"); when(run.getRepository()).thenReturn("acme/ticketly"); when(run.getSourceRef()).thenReturn("main"); when(run.getTitle()).thenReturn("Assign tickets"); when(run.getState()).thenReturn(RunState.READY_FOR_REVIEW); when(run.isApproved()).thenReturn(true);
         when(publications.findByFeatureRunId("run-1")).thenReturn(Optional.empty()); when(publications.save(any())).thenAnswer(call -> call.getArgument(0));
         when(api.putFile(eq(7L), eq("acme/ticketly"), any(), any())).thenReturn("head-2"); when(api.createCompletedCheck(eq(7L), eq("acme/ticketly"), eq("head-2"), any(), any())).thenReturn(41L); when(api.createDraftPullRequest(eq(7L), eq("acme/ticketly"), any(), any(), any(), any())).thenReturn(17L);
         GithubDeliveryService service = new GithubDeliveryService(publications, api, audit);
@@ -28,4 +28,11 @@ class GithubDeliveryServiceTest {
         when(publications.findByFeatureRunId("run-1")).thenReturn(Optional.of(publication)); service.deliver(run, 7L, "base-1", List.of(), "Verified"); verify(api, times(1)).createBranch(anyLong(), anyString(), anyString(), anyString()); verify(api, times(1)).createDraftPullRequest(anyLong(), anyString(), anyString(), anyString(), anyString(), anyString());
     }
     @Test void rejectsTraversalBeforeAnyGitHubCall() { org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> new GithubChange("../secrets", "no", "bad")); }
+    @Test void rejectsVerifiedButUnapprovedRun() {
+        GithubPublicationRepository publications = mock(GithubPublicationRepository.class); GithubApi api = mock(GithubApi.class); FeatureRun run = mock(FeatureRun.class);
+        when(run.getId()).thenReturn("run-2"); when(run.getRepository()).thenReturn("acme/ticketly"); when(run.getState()).thenReturn(RunState.READY_FOR_REVIEW); when(publications.findByFeatureRunId("run-2")).thenReturn(Optional.empty()); when(publications.save(any())).thenAnswer(call -> call.getArgument(0));
+        GithubDeliveryService service = new GithubDeliveryService(publications, api, mock(AuditLedgerService.class));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> service.deliver(run, 7L, "base", List.of(new GithubChange("a", "b", "c")), "summary"));
+        verifyNoInteractions(api);
+    }
 }
