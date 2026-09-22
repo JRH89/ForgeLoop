@@ -98,10 +98,15 @@ public class TaskLeaseService {
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Provider evidence requires an active acknowledged lease");
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
-        return providerAttempts.findByTask_IdAndRequestIdDigest(task.getId(), submission.requestIdDigest()).orElseGet(() ->
+        ProviderAttempt recorded = providerAttempts.findByTask_IdAndRequestIdDigest(task.getId(), submission.requestIdDigest()).orElseGet(() ->
                 providerAttempts.save(new ProviderAttempt(task, runner, submission.provider(), submission.model(), submission.requestIdDigest(),
                         submission.inputTokens(), submission.outputTokens(), submission.attemptCount(), submission.estimatedCostMicros(),
                         submission.costKnown(), submission.outcome(), submission.retryable(), submission.category())));
+        long taskSpent = providerAttempts.sumKnownCostByTaskId(task.getId());
+        long runSpent = providerAttempts.sumKnownCostByRunId(task.getRun().getId());
+        long runBudget = Math.round(task.getRun().getBudgetUsd() * 1_000_000d);
+        if ((task.getBudgetMicros() > 0 && taskSpent >= task.getBudgetMicros()) || runSpent >= runBudget) task.getRun().block();
+        return recorded;
     }
 
     /** Returns the active task identity only after validating the runner-bound lease credentials. */

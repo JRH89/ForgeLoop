@@ -79,6 +79,7 @@ class TaskLeaseServiceTest {
     void providerAttemptsRequireAndRemainBoundToAnAcknowledgedLease() {
         TaskLease lease = mock(TaskLease.class);
         DeliveryTask task = mock(DeliveryTask.class);
+        FeatureRun run = mock(FeatureRun.class);
         Runner runner = mock(Runner.class);
         when(leases.findById("lease")).thenReturn(Optional.of(lease));
         when(lease.belongsTo("runner")).thenReturn(true);
@@ -87,6 +88,9 @@ class TaskLeaseServiceTest {
         when(lease.isAcknowledged()).thenReturn(true);
         when(lease.getTaskId()).thenReturn("task");
         when(task.getId()).thenReturn("task");
+        when(task.getRun()).thenReturn(run);
+        when(run.getId()).thenReturn("run");
+        when(run.getBudgetUsd()).thenReturn(10.0);
         when(tasks.findById("task")).thenReturn(Optional.of(task));
         when(runners.findById("runner")).thenReturn(Optional.of(runner));
         when(providerAttempts.findByTask_IdAndRequestIdDigest("task", "a".repeat(64))).thenReturn(Optional.empty());
@@ -98,6 +102,30 @@ class TaskLeaseServiceTest {
         assertEquals("anthropic", recorded.getProvider());
         assertEquals(2, recorded.getAttemptCount());
         assertEquals(42, recorded.getEstimatedCostMicros());
+    }
+
+    @Test
+    void knownCostExhaustionBlocksTheOwningRun() {
+        FeatureRun run = new FeatureRun("org", "a/b", "issue-2", "x", "spec", 1, "GENERIC", "main", 1);
+        DeliveryTask task = run.addPlannedTask("implementation", "IMPLEMENTATION", "Implement", "provider", List.of("src"), 2, 50);
+        TaskLease lease = mock(TaskLease.class);
+        Runner runner = mock(Runner.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(true);
+        when(lease.getTaskId()).thenReturn("task");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(runners.findById("runner")).thenReturn(Optional.of(runner));
+        when(providerAttempts.findByTask_IdAndRequestIdDigest(null, "b".repeat(64))).thenReturn(Optional.empty());
+        when(providerAttempts.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(providerAttempts.sumKnownCostByTaskId(null)).thenReturn(50L);
+
+        service.recordProviderAttempt("lease", "runner", "nonce",
+                new ProviderAttemptSubmission("anthropic", "claude", "b".repeat(64), 1, 2, 1, "SUCCEEDED", 50, true, false, "COMPLETED"));
+
+        assertEquals(RunState.BLOCKED, run.getState());
     }
 
     @Test
