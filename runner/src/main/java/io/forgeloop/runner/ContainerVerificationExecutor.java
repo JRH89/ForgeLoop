@@ -34,13 +34,22 @@ public final class ContainerVerificationExecutor {
 
         List<String> dockerCommand = new ArrayList<>(List.of(
                 "docker", "run", "--rm", "--init", "--read-only",
-                "--mount", "type=bind,src=" + dockerVisibleWorktree + ",dst=/workspace,readonly",
+                "--mount", "type=bind,src=" + dockerVisibleWorktree + ",dst=/source,readonly",
                 "--workdir", "/workspace",
-                "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m"));
+                "--tmpfs", "/tmp:rw,noexec,nosuid,size=128m",
+                "--tmpfs", "/workspace:rw,exec,nosuid,size=2g",
+                "--env", "HOME=/tmp/home",
+                "--env", "XDG_CACHE_HOME=/tmp/cache",
+                "--env", "MAVEN_CONFIG=/tmp/m2",
+                "--env", "MAVEN_OPTS=-Dmaven.repo.local=/workspace/.m2/repository -Djansi.tmpdir=/workspace/.tmp",
+                "--env", "npm_config_cache=/tmp/npm"));
         if (!allowNetwork) {
             dockerCommand.addAll(List.of("--network", "none"));
         }
         dockerCommand.add(image);
+        // The fixed bootstrap copies the read-only source into an ephemeral filesystem. Policy argv is
+        // forwarded as positional arguments and is never interpolated into shell source.
+        dockerCommand.addAll(List.of("sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /workspace/.tmp /workspace/.m2/repository && exec \"$@\"", "forgeloop-verify"));
         dockerCommand.addAll(command);
 
         Instant startedAt = Instant.now();

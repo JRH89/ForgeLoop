@@ -18,6 +18,9 @@ import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.TaskLeaseRepository;
 import io.forgeloop.control.domain.TaskState;
 import io.forgeloop.control.domain.VerificationEvidenceRepository;
+import io.forgeloop.control.domain.VerificationEvidence;
+import io.forgeloop.control.domain.VerificationPolicySpec;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -54,8 +57,9 @@ class TaskLeaseServiceTest {
     @Test
     void namedGateEvidenceUpdatesTheOwningRun() {
         FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "- x", 1, "GENERIC", 1);
-        run.addTask("VERIFICATION", "unit", "docker");
-        run.addGate("unit");
+        String image = "node@sha256:" + "a".repeat(64);
+        run.addGate(new VerificationPolicySpec("unit", "CONTAINER", image, List.of("npm", "test"), "NONE", 300, true, "ALL"));
+        run.addPolicyVerificationTasks();
         DeliveryTask task = run.getTasks().getFirst();
         TaskLease lease = mock(TaskLease.class);
         Runner runner = mock(Runner.class);
@@ -69,10 +73,13 @@ class TaskLeaseServiceTest {
         when(runners.findById("runner")).thenReturn(Optional.of(runner));
         when(evidence.save(any())).thenAnswer(call -> call.getArgument(0));
 
+        Instant time = Instant.parse("2026-01-01T00:00:00Z");
+        String outputDigest = VerificationEvidence.digest("passed");
+        String bundleDigest = VerificationEvidence.bundleDigest("CONTAINER", "unit", image, List.of("npm", "test"), 0, false, outputDigest, time, time, null);
         service.recordEvidence("lease", "runner", "nonce",
-                new VerificationEvidenceSubmission("CONTAINER", "unit", "node:22-alpine", "npm test", 0, false, "passed"));
+                new VerificationEvidenceSubmission("CONTAINER", "unit", image, List.of("npm", "test"), 0, false, "passed", time, time, null, outputDigest, bundleDigest));
 
-        assertEquals(RunState.READY_FOR_REVIEW, run.getState());
+        assertEquals(RunState.RECEIVED, run.getState());
     }
 
     @Test

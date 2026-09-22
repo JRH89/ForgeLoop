@@ -41,6 +41,7 @@ public class TaskPlanningService {
         plan.tasks().forEach(input -> materialized.put(input.key(), run.addPlannedTask(input.key(), input.role(), input.title(),
                 input.requiredCapability(), input.ownedPaths(), input.attemptBudget(), input.budgetMicros())));
         plan.tasks().forEach(input -> input.dependencies().forEach(key -> materialized.get(input.key()).dependsOn(materialized.get(key))));
+        run.addPolicyVerificationTasks();
         planner.transition(TaskState.VERIFIED);
         leases.findByTask_Id(plannerTaskId).orElseThrow(() -> new IllegalStateException("Planner lease not found")).completePlanning();
         run.queuePlannedWork();

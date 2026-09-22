@@ -6,9 +6,6 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.security.MessageDigest;
-import java.time.Instant;
-import java.util.HexFormat;
 
 /** Writes an immutable-on-success local verification artifact and a checksum manifest for later upload. */
 public final class EvidenceBundleWriter {
@@ -16,17 +13,28 @@ public final class EvidenceBundleWriter {
         Path normalized = bundleDirectory.toAbsolutePath().normalize();
         Files.createDirectories(normalized);
         String reportJson = json(report);
-        String fileName = "verification-" + Instant.now().toEpochMilli() + ".json";
+        String fileName = "verification-" + report.bundleDigest() + ".json";
         Path target = normalized.resolve(fileName);
         Path temporary = Files.createTempFile(normalized, ".verification-", ".tmp");
         try {
             Files.writeString(temporary, reportJson, StandardCharsets.UTF_8);
             moveAtomically(temporary, target);
-            Files.writeString(normalized.resolve(fileName + ".sha256"), sha256(reportJson) + "  " + fileName + System.lineSeparator(), StandardCharsets.UTF_8);
+            Files.writeString(normalized.resolve(fileName + ".sha256"), EvidenceDigests.sha256(reportJson) + "  " + fileName + System.lineSeparator(), StandardCharsets.UTF_8);
             return target;
         } finally {
             Files.deleteIfExists(temporary);
         }
+    }
+
+    /** Recomputes the manifest before an artifact is uploaded or cited. */
+    public boolean verify(Path artifact) throws IOException {
+        Path normalized = artifact.toAbsolutePath().normalize();
+        Path manifest = normalized.resolveSibling(normalized.getFileName() + ".sha256");
+        if (!Files.isRegularFile(normalized) || !Files.isRegularFile(manifest)) return false;
+        String line = Files.readString(manifest, StandardCharsets.UTF_8).strip();
+        String expectedSuffix = "  " + normalized.getFileName();
+        if (!line.endsWith(expectedSuffix) || line.length() != 64 + expectedSuffix.length()) return false;
+        return line.substring(0, 64).equals(EvidenceDigests.sha256(Files.readString(normalized, StandardCharsets.UTF_8)));
     }
 
     private static void moveAtomically(Path source, Path target) throws IOException {
@@ -36,15 +44,12 @@ public final class EvidenceBundleWriter {
     private static String json(VerificationEvidenceReport report) {
         VerificationResult result = report.result();
         return "{\"kind\":\"" + escape(report.kind()) + "\",\"gate\":" + nullable(report.gate())
-                + ",\"image\":" + nullable(report.image()) + ",\"command\":\"" + escape(report.command())
-                + "\",\"exitCode\":" + result.exitCode() + ",\"timedOut\":" + result.timedOut()
+                + ",\"image\":" + nullable(report.image()) + ",\"command\":[" + report.command().stream().map(value -> "\"" + escape(value) + "\"").reduce((a,b)->a+","+b).orElse("") + "]"
+                + ",\"exitCode\":" + result.exitCode() + ",\"timedOut\":" + result.timedOut()
                 + ",\"startedAt\":\"" + result.startedAt() + "\",\"finishedAt\":\"" + result.finishedAt()
-                + "\",\"output\":\"" + escape(result.output()) + "\"}";
+                + "\",\"artifactReference\":" + nullable(report.artifactReference()) + ",\"outputDigest\":\"" + report.outputDigest()
+                + "\",\"bundleDigest\":\"" + report.bundleDigest() + "\",\"output\":\"" + escape(result.output()) + "\"}";
     }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }
     private static String escape(String value) { return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t"); }
-    private static String sha256(String value) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
-        catch (Exception exception) { throw new IllegalStateException("SHA-256 unavailable", exception); }
-    }
 }

@@ -34,13 +34,16 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch sourceRef specification:executionSpecification requiredCapability budgetUsd ownedPaths dependencyChangeShas}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch sourceRef specification:executionSpecification requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         for (JsonNode task : JSON.readTree(response).path("data").path("availableRunnerTasks")) {
             tasks.add(new RunnerTask(task.path("id").asText(), task.path("role").asText(), task.path("title").asText(),
                     task.path("repository").asText(), task.path("baseBranch").asText(), task.path("sourceRef").asText(), task.path("specification").asText(), task.path("requiredCapability").asText(), task.path("budgetUsd").asDouble(),
                     JSON.convertValue(task.path("ownedPaths"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
-                    JSON.convertValue(task.path("dependencyChangeShas"), JSON.getTypeFactory().constructCollectionType(List.class, String.class))));
+                    JSON.convertValue(task.path("dependencyChangeShas"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
+                    nullableText(task, "verificationGateName"), nullableText(task, "verificationKind"), nullableText(task, "verificationImageDigest"),
+                    JSON.convertValue(task.path("verificationCommand"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
+                    nullableText(task, "verificationNetworkPolicy"), task.path("verificationTimeoutSeconds").isNull() ? null : task.path("verificationTimeoutSeconds").asInt(), task.path("verificationBaseRef").asText()));
         }
         return List.copyOf(tasks);
     }
@@ -62,8 +65,11 @@ public final class RunnerClient {
         String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
                 + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
                 + "\",\"input\":{\"kind\":\"" + escape(report.kind()) + "\",\"gate\":" + nullable(report.gate()) + ",\"image\":" + nullable(report.image())
-                + ",\"command\":\"" + escape(report.command()) + "\",\"exitCode\":" + result.exitCode()
-                + ",\"timedOut\":" + result.timedOut() + ",\"output\":\"" + escape(result.output()) + "\"}}";
+                + ",\"command\":" + jsonStrings(report.command()) + ",\"exitCode\":" + result.exitCode()
+                + ",\"timedOut\":" + result.timedOut() + ",\"output\":\"" + escape(result.output())
+                + "\",\"startedAt\":\"" + result.startedAt() + "\",\"finishedAt\":\"" + result.finishedAt()
+                + "\",\"artifactReference\":" + nullable(report.artifactReference()) + ",\"outputDigest\":\"" + report.outputDigest()
+                + "\",\"bundleDigest\":\"" + report.bundleDigest() + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);
     }
     /** Sends metadata-only provider evidence through the same authenticated lease boundary as verification evidence. */
@@ -93,6 +99,8 @@ public final class RunnerClient {
     }
     private String post(String query, String variables) throws Exception { String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}"; HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed"); return response.body(); }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }
+    private static String jsonStrings(List<String> values) { return "[" + values.stream().map(value -> "\"" + escape(value) + "\"").reduce((a,b)->a+","+b).orElse("") + "]"; }
+    private static String nullableText(JsonNode node, String field) { return node.path(field).isMissingNode() || node.path(field).isNull() ? null : node.path(field).asText(); }
     private static String escape(String value) {
         StringBuilder escaped = new StringBuilder(value.length() + 16);
         for (int index = 0; index < value.length(); index++) {

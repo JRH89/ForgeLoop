@@ -36,6 +36,7 @@ public class DeliveryTask {
     private List<DeliveryTask> dependencies = new ArrayList<>();
     @OneToMany(mappedBy = "task") private List<ProviderAttempt> providerAttempts = new ArrayList<>();
     @OneToMany(mappedBy = "task") private List<RepairPackage> repairPackages = new ArrayList<>();
+    @ManyToOne private VerificationGate verificationGate;
 
     protected DeliveryTask() { }
     DeliveryTask(FeatureRun run, String planKey, String role, String title, String requiredCapability,
@@ -69,6 +70,7 @@ public class DeliveryTask {
         state = to;
     }
     public void dependsOn(DeliveryTask dependency) { dependencies.add(dependency); }
+    public void attachVerificationGate(VerificationGate gate) { if (!"VERIFICATION".equals(role)) throw new IllegalStateException("Only verification tasks can own gates"); this.verificationGate = gate; }
     public void recordChangeSha(String sha) {
         if (sha == null || !sha.matches("[0-9a-f]{40,64}")) throw new IllegalArgumentException("Change SHA is invalid");
         this.changeSha = sha;
@@ -92,7 +94,7 @@ public class DeliveryTask {
     public void hold() { if (state != TaskState.VERIFIED && state != TaskState.FAILED) state = TaskState.HELD; }
 
     public String getId() { return id; } public String getPlanKey() { return planKey; } public String getRole() { return role; } public String getTitle() { return title; }
-    public String getExecutionRole() { return state == TaskState.REPAIR_QUEUED ? "REPAIR" : role; }
+    public String getExecutionRole() { return state == TaskState.REPAIR_QUEUED && !"VERIFICATION".equals(role) ? "REPAIR" : role; }
     public FeatureRun getRun() { return run; }
     /** Runner dispatch fields are derived from the policy-bound run, not runner input. */
     public String getRepository() { return run.getRepository(); }
@@ -121,4 +123,12 @@ public class DeliveryTask {
     public List<String> getDependencyChangeShas() { return dependencies.stream().map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).toList(); }
     public List<ProviderAttempt> getProviderAttempts() { return List.copyOf(providerAttempts); }
     public List<RepairPackage> getRepairPackages() { return List.copyOf(repairPackages); }
+    public VerificationGate getVerificationGate() { return verificationGate; }
+    public String getVerificationGateName() { return verificationGate == null ? null : verificationGate.getName(); }
+    public String getVerificationKind() { return verificationGate == null ? null : verificationGate.getKind(); }
+    public String getVerificationImageDigest() { return verificationGate == null ? null : verificationGate.getImageDigest(); }
+    public List<String> getVerificationCommand() { return verificationGate == null ? List.of() : verificationGate.getCommand(); }
+    public String getVerificationNetworkPolicy() { return verificationGate == null ? null : verificationGate.getNetworkPolicy(); }
+    public Integer getVerificationTimeoutSeconds() { return verificationGate == null ? null : verificationGate.getTimeoutSeconds(); }
+    public String getVerificationBaseRef() { return dependencies.stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch()); }
 }

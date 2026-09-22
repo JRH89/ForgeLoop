@@ -85,9 +85,15 @@ public class TaskLeaseService {
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Evidence requires an active acknowledged lease");
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
-        VerificationEvidence recorded = evidence.save(new VerificationEvidence(task, runner, submission.kind(), submission.gate(), submission.image(), submission.command(),
-                submission.exitCode(), submission.timedOut(), submission.output()));
-        if (submission.gate() != null) task.getRun().recordGate(submission.gate(), !submission.timedOut() && submission.exitCode() == 0);
+        VerificationGate gate = task.getVerificationGate();
+        if (gate == null || submission.gate() == null || !gate.matches(submission.gate())) throw new IllegalArgumentException("Evidence is not bound to this verification task");
+        VerificationPolicySpec policy = gate.toSpec();
+        if (!policy.kind().equals(submission.kind()) || !policy.imageDigest().equals(submission.image()) || !policy.command().equals(submission.command())) throw new IllegalArgumentException("Evidence metadata does not match the run policy snapshot");
+        EvidenceSecretPolicy.requireRedacted(submission.output());
+        VerificationEvidence candidate = new VerificationEvidence(task, runner, submission.kind(), submission.gate(), submission.image(), submission.command(),
+                submission.exitCode(), submission.timedOut(), submission.output(), submission.startedAt(), submission.finishedAt(), submission.artifactReference(), submission.outputDigest(), submission.bundleDigest());
+        VerificationEvidence recorded = evidence.findByDigest(candidate.getDigest()).orElseGet(() -> evidence.save(candidate));
+        task.getRun().recordGate(submission.gate(), !submission.timedOut() && submission.exitCode() == 0, submission.timedOut());
         return recorded;
     }
 

@@ -29,6 +29,7 @@ public class TaskLease {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         task.transition(passed ? TaskState.VERIFIED : TaskState.REPAIR_QUEUED);
         if (task.getState() == TaskState.FAILED) task.getRun().block();
+        if (passed) task.getRun().evaluateReviewReadiness();
         completedAt = Instant.now();
     }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */

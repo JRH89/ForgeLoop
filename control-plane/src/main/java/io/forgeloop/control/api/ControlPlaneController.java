@@ -24,12 +24,13 @@ public class ControlPlaneController {
   @QueryMapping public List<AuditLedgerEntry> featureRunAuditEvents(@Argument String runId) { runs.get(runId); return audit.events("FEATURE_RUN", runId); }
   @MutationMapping public FeatureRun submitFeature(@Argument SubmitFeatureInput input) { return runs.submit(new FeatureSubmission(input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd())); }
   @MutationMapping public RepositoryConnection connectRepository(@Argument ConnectRepositoryInput input) { operators.requireAdministrator(); return connections.register(new RepositoryRegistration(input.repository(), input.installationId(), input.defaultBranch(), input.issueLabel(), input.harnessProfile(), input.requiredGates(), input.maxBudgetUsd())); }
+  @MutationMapping public RepositoryConnection configureRepositoryVerification(@Argument String repository, @Argument List<VerificationPolicyInput> policies) { operators.requireAdministrator(); return connections.configureVerification(repository, policies.stream().map(VerificationPolicyInput::toSpec).toList()); }
   @MutationMapping public String issueRunnerRegistrationToken(@Argument String organizationId) { operators.requireAdministrator(); operators.requireOrganization(organizationId); return runners.issueRegistrationToken(organizationId); }
   @MutationMapping public RunnerEnrollment registerRunner(@Argument RegisterRunnerInput input) { return runners.register(new RunnerRegistration(input.token(), input.name(), input.version(), input.capabilities())); }
   @MutationMapping public Runner runnerHeartbeat(@Argument String runnerId, @Argument String credential) { return runners.heartbeat(runnerId, credential); }
   @MutationMapping public OrganizationMembership grantOrganizationMembership(@Argument String organizationId, @Argument String subject, @Argument OperatorRole role) { return organizations.grantMembership(organizationId, subject, role); }
   @MutationMapping public DeliveryTask transitionTask(@Argument String taskId, @Argument TaskState to) { return runs.transitionTask(taskId, to); }
-  @MutationMapping public FeatureRun recordVerificationGate(@Argument String runId, @Argument String gate, @Argument boolean passed) { return runs.recordGate(runId, gate, passed); }
+  @MutationMapping public FeatureRun overrideVerificationGate(@Argument String runId, @Argument String gate, @Argument String reason) { operators.requireAdministrator(); return runs.overrideGate(runId, gate, reason); }
   @MutationMapping public FeatureRun cancelFeatureRun(@Argument String runId) { operators.requireAdministrator(); return runs.cancel(runId); }
   @MutationMapping public List<RepositoryConnection> synchronizeGithubInstallation(@Argument long installationId) { operators.requireAdministrator(); operators.requireOrganization(githubInstallations.findByInstallationId(installationId).orElseThrow(() -> new IllegalArgumentException("GitHub installation is not registered")).getOrganizationId()); installationSync.synchronizeInstallation(installationId); return connections.list(); }
   /** Temporary controlled handoff until Slice 3 supplies runner-produced changes and base commits. */
@@ -38,4 +39,5 @@ public class ControlPlaneController {
   public record ConnectRepositoryInput(String repository, long installationId, String defaultBranch, String issueLabel, String harnessProfile, List<String> requiredGates, double maxBudgetUsd) { }
   public record RegisterRunnerInput(String token, String name, String version, List<String> capabilities) { }
   public record GithubChangeInput(String path, String content, String message) { }
+  public record VerificationPolicyInput(String name, String kind, String imageDigest, List<String> command, String networkPolicy, int timeoutSeconds, boolean required, String criterionCoverage) { VerificationPolicySpec toSpec(){return new VerificationPolicySpec(name,kind,imageDigest,command,networkPolicy,timeoutSeconds,required,criterionCoverage);} }
 }

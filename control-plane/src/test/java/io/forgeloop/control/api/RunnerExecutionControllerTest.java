@@ -8,6 +8,9 @@ import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.TaskLeaseService;
 import io.forgeloop.control.application.VerificationEvidenceSubmission;
 import io.forgeloop.control.application.ProviderAttemptSubmission;
+import io.forgeloop.control.domain.VerificationEvidence;
+import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RunnerExecutionControllerTest {
@@ -35,7 +38,10 @@ class RunnerExecutionControllerTest {
 
     @Test
     void authenticatesRunnerBeforeRecordingEvidence() {
-        VerificationEvidenceSubmission report = new VerificationEvidenceSubmission("CONTAINER", "unit", "node:22-alpine", "node --version", 0, false, "ok");
+        Instant time = Instant.parse("2026-01-01T00:00:00Z");
+        String outputDigest = VerificationEvidence.digest("ok");
+        String bundleDigest = VerificationEvidence.bundleDigest("CONTAINER", "unit", "node@sha256:" + "a".repeat(64), List.of("node", "--version"), 0, false, outputDigest, time, time, null);
+        VerificationEvidenceSubmission report = new VerificationEvidenceSubmission("CONTAINER", "unit", "node@sha256:" + "a".repeat(64), List.of("node", "--version"), 0, false, "ok", time, time, null, outputDigest, bundleDigest);
 
         controller.recordVerificationEvidence("lease-1", "runner-1", "nonce", "runner-credential", report);
 
