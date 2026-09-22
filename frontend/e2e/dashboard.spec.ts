@@ -4,7 +4,10 @@ import { expect, test } from '@playwright/test';
 test('renders the persisted delivery-run console', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { name: 'Verified changes, not agent claims.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Runs', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'ForgeLoop navigation' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Create delivery run' })).toBeVisible();
+  await expect(page.getByText('Intake queue')).toBeVisible();
+  await expect(page.getByRole('button', { name: '+ New run' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Task graph & attempts' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Evidence browser & redacted logs' })).toBeVisible();
 });

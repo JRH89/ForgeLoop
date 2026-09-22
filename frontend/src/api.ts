@@ -1,12 +1,22 @@
 const endpoint = import.meta.env.VITE_GRAPHQL_URL ?? '/graphql';
 
-export type Task = { id: string; role: string; title: string; state: string; attemptBudget: number; attempts: number };
-export type Gate = { id: string; name: string; required: boolean; state: string };
+export type ProviderAttempt = { id: string; provider: string; model: string; inputTokens: number; outputTokens: number; attemptCount: number; estimatedCostMicros: number; costKnown: boolean; outcome: string; retryable: boolean; category: string; recordedAt: string };
+export type RepairPackage = { id: string; attempt: number; failureCategory: string; changeSha?: string; evidenceDigest?: string; createdAt: string };
+export type Task = { id: string; planKey: string; role: string; executionRole: string; title: string; state: string; attemptBudget: number; attempts: number; budgetMicros: number; spentCostMicros: number; changeSha?: string; ownedPaths: string[]; dependencyKeys: string[]; providerAttempts: ProviderAttempt[]; repairPackages: RepairPackage[] };
+export type Gate = { id: string; name: string; required: boolean; state: string; kind?: string; imageDigest?: string; command: string[]; networkPolicy?: string; timeoutSeconds?: number; criterionCoverage?: string };
 export type Criterion = { id: string; statement: string; coverageState: string };
-export type FeatureRun = { id: string; repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number; state: string; createdAt: string; tasks: Task[]; gates: Gate[]; criteria: Criterion[] };
+export type FeatureRun = { id: string; repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number; spentCostMicros: number; harnessProfile: string; baseBranch: string; policyRevision: number; state: string; createdAt: string; approved: boolean; approvedAt?: string; approvedBy?: string; tasks: Task[]; gates: Gate[]; criteria: Criterion[] };
+export type VerificationEvidence = { id: string; taskId: string; runnerId: string; kind: string; gate: string; image: string; command: string[]; exitCode: number; timedOut: boolean; output: string; digest: string; startedAt: string; finishedAt: string; artifactReference?: string; recordedAt: string };
+export type AuditEvent = { id: string; actor: string; action: string; resourceType: string; resourceId: string; payloadDigest: string; occurredAt: string };
+export type GithubPublication = { repository: string; branch: string; headSha?: string; pullRequestNumber?: number; deliveredAt?: string };
+export type OperatorSession = { subject: string; organizationId: string; role: 'ADMIN' | 'OPERATOR' | 'VIEWER' };
 export type SubmitFeature = { repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number };
 export type RepositoryConnection = { id: string; repository: string; installationId: number; enabled: boolean; defaultBranch: string; issueLabel: string; harnessProfile: string; requiredGates: string[]; maxBudgetUsd: number; policyRevision: number };
 export type ConnectRepository = Omit<RepositoryConnection, 'id' | 'enabled' | 'policyRevision'>;
+export type RunOperations = { evidence: VerificationEvidence[]; audit: AuditEvent[]; publication?: GithubPublication };
+
+const taskFields = `id planKey role executionRole title state attemptBudget attempts budgetMicros spentCostMicros changeSha ownedPaths dependencyKeys providerAttempts { id provider model inputTokens outputTokens attemptCount estimatedCostMicros costKnown outcome retryable category recordedAt } repairPackages { id attempt failureCategory changeSha evidenceDigest createdAt }`;
+const runFields = `id repository sourceRef title specification budgetUsd spentCostMicros harnessProfile baseBranch policyRevision state createdAt approved approvedAt approvedBy tasks { ${taskFields} } gates { id name required state kind imageDigest command networkPolicy timeoutSeconds criterionCoverage } criteria { id statement coverageState }`;
 
 async function request<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
@@ -15,18 +25,13 @@ async function request<T>(query: string, variables: Record<string, unknown> = {}
   return body.data;
 }
 
-export function loadRuns(): Promise<FeatureRun[]> {
-  return request<{ featureRuns?: FeatureRun[] }>('query { featureRuns { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement coverageState } } }').then(data => data.featureRuns ?? []);
-}
-
-export function submitFeature(input: SubmitFeature): Promise<FeatureRun> {
-  return request<{ submitFeature: FeatureRun }>('mutation($input: SubmitFeatureInput!) { submitFeature(input: $input) { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement coverageState } } }', { input }).then(data => data.submitFeature);
-}
-
-/** Cancels an in-flight run through the audited operator mutation. */
-export function cancelFeatureRun(runId: string): Promise<FeatureRun> {
-  return request<{ cancelFeatureRun: FeatureRun }>('mutation($runId: ID!) { cancelFeatureRun(runId: $runId) { id repository sourceRef title specification budgetUsd state createdAt tasks { id role title state attemptBudget attempts } gates { id name required state } criteria { id statement coverageState } } }', { runId }).then(data => data.cancelFeatureRun);
-}
-
+export function loadRuns(): Promise<FeatureRun[]> { return request<{ featureRuns?: FeatureRun[] }>(`query { featureRuns { ${runFields} } }`).then(data => data.featureRuns ?? []); }
+export function loadRun(id: string): Promise<FeatureRun> { return request<{ featureRun: FeatureRun }>(`query($id: ID!) { featureRun(id: $id) { ${runFields} } }`, { id }).then(data => data.featureRun); }
+export function loadOperator(): Promise<OperatorSession> { return request<{ currentOperator: OperatorSession }>('query { currentOperator { subject organizationId role } }').then(data => data.currentOperator); }
+export function loadRunOperations(runId: string): Promise<RunOperations> { return request<{ featureRunEvidence: VerificationEvidence[]; featureRunAuditEvents: AuditEvent[]; featureRunPublication?: GithubPublication }>('query($runId: ID!) { featureRunEvidence(runId: $runId) { id taskId runnerId kind gate image command exitCode timedOut output digest startedAt finishedAt artifactReference recordedAt } featureRunAuditEvents(runId: $runId) { id actor action resourceType resourceId payloadDigest occurredAt } featureRunPublication(runId: $runId) { repository branch headSha pullRequestNumber deliveredAt } }', { runId }).then(data => ({ evidence: data.featureRunEvidence, audit: data.featureRunAuditEvents, publication: data.featureRunPublication })); }
+export function submitFeature(input: SubmitFeature): Promise<FeatureRun> { return request<{ submitFeature: FeatureRun }>(`mutation($input: SubmitFeatureInput!) { submitFeature(input: $input) { ${runFields} } }`, { input }).then(data => data.submitFeature); }
+export function cancelFeatureRun(runId: string): Promise<FeatureRun> { return request<{ cancelFeatureRun: FeatureRun }>(`mutation($runId: ID!) { cancelFeatureRun(runId: $runId, confirmation: "CANCEL") { ${runFields} } }`, { runId }).then(data => data.cancelFeatureRun); }
+export function approveFeatureRun(runId: string): Promise<FeatureRun> { return request<{ approveFeatureRun: FeatureRun }>(`mutation($runId: ID!) { approveFeatureRun(runId: $runId, confirmation: "APPROVE") { ${runFields} } }`, { runId }).then(data => data.approveFeatureRun); }
+export function retryFeatureTask(taskId: string, reason: string): Promise<Task> { return request<{ retryFeatureTask: Task }>(`mutation($taskId: ID!, $reason: String!) { retryFeatureTask(taskId: $taskId, reason: $reason, confirmation: "RETRY") { ${taskFields} } }`, { taskId, reason }).then(data => data.retryFeatureTask); }
 export function loadRepositoryConnections(): Promise<RepositoryConnection[]> { return request<{ repositoryConnections?: RepositoryConnection[] }>('query { repositoryConnections { id repository installationId enabled defaultBranch issueLabel harnessProfile requiredGates maxBudgetUsd policyRevision } }').then(data => data.repositoryConnections ?? []); }
 export function connectRepository(input: ConnectRepository): Promise<RepositoryConnection> { return request<{ connectRepository: RepositoryConnection }>('mutation($input: ConnectRepositoryInput!) { connectRepository(input: $input) { id repository installationId enabled defaultBranch issueLabel harnessProfile requiredGates maxBudgetUsd policyRevision } }', { input }).then(data => data.connectRepository); }
