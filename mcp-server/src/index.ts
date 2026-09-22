@@ -1,9 +1,19 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { operationFor, toolNames } from './tools.js';
+import { invokeControlPlane } from './gateway.js';
+import { definitions, permittedTools, type ToolName } from './tools.js';
 
-const server = new Server({ name: 'forgeloop-mcp', version: '0.2.0' }, { capabilities: { tools: {} } });
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: toolNames.map(name => ({ name, description: `ForgeLoop control-plane operation: ${name}`, inputSchema: { type: 'object', properties: { runId: { type: 'string', description: 'ForgeLoop delivery-run identifier' } }, required: ['runId'], additionalProperties: false } })) }));
-server.setRequestHandler(CallToolRequestSchema, async request => { const name = request.params.name; if (!toolNames.includes(name as typeof toolNames[number])) throw new Error('Unknown ForgeLoop operation'); const runId = request.params.arguments?.runId; if (typeof runId !== 'string' || !runId.trim()) throw new Error('runId is required'); return { content: [{ type: 'text', text: JSON.stringify({ tool: name, runId, operation: operationFor(name as typeof toolNames[number]), note: 'This MCP server is a control-plane boundary. Repository checkout, test execution, browser access, and local MCP tools run only on an authorized ForgeLoop Runner.' }) }] }; });
+const grants = permittedTools(process.env.FORGELOOP_MCP_TOOL_GRANTS);
+const config = { endpoint: process.env.FORGELOOP_GRAPHQL_URL ?? 'http://localhost:8090/graphql', accessToken: process.env.FORGELOOP_ACCESS_TOKEN ?? '' };
+const server = new Server({ name: 'forgeloop-mcp', version: '0.3.0' }, { capabilities: { tools: {} } });
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: grants.map(name => ({ name, description: definitions[name].description, inputSchema: { type: 'object', properties: { runId: { type: 'string' }, taskId: { type: 'string' }, reason: { type: 'string', maxLength: 1000 }, confirmation: { type: 'string', description: 'Explicit APPROVE, CANCEL, or RETRY confirmation for mutating tools.' } }, required: definitions[name].required, additionalProperties: false } })) }));
+server.setRequestHandler(CallToolRequestSchema, async request => {
+  const name = request.params.name as ToolName;
+  if (!grants.includes(name)) throw new Error('Tool is not granted to this MCP client');
+  const data = await invokeControlPlane(name, request.params.arguments ?? {}, config);
+  return { content: [{ type: 'text', text: JSON.stringify(data) }] };
+});
+
 await server.connect(new StdioServerTransport());
