@@ -22,5 +22,18 @@ class EvidenceBundleWriterTest {
         assertTrue(Files.readString(artifact).contains("\\n"));
         assertTrue(Files.exists(artifact.resolveSibling(artifact.getFileName() + ".sha256")));
         assertEquals(64, Files.readString(artifact.resolveSibling(artifact.getFileName() + ".sha256")).substring(0, 64).length());
+        assertTrue(new EvidenceBundleWriter().verify(artifact));
+    }
+
+    @Test
+    void detectsArtifactCorruption() throws Exception {
+        VerificationEvidenceReport report = new VerificationEvidenceReport("CONTAINER", "unit", "node@sha256:" + "a".repeat(64), "npm test",
+                new VerificationResult(0, false, "passed", Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:01Z")));
+        EvidenceBundleWriter writer = new EvidenceBundleWriter();
+        Path artifact = writer.write(temporaryDirectory, report);
+
+        Files.writeString(artifact, "corrupted");
+
+        org.junit.jupiter.api.Assertions.assertFalse(writer.verify(artifact));
     }
 }

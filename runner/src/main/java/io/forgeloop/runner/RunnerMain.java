@@ -216,6 +216,10 @@ public final class RunnerMain {
         RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
         RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
+        if ("VERIFICATION".equals(task.role())) {
+            executeVerificationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
+            return;
+        }
         ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[6])).select(task.role());
         if ("INTEGRATION".equals(task.role())) {
             executeIntegrationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
@@ -227,6 +231,34 @@ public final class RunnerMain {
         }
         String policyPrefixes = task.ownedPaths().isEmpty() ? arguments[7] : String.join(",", task.ownedPaths());
         executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[8]);
+    }
+
+    /** Executes only the immutable command and container digest selected by the repository policy snapshot. */
+    private static void executeVerificationTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
+                                                String repositoriesRoot, String workspaceRoot, Path leaseFile) throws Exception {
+        if (task.verificationGateName() == null || task.verificationImageDigest() == null || task.verificationCommand().isEmpty()
+                || task.verificationTimeoutSeconds() == null || task.verificationNetworkPolicy() == null) throw new IllegalArgumentException("Verification task policy is incomplete");
+        RunnerLease lease = client.claimTask(identity, task.id());
+        new RunnerLeaseStore().save(leaseFile, lease);
+        Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot), task.repository());
+        Path worktree = new GitWorktreeManager().create(repository, task.verificationBaseRef(), task.id(), Path.of(workspaceRoot));
+        client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        try {
+            VerificationResult result = new ContainerVerificationExecutor().execute(worktree, dockerVisibleWorktree(worktree),
+                    task.verificationImageDigest(), task.verificationCommand(), Duration.ofSeconds(task.verificationTimeoutSeconds()),
+                    "EGRESS".equals(task.verificationNetworkPolicy()));
+            String artifactReference = "local-evidence/" + task.id();
+            VerificationEvidenceReport report = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
+                    task.verificationImageDigest(), task.verificationCommand(), result, artifactReference);
+            new EvidenceBundleWriter().write(Path.of(workspaceRoot).resolve("evidence").resolve(task.id()), report);
+            client.recordEvidence(identity, lease, report);
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), result.passed());
+            if (!result.passed()) throw new IllegalStateException("Policy verification failed: " + task.verificationGateName());
+            System.out.println("Verification task completed: gate=" + task.verificationGateName() + " evidence=" + report.bundleDigest());
+        } catch (Exception failure) {
+            try { client.completeLease(identity, lease.leaseId(), lease.nonce(), false); } catch (Exception ignored) { /* Original verification failure wins. */ }
+            throw failure;
+        }
     }
 
     /** Cherry-picks only dependency commits declared by the validated task graph. */
