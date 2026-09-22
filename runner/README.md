@@ -13,8 +13,9 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Claims a task and keeps the lease nonce in a local state file rather than printing it.
 * Provides a guarded Git worktree manager and an atomic claim-and-prepare flow for task-scoped repository isolation from pre-cloned local checkouts.
 * Runs policy-selected verification commands directly (never through a shell) with a one-hour maximum timeout and bounded output.
-* Runs disposable Docker verification containers with a read-only task mount, a read-only root filesystem, capped temporary storage, and deny-by-default networking.
-* Can submit bounded, lease-bound verification evidence to the control plane; the control plane calculates its integrity digest.
+* Runs disposable Docker verification containers from a read-only task mount copied into capped ephemeral storage, with a read-only root filesystem and deny-by-default networking.
+* Executes server-snapshotted verification policy (digest-pinned image, argv, network decision, timeout, and gate) without consulting provider policy.
+* Redacts common credential forms and submits bounded, lease-bound evidence whose output and bundle checksums are independently recomputed by the control plane.
 * Executes a strict non-writing planner contract and submits the validated task graph through its active lease.
 * Enforces control-plane-owned path prefixes for writing tasks and dispatches repair attempts with only bounded failure context.
 * Integrates only the commit SHAs declared by an eligible integration task; conflicts fail the lease and enter the bounded repair policy.
@@ -28,7 +29,7 @@ docker build -t forgeloop-runner:local runner
 
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
-The runner does not yet clone repositories, choose verification commands, upload evidence to an object store, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, execute a policy-selected planner or coding provider, integrate declared task commits, persist redacted attempt metadata, and run operator-selected verification commands.
+The runner does not yet clone repositories, upload evidence to an object store, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, execute a policy-selected planner or coding provider, integrate declared task commits, persist redacted attempt metadata, and execute repository-policy-selected verification tasks.
 
 ## Provider boundary
 
@@ -83,7 +84,7 @@ remove-worktree /repositories/ticketly task-123 /worktrees
 
 ## Verification
 
-Commands are executed directly, never through a shell. The worktree must have been prepared by Git and the timeout cannot exceed one hour.
+Host commands are executed directly, never through a shell. The worktree must have been prepared by Git and the timeout cannot exceed one hour.
 
 ```sh
 verify /worktrees/task-123 900 npm test
@@ -91,7 +92,7 @@ verify /worktrees/task-123 900 npm test
 
 ### Container verification
 
-Container verification accepts a Docker image plus direct command arguments; it never invokes a shell. By default, the child container has no network access and can only read the task worktree.
+Container verification accepts a Docker image plus command arguments. A fixed bootstrap shell copies the read-only source mount into an ephemeral workspace and forwards policy argv as positional arguments without interpolation; a reviewed policy may itself explicitly select a shell command when chaining package-manager steps. By default, the child container has no network access.
 
 ```sh
 verify-container /worktrees/task-123 900 none node:22-alpine node --version

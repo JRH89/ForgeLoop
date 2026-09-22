@@ -38,19 +38,21 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Operator cancellation holds non-terminal tasks, records an audit event, and is exposed in the operator console.
 - [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, nonce-backed lease acknowledgement, authenticated task discovery, and policy-selected provider execution against pre-cloned repositories.
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
-- [x] Shell-free runner verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
-- [x] Disposable, read-only Docker verification executor with task worktree mounts, bounded output and timeouts, and deny-by-default network isolation. Docker socket access remains an explicit runner-operator capability.
-- [x] Authenticated, lease-bound persistence of bounded verification evidence with a control-plane-generated integrity digest and optional required-gate attribution.
-- [ ] Git clone, local MCP processes, redacted events, artifact upload, and policy-selected verification orchestration.
+- [x] Shell-free host verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
+- [x] Disposable Docker verification executor that copies a read-only task mount into an ephemeral writable filesystem, bounds output/time/storage, requires digest-pinned images, and denies network access unless policy enables egress.
+- [x] Authenticated, lease-bound persistence of redacted verification evidence with independently recomputed output/bundle digests, provenance, artifact references, and exact policy metadata matching.
+- [x] Repository-policy-selected verification orchestration with server-created gate tasks, image/argv/network/timeout snapshots, criterion coverage, and bounded verification repair retries.
+- [ ] Git clone, local MCP processes, streamed redacted events, and immutable object-store artifact upload.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
 - [ ] Review-agent orchestration, human escalation, and approval controls.
 
 ### Evidence and repository delivery
 
-- [x] Lease-bound container verification can execute and report named-gate evidence through the runner CLI; passing all required gates transitions a run to `READY_FOR_REVIEW`, while a failed gate blocks it.
-- [x] Local runner writes atomic JSON verification evidence with SHA-256 manifests for off-host upload or retention.
-- [ ] Immutable object-store evidence bundles, policy-selected gate orchestration, browser/security gates, and acceptance-criterion evidence.
+- [x] Required repository gates are dispatched as runner tasks; only matching passed evidence covers acceptance criteria and transitions a run to `READY_FOR_REVIEW`.
+- [x] Local runner writes atomic, redacted JSON verification evidence with SHA-256 manifests and detects artifact corruption before upload or citation.
+- [x] Container, browser, security, contract, and Compose checks are represented by repo-agnostic versioned policy; Ticketly's five-check profile is documented and persisted independently.
+- [ ] Immutable object-store evidence upload and retention lifecycle.
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
 - [x] Signed, short-lived GitHub App callback state binds an installation to the initiating ForgeLoop organization before repository synchronization.
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
@@ -61,7 +63,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 ### Current capability boundary
 
-ForgeLoop can persist and display policy-bound delivery runs and repository connections. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch dependency-ready non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, and route failures through bounded task-owned repair context. It records redacted provider telemetry and can execute an operator-selected container verification command. It **cannot yet select all required verification commands from repository policy, complete review/approval orchestration, or publish runner-produced work as a pull request**; those capabilities remain unchecked until the verification-policy and GitHub delivery paths are connected and verified.
+ForgeLoop can persist and display policy-bound delivery runs and repository connections. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch dependency-ready non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, and route failures through bounded task-owned repair context. Required verification commands are selected from an immutable repository-policy snapshot and produce redacted, checksummed evidence tied to acceptance criteria. ForgeLoop **cannot yet complete review/approval orchestration, upload evidence to production object storage, or publish runner-produced work as a pull request**; those capabilities remain unchecked until their slices are implemented and verified.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 

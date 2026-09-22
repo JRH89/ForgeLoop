@@ -4,11 +4,11 @@ This is the execution plan for the production product, not a demo plan. A slice 
 
 ## Current position
 
-ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signed GitHub webhook intake, installed-repository synchronization, live GitHub App JWT and installation-token validation, runner registration/leases, isolated container verification, named gate state transitions, local checksummed evidence bundles, a basic operator console, persisted tenant roles, OIDC issuer/audience enforcement outside explicit development mode, production configuration validation, and tenant-scoped digest-only control-plane audit events.
+ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signed GitHub webhook intake, installed-repository synchronization, live GitHub App JWT and installation-token validation, runner registration/leases, validated task-DAG execution and integration, repository-policy-selected container verification, criterion coverage, redacted checksummed evidence bundles, a basic operator console, persisted tenant roles, OIDC issuer/audience enforcement outside explicit development mode, production configuration validation, and tenant-scoped digest-only control-plane audit events.
 
 Ticketly is now a separate support SaaS repository. It has no ForgeLoop delivery dashboard, fabricated agent runs, fabricated cost data, or fabricated verification data. It remains the primary target application for the eventual real GitHub issue-to-PR validation.
 
-The product can now invoke policy-selected models and create guarded, task-scoped commits in an existing runner checkout. It does **not** yet autonomously generate the task graph, integrate those commits, select verification commands, create a branch/PR/check run from runner-produced work, persist object-store artifacts, or complete an end-to-end issue-to-PR loop. These are the critical path.
+The product can now invoke policy-selected models, create guarded task-scoped commits, integrate declared changes, and dispatch immutable repository-policy verification tasks with independently validated evidence. It does **not** yet provide the complete operator/MCP surface, create a branch/PR/check run from runner-produced work, persist object-store artifacts, or complete the two-repository issue-to-PR proving loop. These are the critical path.
 
 ## Slice 1 — Multi-tenant security and auditable operations — complete
 
@@ -77,7 +77,7 @@ Exit criteria: a controlled failure repairs only its owning task; attempt/budget
 
 Completed evidence: the runner's planner role now accepts only an exact JSON plan contract and performs semantic validation before submission; the control plane repeats validation transactionally before materializing criteria, stable task keys, dependencies, owned paths, capabilities, attempt limits, and micro-dollar budgets. Run-scoped pessimistic locking makes competing claims restart-safe, while dependency, path-overlap, capability, task-budget, and run-budget checks determine dispatch eligibility. Independent backend/frontend nodes are concurrently eligible; dependent integration and verification nodes remain blocked. Integration cherry-picks only server-declared dependency SHAs and atomically marks only those dependencies integrated. Failed or expired work increments the owning task's fixed attempt budget, creates bounded repair context from change/evidence identities and criteria, redispatches under the `REPAIR` role, and blocks the run after exhaustion. Automated evidence includes cycle/traversal/budget rejection, dependency and conflict scheduling, repair isolation/exhaustion, integration state transitions, real Git integration, an authenticated live planner-lease/DAG submission, and a clean PostgreSQL migration through Flyway schema 16.
 
-## Slice 6 — Policy-selected verification and evidence
+## Slice 6 — Policy-selected verification and evidence — complete
 
 Make verification authoritative for every repository profile.
 
@@ -87,6 +87,8 @@ Make verification authoritative for every repository profile.
 - Enforce that `READY_FOR_REVIEW` requires all required gates and criterion evidence; failed gates create the appropriate repair package.
 
 Exit criteria: artifact corruption is detected; a skipped/failed gate cannot create a PR; Ticketly’s backend, frontend, Compose, Playwright, and authorization checks are all selected by policy rather than hard-coded.
+
+Completed evidence: repository connections now persist versioned gate definitions containing check kind, digest-pinned image, argv, network decision, timeout, required status, and criterion mapping; each run receives an immutable snapshot and planner completion creates dependency-gated `VERIFICATION` tasks. The runner routes those tasks without provider-policy lookup, verifies the integrated ref in a disposable container with a read-only source mount and executable ephemeral workspace, bounds runtime/output/storage, and defaults network to none. Reports redact common credentials and include command/image provenance, timestamps, artifact reference, output digest, and canonical bundle digest; the control plane independently recomputes checksums and rejects corrupt, secret-bearing, or policy-mismatched submissions. Required gate states include passed, failed, timed out, skipped by policy, and audited manual override, while review readiness additionally requires completed verification leases and all mapped required evidence. Ticketly policy revision 3 independently selects backend Maven, frontend lint/unit/typecheck/build, Compose contract, Playwright scenario discovery, and authorization contract gates using immutable container digests. Local proof includes corruption rejection through authenticated GraphQL, successful Ticketly backend/frontend/Compose/Playwright workloads, 66 control-plane and 50 runner test cases, frontend/MCP/harness suites, browser E2E, and clean PostgreSQL migration through all 18 Flyway migrations to schema 17.
 
 ## Slice 7 — Operator console and MCP gateway
 
