@@ -20,10 +20,8 @@ public class FeatureRunService {
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
     FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
-    run.addTask("IMPLEMENTATION", "Implement scoped repository changes", "provider");
-    run.addTask("INDEPENDENT_TEST", "Derive independent verification from acceptance criteria", "docker");
     for (String gate : connection.getRequiredGates()) run.addGate(gate);
-    input.specification().lines().filter(line -> line.strip().startsWith("- ")).map(line -> line.strip().substring(2)).forEach(run::addCriterion);
+    run.beginPlanning();
     FeatureRun saved = runs.save(run); audit.record("FEATURE_RUN_SUBMITTED", "FEATURE_RUN", saved.getId() == null ? input.sourceRef() : saved.getId(), input.repository() + "|" + input.sourceRef()); return saved;
   }
   /** Idempotent GitHub issue intake protects against event retries and label changes. */
@@ -34,5 +32,8 @@ public class FeatureRunService {
   @Transactional public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); initializeDisplayGraph(run); connections.requireEnabled(run.getRepository()); return run; }
   @Transactional public List<FeatureRun> list() { return runs.findAll().stream().filter(run -> { try { initializeDisplayGraph(run); connections.requireEnabled(run.getRepository()); return true; } catch (RuntimeException ignored) { return false; } }).toList(); }
   /** Initializes all three display collections before leaving the transaction; GraphQL must not lazy-load domain state. */
-  private static void initializeDisplayGraph(FeatureRun run) { run.getTasks(); run.getGates(); run.getCriteria(); }
+  private static void initializeDisplayGraph(FeatureRun run) {
+    run.getTasks().forEach(task -> { task.getDependencies(); task.getProviderAttempts(); task.getRepairPackages(); });
+    run.getGates(); run.getCriteria();
+  }
 }

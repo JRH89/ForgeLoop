@@ -34,11 +34,13 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role title repository baseBranch sourceRef specification requiredCapability}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch sourceRef specification:executionSpecification requiredCapability budgetUsd ownedPaths dependencyChangeShas}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         for (JsonNode task : JSON.readTree(response).path("data").path("availableRunnerTasks")) {
             tasks.add(new RunnerTask(task.path("id").asText(), task.path("role").asText(), task.path("title").asText(),
-                    task.path("repository").asText(), task.path("baseBranch").asText(), task.path("sourceRef").asText(), task.path("specification").asText(), task.path("requiredCapability").asText()));
+                    task.path("repository").asText(), task.path("baseBranch").asText(), task.path("sourceRef").asText(), task.path("specification").asText(), task.path("requiredCapability").asText(), task.path("budgetUsd").asDouble(),
+                    JSON.convertValue(task.path("ownedPaths"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
+                    JSON.convertValue(task.path("dependencyChangeShas"), JSON.getTypeFactory().constructCollectionType(List.class, String.class))));
         }
         return List.copyOf(tasks);
     }
@@ -48,10 +50,11 @@ public final class RunnerClient {
     /** Completes an acknowledged lease and records whether its runner verification passed. */
     public String completeLease(RunnerIdentity identity, String leaseId, String nonce, boolean passed) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$passed:Boolean!){completeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,passed:$passed){id completed}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"passed\":" + passed + "}"); }
     /** Marks agent-authored work ready for independent integration and verification, never verified. */
-    public String completeProviderWork(RunnerIdentity identity, RunnerLease lease) throws Exception {
+    public String completeProviderWork(RunnerIdentity identity, RunnerLease lease, String changeSha) throws Exception {
         String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
-                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}";
-        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){completeProviderTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){id completed}}", variables);
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"changeSha\":\"" + escape(changeSha) + "\"}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$changeSha:String!){completeProviderTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,changeSha:$changeSha){id completed}}", variables);
     }
     /** Records immutable evidence before a lease is completed, while its nonce is still valid. */
     public String recordEvidence(RunnerIdentity identity, RunnerLease lease, VerificationEvidenceReport report) throws Exception {
@@ -74,6 +77,19 @@ public final class RunnerClient {
                 + ",\"outcome\":\"" + escape(report.outcome()) + "\",\"retryable\":" + report.retryable()
                 + ",\"category\":\"" + escape(report.category()) + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:ProviderAttemptInput!){recordProviderAttempt(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id requestIdDigest outcome}}", variables);
+    }
+    /** Submits the exact planner contract through the active planner lease. */
+    public String submitTaskPlan(RunnerIdentity identity, RunnerLease lease, PlannerPlan plan) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"input\":" + JSON.writeValueAsString(plan) + "}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:TaskPlanInput!){submitTaskPlan(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id state tasks{id planKey state}}}", variables);
+    }
+    public String completeIntegration(RunnerIdentity identity, RunnerLease lease, String integratedSha) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"integratedSha\":\"" + escape(integratedSha) + "\"}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$integratedSha:String!){completeIntegrationTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,integratedSha:$integratedSha){id completed}}", variables);
     }
     private String post(String query, String variables) throws Exception { String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}"; HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed"); return response.body(); }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }

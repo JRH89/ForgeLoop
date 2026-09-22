@@ -1,0 +1,31 @@
+package io.forgeloop.runner;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import org.junit.jupiter.api.Test;
+
+class PlannerPlanTest {
+    @Test
+    void parsesAndValidatesExactAcyclicPlan() {
+        PlannerPlan plan = PlannerPlan.parse("""
+                {"acceptanceCriteria":["works"],"tasks":[
+                  {"key":"backend","role":"BACKEND","title":"Implement","requiredCapability":"provider","dependencies":[],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":500000},
+                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":["backend"],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":500000}
+                ]}
+                """).validate(1);
+
+        assertEquals(2, plan.tasks().size());
+    }
+
+    @Test
+    void rejectsExtraFieldsCyclesAndUnsafePaths() {
+        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse("{\"acceptanceCriteria\":[\"x\"],\"tasks\":[],\"extra\":true}"));
+        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse("""
+                {"acceptanceCriteria":["x"],"tasks":[
+                  {"key":"a","role":"BACKEND","title":"A","requiredCapability":"provider","dependencies":["b"],"ownedPaths":["../src"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"b","role":"FRONTEND","title":"B","requiredCapability":"provider","dependencies":["a"],"ownedPaths":["web"],"attemptBudget":2,"budgetMicros":1}
+                ]}
+                """).validate(1));
+    }
+}

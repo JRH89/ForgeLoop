@@ -43,6 +43,21 @@ public final class GitWorktreeManager {
         return output(worktree, List.of("git", "rev-parse", "HEAD"));
     }
 
+    /** Integrates only server-declared commit identities, without invoking a shell. */
+    public String integrate(Path worktree, List<String> commitShas) throws IOException, InterruptedException {
+        if (!Files.exists(worktree.resolve(".git")) || commitShas == null || commitShas.isEmpty()
+                || commitShas.stream().anyMatch(sha -> sha == null || !sha.matches("[0-9a-f]{40,64}"))) {
+            throw new IllegalArgumentException("Git integration request is invalid");
+        }
+        try {
+            for (String sha : commitShas) run(worktree, List.of("git", "cherry-pick", sha));
+        } catch (RuntimeException | IOException | InterruptedException failure) {
+            try { run(worktree, List.of("git", "cherry-pick", "--abort")); } catch (Exception ignored) { /* Preserve the original conflict. */ }
+            throw failure;
+        }
+        return output(worktree, List.of("git", "rev-parse", "HEAD"));
+    }
+
     private void run(Path repository, List<String> command) throws IOException, InterruptedException {
         List<String> safeCommand = new ArrayList<>();
         safeCommand.add("git");

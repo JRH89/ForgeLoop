@@ -15,6 +15,9 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Runs policy-selected verification commands directly (never through a shell) with a one-hour maximum timeout and bounded output.
 * Runs disposable Docker verification containers with a read-only task mount, a read-only root filesystem, capped temporary storage, and deny-by-default networking.
 * Can submit bounded, lease-bound verification evidence to the control plane; the control plane calculates its integrity digest.
+* Executes a strict non-writing planner contract and submits the validated task graph through its active lease.
+* Enforces control-plane-owned path prefixes for writing tasks and dispatches repair attempts with only bounded failure context.
+* Integrates only the commit SHAs declared by an eligible integration task; conflicts fail the lease and enter the bounded repair policy.
 * Runs as a non-root container image.
 
 ## Container build
@@ -25,7 +28,7 @@ docker build -t forgeloop-runner:local runner
 
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
-The runner does not yet clone repositories, choose verification commands, upload evidence to an object store, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, execute a policy-selected coding provider, persist redacted attempt metadata, and run operator-selected verification commands.
+The runner does not yet clone repositories, choose verification commands, upload evidence to an object store, or create pull requests. It can claim a server-authorized task, create a guarded detached worktree from a locally available checkout, execute a policy-selected planner or coding provider, integrate declared task commits, persist redacted attempt metadata, and run operator-selected verification commands.
 
 ## Provider boundary
 
@@ -33,11 +36,13 @@ The runner includes tested Anthropic Messages, OpenAI Responses, Gemini generate
 
 `execute-policy-task` is the production provider-worker entry point. It resolves provider, model, and a one-to-three-attempt retry ceiling from a reviewed runner-local JSON policy, then claims and acknowledges the task lease, creates an isolated worktree, invokes the provider, validates every output field and path before writing, commits atomically written files, submits redacted usage/failure evidence, and completes the lease. Unsupported roles are rejected before a lease is claimed.
 
-All delivery roles have explicit least-privilege manifests. Implementation, backend, frontend, independent-test, and repair roles may use the schema-guarded patch worker. Planner, integration, and review roles remain read-only and cannot use that worker; their coordinated execution is part of the task-graph slice. A successful coding worker transitions only to `CHANGE_READY`, never `VERIFIED`.
+All delivery roles have explicit least-privilege manifests. Implementation, backend, frontend, independent-test, and repair roles may use the schema-guarded patch worker. Planner and integration have dedicated non-writing-provider and Git-integration paths; review remains read-only. A successful coding worker transitions only to `CHANGE_READY`, never `VERIFIED`. Integration consumes only dependency SHAs from the validated graph and advances only those declared dependencies.
 
 ```text
 execute-policy-task <control-plane-url> <identity-file> <task-id> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <lease-file>
 ```
+
+For graph-planned writing tasks, the control-plane-owned `ownedPaths` list overrides the legacy `allowed-prefixes` CLI value. Planner and integration tasks use the same command but are routed to their dedicated execution paths.
 
 Copy `provider-policy.example.json` outside the repository and choose only models enabled for that runner. Provider credentials use `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`. A local adapter uses `FORGELOOP_LOCAL_PROVIDER_URL` and optional `FORGELOOP_LOCAL_PROVIDER_API_KEY`; non-loopback endpoints require `FORGELOOP_LOCAL_PROVIDER_ALLOW_REMOTE=true`.
 

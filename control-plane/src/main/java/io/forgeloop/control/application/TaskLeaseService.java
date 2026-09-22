@@ -18,24 +18,38 @@ public class TaskLeaseService {
     private final TaskLeaseRepository leases;
     private final VerificationEvidenceRepository evidence;
     private final ProviderAttemptRepository providerAttempts;
+    private final RepairPackageRepository repairPackages;
     private final SecureRandom random = new SecureRandom();
 
     public TaskLeaseService(DeliveryTaskRepository tasks, RunnerRepository runners, TaskLeaseRepository leases,
-                            VerificationEvidenceRepository evidence, ProviderAttemptRepository providerAttempts) {
-        this.tasks = tasks; this.runners = runners; this.leases = leases; this.evidence = evidence; this.providerAttempts = providerAttempts;
+                            VerificationEvidenceRepository evidence, ProviderAttemptRepository providerAttempts,
+                            RepairPackageRepository repairPackages) {
+        this.tasks = tasks; this.runners = runners; this.leases = leases; this.evidence = evidence;
+        this.providerAttempts = providerAttempts; this.repairPackages = repairPackages;
     }
 
     @Transactional public LeaseGrant claim(String taskId, String runnerId) {
-        DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        DeliveryTask discovered = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        DeliveryTask task = tasks.findAllForUpdateByRunId(discovered.getRun().getId()).stream()
+                .filter(candidate -> java.util.Objects.equals(candidate.getId(), discovered.getId())).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
         if (!runner.isEnabled()) throw new IllegalStateException("Runner is disabled");
         if (!runner.hasCapability(task.getRequiredCapability())) throw new IllegalStateException("Runner lacks the task capability");
         if (task.getState() != TaskState.PENDING && task.getState() != TaskState.REPAIR_QUEUED) throw new IllegalStateException("Task is not claimable");
+        if (!task.dependenciesSatisfied()) throw new IllegalStateException("Task dependencies are not complete");
+        if (!task.hasBudgetRemaining()) throw new IllegalStateException("Task budget is exhausted");
+        if (!task.getRun().hasBudgetRemaining()) throw new IllegalStateException("Run budget is exhausted");
+        boolean conflict = tasks.findByRun_Id(task.getRun().getId()).stream()
+                .filter(other -> other.getState() == TaskState.LEASED || other.getState() == TaskState.PREPARING || other.getState() == TaskState.RUNNING)
+                .anyMatch(task::pathConflictsWith);
+        if (conflict) throw new IllegalStateException("Task path ownership conflicts with active work");
         TaskLease existing = leases.findByTask_Id(taskId).orElse(null);
         if (existing != null && existing.active()) throw new IllegalStateException("Task already has an active lease");
         String nonce = secret();
         TaskLease lease = leases.save(new TaskLease(task, runner, hash(nonce), Instant.now().plus(Duration.ofMinutes(10))));
         task.transition(TaskState.LEASED);
+        if (!"PLANNER".equals(task.getRole())) task.getRun().startExecution();
         return new LeaseGrant(lease, nonce);
     }
 
@@ -44,11 +58,25 @@ public class TaskLeaseService {
     }
 
     @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed) {
-        TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.complete(passed); return lease;
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        lease.complete(passed);
+        if (!passed) {
+            String category = providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
+                    .map(ProviderAttempt::getCategory).orElse("VERIFICATION_FAILED");
+            String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
+                    .map(VerificationEvidence::getDigest).orElse(null);
+            repairPackages.save(new RepairPackage(task, category, digest));
+        }
+        return lease;
     }
 
-    @Transactional public TaskLease completeProviderWork(String leaseId, String runnerId, String nonce) {
-        TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.completeChangeReady(); return lease;
+    @Transactional public TaskLease completeProviderWork(String leaseId, String runnerId, String nonce, String changeSha) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.completeChangeReady(changeSha); return lease;
+    }
+
+    @Transactional public TaskLease completeIntegration(String leaseId, String runnerId, String nonce, String integratedSha) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.completeIntegration(integratedSha); return lease;
     }
 
     @Transactional public VerificationEvidence recordEvidence(String leaseId, String runnerId, String nonce,
@@ -70,10 +98,22 @@ public class TaskLeaseService {
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Provider evidence requires an active acknowledged lease");
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
-        return providerAttempts.findByTask_IdAndRequestIdDigest(task.getId(), submission.requestIdDigest()).orElseGet(() ->
+        ProviderAttempt recorded = providerAttempts.findByTask_IdAndRequestIdDigest(task.getId(), submission.requestIdDigest()).orElseGet(() ->
                 providerAttempts.save(new ProviderAttempt(task, runner, submission.provider(), submission.model(), submission.requestIdDigest(),
                         submission.inputTokens(), submission.outputTokens(), submission.attemptCount(), submission.estimatedCostMicros(),
                         submission.costKnown(), submission.outcome(), submission.retryable(), submission.category())));
+        long taskSpent = providerAttempts.sumKnownCostByTaskId(task.getId());
+        long runSpent = providerAttempts.sumKnownCostByRunId(task.getRun().getId());
+        long runBudget = Math.round(task.getRun().getBudgetUsd() * 1_000_000d);
+        if ((task.getBudgetMicros() > 0 && taskSpent >= task.getBudgetMicros()) || runSpent >= runBudget) task.getRun().block();
+        return recorded;
+    }
+
+    /** Returns the active task identity only after validating the runner-bound lease credentials. */
+    @Transactional public String requireActiveTaskId(String leaseId, String runnerId, String nonce) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Operation requires an active acknowledged lease");
+        return lease.getTaskId();
     }
 
     private TaskLease validatedLease(String leaseId, String runnerId, String nonce) {

@@ -13,6 +13,7 @@ import io.forgeloop.control.domain.RunState;
 import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.domain.RunnerRepository;
 import io.forgeloop.control.domain.ProviderAttemptRepository;
+import io.forgeloop.control.domain.RepairPackageRepository;
 import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.TaskLeaseRepository;
 import io.forgeloop.control.domain.TaskState;
@@ -27,15 +28,19 @@ class TaskLeaseServiceTest {
     TaskLeaseRepository leases = mock(TaskLeaseRepository.class);
     VerificationEvidenceRepository evidence = mock(VerificationEvidenceRepository.class);
     ProviderAttemptRepository providerAttempts = mock(ProviderAttemptRepository.class);
-    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts);
+    RepairPackageRepository repairPackages = mock(RepairPackageRepository.class);
+    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts, repairPackages);
 
     @Test
     void claimCreatesExpiringSingleOwnerLease() {
         FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "- x", 1, "GENERIC", 1);
         run.addTask("IMPLEMENTATION", "x", "git");
+        run.beginPlanning();
+        run.queuePlannedWork();
         DeliveryTask task = run.getTasks().getFirst();
         Runner runner = new Runner("org", "node", "1", List.of("git"), "credential-hash");
         when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(tasks.findAllForUpdateByRunId(null)).thenReturn(List.of(task));
         when(runners.findById("runner")).thenReturn(Optional.of(runner));
         when(leases.findByTask_Id("task")).thenReturn(Optional.empty());
         when(leases.save(any())).thenAnswer(call -> call.getArgument(0));
@@ -74,6 +79,7 @@ class TaskLeaseServiceTest {
     void providerAttemptsRequireAndRemainBoundToAnAcknowledgedLease() {
         TaskLease lease = mock(TaskLease.class);
         DeliveryTask task = mock(DeliveryTask.class);
+        FeatureRun run = mock(FeatureRun.class);
         Runner runner = mock(Runner.class);
         when(leases.findById("lease")).thenReturn(Optional.of(lease));
         when(lease.belongsTo("runner")).thenReturn(true);
@@ -82,6 +88,9 @@ class TaskLeaseServiceTest {
         when(lease.isAcknowledged()).thenReturn(true);
         when(lease.getTaskId()).thenReturn("task");
         when(task.getId()).thenReturn("task");
+        when(task.getRun()).thenReturn(run);
+        when(run.getId()).thenReturn("run");
+        when(run.getBudgetUsd()).thenReturn(10.0);
         when(tasks.findById("task")).thenReturn(Optional.of(task));
         when(runners.findById("runner")).thenReturn(Optional.of(runner));
         when(providerAttempts.findByTask_IdAndRequestIdDigest("task", "a".repeat(64))).thenReturn(Optional.empty());
@@ -96,14 +105,38 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void knownCostExhaustionBlocksTheOwningRun() {
+        FeatureRun run = new FeatureRun("org", "a/b", "issue-2", "x", "spec", 1, "GENERIC", "main", 1);
+        DeliveryTask task = run.addPlannedTask("implementation", "IMPLEMENTATION", "Implement", "provider", List.of("src"), 2, 50);
+        TaskLease lease = mock(TaskLease.class);
+        Runner runner = mock(Runner.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(true);
+        when(lease.getTaskId()).thenReturn("task");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(runners.findById("runner")).thenReturn(Optional.of(runner));
+        when(providerAttempts.findByTask_IdAndRequestIdDigest(null, "b".repeat(64))).thenReturn(Optional.empty());
+        when(providerAttempts.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(providerAttempts.sumKnownCostByTaskId(null)).thenReturn(50L);
+
+        service.recordProviderAttempt("lease", "runner", "nonce",
+                new ProviderAttemptSubmission("anthropic", "claude", "b".repeat(64), 1, 2, 1, "SUCCEEDED", 50, true, false, "COMPLETED"));
+
+        assertEquals(RunState.BLOCKED, run.getState());
+    }
+
+    @Test
     void providerCompletionStopsAtChangeReadyBoundary() {
         TaskLease lease = mock(TaskLease.class);
         when(leases.findById("lease")).thenReturn(Optional.of(lease));
         when(lease.belongsTo("runner")).thenReturn(true);
         when(lease.matchesNonceHash(any())).thenReturn(true);
 
-        service.completeProviderWork("lease", "runner", "nonce");
+        service.completeProviderWork("lease", "runner", "nonce", "a".repeat(40));
 
-        verify(lease).completeChangeReady();
+        verify(lease).completeChangeReady("a".repeat(40));
     }
 }

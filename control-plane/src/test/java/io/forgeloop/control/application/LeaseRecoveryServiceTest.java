@@ -9,6 +9,7 @@ import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.TaskLeaseRepository;
 import io.forgeloop.control.domain.TaskState;
+import io.forgeloop.control.domain.RepairPackageRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,8 @@ import org.mockito.Mockito;
 
 class LeaseRecoveryServiceTest {
     private final TaskLeaseRepository leases = Mockito.mock(TaskLeaseRepository.class);
-    private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases);
+    private final RepairPackageRepository repairs = Mockito.mock(RepairPackageRepository.class);
+    private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases, repairs);
 
     @Test
     void returnsExpiredLeaseTaskToRepairQueueAndRemovesLease() {
@@ -24,11 +26,13 @@ class LeaseRecoveryServiceTest {
         run.addTask("IMPLEMENTATION", "Implement", "provider");
         TaskLease expired = new TaskLease(run.getTasks().getFirst(), new Runner("org", "runner", "1", List.of("provider"), "hash"),
                 "nonce-hash", Instant.now().minusSeconds(1));
+        run.getTasks().getFirst().transition(TaskState.LEASED);
         when(leases.findByCompletedAtIsNullAndExpiresAtBefore(Mockito.any())).thenReturn(List.of(expired));
 
         recovery.recoverExpiredLeases();
 
         assertEquals(TaskState.REPAIR_QUEUED, run.getTasks().getFirst().getState());
+        verify(repairs).save(Mockito.any());
         verify(leases).deleteAll(List.of(expired));
     }
 }
