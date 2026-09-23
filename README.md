@@ -49,7 +49,8 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] Disposable Docker verification executor that copies a read-only task mount into an ephemeral writable filesystem, bounds output/time/storage, requires digest-pinned images, and denies network access unless policy enables egress.
 - [x] Authenticated, lease-bound persistence of redacted verification evidence with independently recomputed output/bundle digests, provenance, artifact references, and exact policy metadata matching.
 - [x] Repository-policy-selected verification orchestration with server-created gate tasks, image/argv/network/timeout snapshots, criterion coverage, and bounded verification repair retries.
-- [ ] Git clone, local MCP processes, streamed redacted events, and immutable object-store artifact upload.
+- [x] Lease-bound, checksummed artifact upload through filesystem and S3-compatible storage backends, with read-after-write verification, retention metadata, and operator-console visibility.
+- [ ] Git clone, local MCP processes, and streamed redacted events.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
 - [x] Role-aware, confirmed, audited human cancellation, bounded task retry, and verified-run approval controls.
@@ -61,7 +62,7 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] Required repository gates are dispatched as runner tasks; only matching passed evidence covers acceptance criteria and transitions a run to `READY_FOR_REVIEW`.
 - [x] Local runner writes atomic, redacted JSON verification evidence with SHA-256 manifests and detects artifact corruption before upload or citation.
 - [x] Container, browser, security, contract, and Compose checks are represented by repo-agnostic versioned policy; Ticketly's five-check profile is documented and persisted independently.
-- [ ] Immutable object-store evidence upload and retention lifecycle.
+- [x] S3-compatible evidence upload with tenant/run/task/lease object identities, integrity verification, and explicit retain-until metadata; production bucket lifecycle/Object Lock remains a deployment responsibility.
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
 - [x] Signed, short-lived GitHub App callback state binds an installation to the initiating ForgeLoop organization before repository synchronization.
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
@@ -73,7 +74,7 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 
 ### Current capability boundary
 
-ForgeLoop can persist and operate policy-bound delivery runs and repository connections through its role-aware web console or permission-scoped MCP gateway. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, push the exact integrated head with a lease-bound installation token, perform criterion-level independent review, and route failed review or verification through a bounded code-repair cycle. Required verification commands come from an immutable repository-policy snapshot and produce redacted, checksummed evidence; a verified run requires explicit administrator approval before the control plane creates its check run and draft PR. Ticketly issue 7 proved this path live and produced merged PR 8 without operator repository edits. Immutable production object storage, a second unrelated repository proof, hosted OIDC, and production operations remain incomplete.
+ForgeLoop can persist and operate policy-bound delivery runs and repository connections through its role-aware web console or permission-scoped MCP gateway. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, push the exact integrated head with a lease-bound installation token, perform criterion-level independent review, and route failed review or verification through a bounded code-repair cycle. Required verification commands come from an immutable repository-policy snapshot and produce redacted, checksummed evidence; their JSON artifacts can be verified and retained in S3-compatible storage. A verified run requires explicit administrator approval before the control plane creates its check run and draft PR. Ticketly issue 7 proved this path live and produced merged PR 8 without operator repository edits. A second unrelated repository proof is deferred because the configured provider account has insufficient credit; hosted OIDC and production infrastructure validation also remain incomplete.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 

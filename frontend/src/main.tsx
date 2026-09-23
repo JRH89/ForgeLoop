@@ -472,6 +472,16 @@ function RunDetail({
       </section>
       <section className="panel">
         <h2>Evidence browser & redacted logs</h2>
+        {operations.artifacts.length > 0 && (
+          <div className="item">
+            <div>
+              <b>Durable evidence artifacts</b>
+              <small>
+                {operations.artifacts.length} checksummed object{operations.artifacts.length === 1 ? "" : "s"} retained by policy
+              </small>
+            </div>
+          </div>
+        )}
         {operations.evidence.length ? (
           operations.evidence.map((item) => (
             <details className="evidence" key={item.id}>
@@ -500,6 +510,12 @@ function RunDetail({
                 <dd>{item.command.join(" ")}</dd>
                 <dt>Digest</dt>
                 <dd>{item.digest}</dd>
+                {item.artifactReference && (
+                  <>
+                    <dt>Artifact</dt>
+                    <dd>{item.artifactReference}</dd>
+                  </>
+                )}
               </dl>
               <pre>{item.output}</pre>
             </details>
@@ -575,6 +591,7 @@ function RunsPage({
   const [operations, setOperations] = useState<RunOperations>({
     evidence: [],
     reviews: [],
+    artifacts: [],
     audit: [],
   });
   const [creating, setCreating] = useState(false);

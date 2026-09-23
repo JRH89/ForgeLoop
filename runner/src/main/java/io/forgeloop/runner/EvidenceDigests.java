@@ -10,7 +10,10 @@ import java.util.List;
 final class EvidenceDigests {
     private EvidenceDigests() { }
     static String sha256(String material) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(material.getBytes(StandardCharsets.UTF_8))); }
+        return sha256(material.getBytes(StandardCharsets.UTF_8));
+    }
+    static String sha256(byte[] material) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(material)); }
         catch (Exception exception) { throw new IllegalStateException("SHA-256 unavailable", exception); }
     }
     static String bundle(String kind, String gate, String image, List<String> command, VerificationResult result, String artifactReference, String outputDigest) {

@@ -259,10 +259,17 @@ public final class RunnerMain {
             VerificationResult result = new ContainerVerificationExecutor().execute(worktree, dockerVisibleWorktree(worktree),
                     task.verificationImageDigest(), task.verificationCommand(), Duration.ofSeconds(task.verificationTimeoutSeconds()),
                     "EGRESS".equals(task.verificationNetworkPolicy()));
-            String artifactReference = "local-evidence/" + task.id();
+            Path evidenceDirectory = Path.of(workspaceRoot).resolve("evidence").resolve(task.id());
+            VerificationEvidenceReport localReport = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
+                    task.verificationImageDigest(), task.verificationCommand(), result, null);
+            EvidenceBundleWriter writer = new EvidenceBundleWriter();
+            Path localArtifact = writer.write(evidenceDirectory, localReport);
+            if (!writer.verify(localArtifact)) throw new IllegalStateException("Local evidence checksum verification failed");
+            byte[] artifactBytes = Files.readAllBytes(localArtifact);
+            String artifactReference = client.uploadArtifact(identity, lease, artifactBytes, EvidenceDigests.sha256(artifactBytes));
             VerificationEvidenceReport report = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
                     task.verificationImageDigest(), task.verificationCommand(), result, artifactReference);
-            new EvidenceBundleWriter().write(Path.of(workspaceRoot).resolve("evidence").resolve(task.id()), report);
+            writer.write(evidenceDirectory, report);
             client.recordEvidence(identity, lease, report);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), result.passed());
             if (!result.passed()) throw new IllegalStateException("Policy verification failed: " + task.verificationGateName());

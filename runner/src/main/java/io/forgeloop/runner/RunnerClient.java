@@ -18,9 +18,10 @@ public final class RunnerClient {
     private static final Pattern LEASE_GRANT = Pattern.compile("(?s)\\\"lease\\\"\\s*:\\s*\\{.*?\\\"id\\\"\\s*:\\s*\\\"([^\\\"]+)\\\".*?}.*?\\\"nonce\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"");
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient http;
+    private final URI controlPlane;
     private final URI endpoint;
 
-    public RunnerClient(HttpClient http, URI controlPlane) { this.http = http; this.endpoint = controlPlane.resolve("/graphql"); }
+    public RunnerClient(HttpClient http, URI controlPlane) { this.http = http; this.controlPlane = controlPlane; this.endpoint = controlPlane.resolve("/graphql"); }
 
     public RunnerIdentity register(RunnerConfig config) throws Exception {
         String query = "mutation($input:RegisterRunnerInput!){registerRunner(input:$input){runner{id} credential}}";
@@ -72,6 +73,26 @@ public final class RunnerClient {
                 + "\",\"artifactReference\":" + nullable(report.artifactReference()) + ",\"outputDigest\":\"" + report.outputDigest()
                 + "\",\"bundleDigest\":\"" + report.bundleDigest() + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);
+    }
+    /** Uploads a bounded local evidence file through the active lease without base64/GraphQL inflation. */
+    public String uploadArtifact(RunnerIdentity identity, RunnerLease lease, byte[] content, String sha256) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(controlPlane.resolve("/api/runner/artifacts"))
+                .header("Content-Type", "application/json")
+                .header("X-ForgeLoop-Runner-Id", identity.runnerId())
+                .header("X-ForgeLoop-Runner-Credential", identity.credential())
+                .header("X-ForgeLoop-Lease-Id", lease.leaseId())
+                .header("X-ForgeLoop-Lease-Nonce", lease.nonce())
+                .header("X-ForgeLoop-Artifact-Sha256", sha256)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(content)).build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) throw new IllegalStateException("Artifact upload failed with HTTP " + response.statusCode());
+        JsonNode receipt = JSON.readTree(response.body());
+        String reference = receipt.path("reference").asText();
+        if (!reference.startsWith("artifact://") || !sha256.equals(receipt.path("sha256").asText())
+                || receipt.path("sizeBytes").asLong(-1) != content.length || receipt.path("retainUntil").asText().isBlank()) {
+            throw new IllegalStateException("Artifact upload response was malformed");
+        }
+        return reference;
     }
     /** Sends metadata-only provider evidence through the same authenticated lease boundary as verification evidence. */
     public String recordProviderAttempt(RunnerIdentity identity, RunnerLease lease, ProviderAttemptReport report) throws Exception {
