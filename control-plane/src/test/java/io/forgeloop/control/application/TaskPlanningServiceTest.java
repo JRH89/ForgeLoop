@@ -32,17 +32,18 @@ class TaskPlanningServiceTest {
         DeliveryTask planner = run.getTasks().getFirst();
         TaskLease lease = mock(TaskLease.class);
         when(tasks.findById("planner")).thenReturn(Optional.of(planner));
-        when(leases.findByTask_Id("planner")).thenReturn(Optional.of(lease));
+        when(leases.findFirstByTask_IdOrderByExpiresAtDesc("planner")).thenReturn(Optional.of(lease));
         when(runs.save(any())).thenAnswer(call -> call.getArgument(0));
         TaskPlanSubmission plan = new TaskPlanSubmission(List.of("behavior is verified"), List.of(
                 new PlannedTaskSubmission("backend", "BACKEND", "Backend", "provider", List.of(), List.of("src"), 2, 500_000),
-                new PlannedTaskSubmission("test", "INDEPENDENT_TEST", "Test", "provider", List.of("backend"), List.of("tests"), 2, 500_000)));
+                new PlannedTaskSubmission("test", "INDEPENDENT_TEST", "Test", "provider", List.of(), List.of("tests"), 2, 500_000),
+                new PlannedTaskSubmission("integration", "INTEGRATION", "Integrate", "git", List.of("backend","test"), List.of(), 2, 0)));
 
         FeatureRun saved = planning.submit("planner", plan);
 
         assertEquals(RunState.QUEUED, saved.getState());
         assertEquals(TaskState.VERIFIED, planner.getState());
-        assertEquals(List.of("backend"), saved.getTasks().get(2).getDependencyKeys());
+        assertEquals(List.of("backend", "test"), saved.getTasks().get(3).getDependencyKeys());
         verify(lease).completePlanning();
     }
 
@@ -55,7 +56,8 @@ class TaskPlanningServiceTest {
 
         assertThrows(IllegalStateException.class, () -> planning.submit("planner",
                 new TaskPlanSubmission(List.of("criterion"), List.of(
-                        new PlannedTaskSubmission("new", "BACKEND", "New", "provider", List.of(), List.of("src"), 2, 1)))));
+                        new PlannedTaskSubmission("new", "BACKEND", "New", "provider", List.of(), List.of("src"), 2, 1),
+                        new PlannedTaskSubmission("integration", "INTEGRATION", "Integrate", "git", List.of("new"), List.of(), 2, 0)))));
     }
 
     private static FeatureRun planningRun() {

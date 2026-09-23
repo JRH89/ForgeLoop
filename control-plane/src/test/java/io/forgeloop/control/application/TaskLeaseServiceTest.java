@@ -45,7 +45,7 @@ class TaskLeaseServiceTest {
         when(tasks.findById("task")).thenReturn(Optional.of(task));
         when(tasks.findAllForUpdateByRunId(null)).thenReturn(List.of(task));
         when(runners.findById("runner")).thenReturn(Optional.of(runner));
-        when(leases.findByTask_Id("task")).thenReturn(Optional.empty());
+        when(leases.findFirstByTask_IdOrderByExpiresAtDesc("task")).thenReturn(Optional.empty());
         when(leases.save(any())).thenAnswer(call -> call.getArgument(0));
 
         LeaseGrant grant = service.claim("task", "runner");

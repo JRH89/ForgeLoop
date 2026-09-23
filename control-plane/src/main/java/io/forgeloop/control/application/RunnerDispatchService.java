@@ -19,7 +19,7 @@ public class RunnerDispatchService {
     @Transactional(readOnly = true)
     public List<DeliveryTask> available(Runner runner) {
         List<DeliveryTask> active = tasks.findByStateIn(List.of(TaskState.LEASED, TaskState.PREPARING, TaskState.RUNNING));
-        return tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED)).stream()
+        List<DeliveryTask> available = tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED)).stream()
                 .filter(task -> runner.hasCapability(task.getRequiredCapability()))
                 .filter(DeliveryTask::dependenciesSatisfied)
                 .filter(DeliveryTask::hasBudgetRemaining)
@@ -28,5 +28,14 @@ public class RunnerDispatchService {
                         .filter(task -> Objects.equals(task.getRun().getId(), candidate.getRun().getId()))
                         .noneMatch(candidate::pathConflictsWith))
                 .toList();
+        // GraphQL serializes after this transaction closes. Materialize every lazy aggregate
+        // used by the runner contract here so dispatch never depends on Open Session in View.
+        available.forEach(task -> {
+            task.getAcceptanceCriteria();
+            task.getDependencyChangeShas();
+            task.getExecutionSpecification();
+            task.getVerificationGateName();
+        });
+        return available;
     }
 }

@@ -8,11 +8,16 @@ import io.forgeloop.control.application.VerificationEvidenceSubmission;
 import io.forgeloop.control.application.ProviderAttemptSubmission;
 import io.forgeloop.control.application.TaskPlanSubmission;
 import io.forgeloop.control.application.TaskPlanningService;
+import io.forgeloop.control.application.ReviewEvidenceService;
+import io.forgeloop.control.application.ReviewEvidenceSubmission;
 import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.ProviderAttempt;
 import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.VerificationEvidence;
+import io.forgeloop.control.domain.ReviewEvidence;
+import io.forgeloop.control.integrations.github.GithubPushGrant;
+import io.forgeloop.control.integrations.github.GithubRunnerPushService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -26,9 +31,11 @@ public class RunnerExecutionController {
     private final RunnerService runners;
     private final RunnerDispatchService dispatch;
     private final TaskPlanningService planning;
+    private final GithubRunnerPushService githubPush;
+    private final ReviewEvidenceService reviews;
 
-    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning) {
-        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning;
+    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, ReviewEvidenceService reviews) {
+        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.reviews = reviews;
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
@@ -46,8 +53,11 @@ public class RunnerExecutionController {
     @MutationMapping public TaskLease completeProviderTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String changeSha) {
         runners.authenticated(runnerId, credential); return leases.completeProviderWork(leaseId, runnerId, nonce, changeSha);
     }
-    @MutationMapping public TaskLease completeIntegrationTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String integratedSha) {
-        runners.authenticated(runnerId, credential); return leases.completeIntegration(leaseId, runnerId, nonce, integratedSha);
+    @MutationMapping public GithubPushGrant issueGithubPushGrant(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
+        runners.authenticated(runnerId, credential); return githubPush.grant(leaseId, runnerId, nonce);
+    }
+    @MutationMapping public TaskLease completeGithubPush(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String integratedSha) {
+        runners.authenticated(runnerId, credential); return githubPush.complete(leaseId, runnerId, nonce, integratedSha);
     }
     @MutationMapping public VerificationEvidence recordVerificationEvidence(@Argument String leaseId, @Argument String runnerId,
                                                                               @Argument String nonce, @Argument String credential,
@@ -60,6 +70,12 @@ public class RunnerExecutionController {
                                                                    @Argument ProviderAttemptSubmission input) {
         runners.authenticated(runnerId, credential);
         return leases.recordProviderAttempt(leaseId, runnerId, nonce, input);
+    }
+    @MutationMapping public ReviewEvidence recordReviewEvidence(@Argument String leaseId, @Argument String runnerId,
+                                                                 @Argument String nonce, @Argument String credential,
+                                                                 @Argument ReviewEvidenceSubmission input) {
+        runners.authenticated(runnerId, credential);
+        return reviews.record(leaseId, runnerId, nonce, input);
     }
     @MutationMapping public FeatureRun submitTaskPlan(@Argument String leaseId, @Argument String runnerId,
                                                        @Argument String nonce, @Argument String credential,

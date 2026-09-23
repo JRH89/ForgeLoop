@@ -34,7 +34,7 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch sourceRef specification:executionSpecification requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         for (JsonNode task : JSON.readTree(response).path("data").path("availableRunnerTasks")) {
             tasks.add(new RunnerTask(task.path("id").asText(), task.path("role").asText(), task.path("title").asText(),
@@ -43,7 +43,8 @@ public final class RunnerClient {
                     JSON.convertValue(task.path("dependencyChangeShas"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
                     nullableText(task, "verificationGateName"), nullableText(task, "verificationKind"), nullableText(task, "verificationImageDigest"),
                     JSON.convertValue(task.path("verificationCommand"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
-                    nullableText(task, "verificationNetworkPolicy"), task.path("verificationTimeoutSeconds").isNull() ? null : task.path("verificationTimeoutSeconds").asInt(), task.path("verificationBaseRef").asText()));
+                    nullableText(task, "verificationNetworkPolicy"), task.path("verificationTimeoutSeconds").isNull() ? null : task.path("verificationTimeoutSeconds").asInt(), task.path("verificationBaseRef").asText(), task.path("executionBaseRef").asText(),
+                    JSON.convertValue(task.path("acceptanceCriteria"), JSON.getTypeFactory().constructCollectionType(List.class, String.class))));
         }
         return List.copyOf(tasks);
     }
@@ -91,11 +92,22 @@ public final class RunnerClient {
                 + "\",\"input\":" + JSON.writeValueAsString(plan) + "}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:TaskPlanInput!){submitTaskPlan(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id state tasks{id planKey state}}}", variables);
     }
-    public String completeIntegration(RunnerIdentity identity, RunnerLease lease, String integratedSha) throws Exception {
+    public GithubPushGrant issueGithubPushGrant(RunnerIdentity identity, RunnerLease lease) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}";
+        JsonNode grant=JSON.readTree(post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){issueGithubPushGrant(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){repository branch expectedHeadSha token}}",variables)).path("data").path("issueGithubPushGrant");
+        return new GithubPushGrant(grant.path("repository").asText(),grant.path("branch").asText(),nullableText(grant,"expectedHeadSha"),grant.path("token").asText());
+    }
+    /** Persists the independent review decision before its lease can advance the pipeline. */
+    public String recordReviewEvidence(RunnerIdentity identity, RunnerLease lease, ReviewResult review) throws Exception {
         String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
                 + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
-                + "\",\"integratedSha\":\"" + escape(integratedSha) + "\"}";
-        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$integratedSha:String!){completeIntegrationTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,integratedSha:$integratedSha){id completed}}", variables);
+                + "\",\"input\":{\"approved\":" + review.approved() + ",\"summary\":\"" + escape(review.summary())
+                + "\",\"criteria\":" + JSON.writeValueAsString(review.criteria()) + "}}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:ReviewEvidenceInput!){recordReviewEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest approved}}", variables);
+    }
+    public String completeGithubPush(RunnerIdentity identity, RunnerLease lease, String integratedSha) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"integratedSha\":\"" + escape(integratedSha) + "\"}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$integratedSha:String!){completeGithubPush(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,integratedSha:$integratedSha){id completed}}",variables);
     }
     private String post(String query, String variables) throws Exception { String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}"; HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed"); return response.body(); }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }

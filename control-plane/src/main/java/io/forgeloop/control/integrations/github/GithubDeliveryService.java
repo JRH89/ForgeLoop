@@ -5,10 +5,6 @@ import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.GithubPublication;
 import io.forgeloop.control.domain.GithubPublicationRepository;
 import io.forgeloop.control.domain.RunState;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,29 +16,23 @@ public class GithubDeliveryService {
     private final AuditLedgerService audit;
     public GithubDeliveryService(GithubPublicationRepository publications, GithubApi github, AuditLedgerService audit) { this.publications = publications; this.github = github; this.audit = audit; }
 
+    /** Finalizes a branch pushed directly by the authenticated runner without uploading source through ForgeLoop. */
     @Transactional
-    public GithubPublication deliver(FeatureRun run, long installationId, String baseSha, List<GithubChange> changes, String summary) {
-        GithubPublication publication = publications.findByFeatureRunId(run.getId()).orElseGet(() -> publications.save(new GithubPublication(run.getId(), run.getRepository(), branch(run), key(run))));
+    public GithubPublication deliverPushed(FeatureRun run, long installationId, String summary) {
+        GithubPublication publication = publications.findByFeatureRunId(run.getId()).orElseThrow(() -> new IllegalStateException("Runner has not pushed an integrated branch"));
         if (publication.isDelivered()) return publication;
         if (run.getState() != RunState.READY_FOR_REVIEW || !run.isApproved()) throw new IllegalStateException("Only an approved, fully verified run can be delivered to GitHub");
-        if (baseSha == null || baseSha.isBlank() || changes == null || changes.isEmpty()) throw new IllegalArgumentException("A base commit and at least one verified change are required");
-        if (publication.getHeadSha() == null) {
-            github.createBranch(installationId, run.getRepository(), publication.getBranch(), baseSha);
-            String head = baseSha;
-            for (GithubChange change : changes) head = github.putFile(installationId, run.getRepository(), publication.getBranch(), change);
-            publication.recordHeadSha(head);
-            audit.record("GITHUB_BRANCH_DELIVERED", "FEATURE_RUN", run.getId(), publication.getBranch());
-        }
-        if (publication.getCheckRunId() == null) {
-            publication.recordCheckRun(github.createCompletedCheck(installationId, run.getRepository(), publication.getHeadSha(), "ForgeLoop verification", summary));
-            audit.record("GITHUB_CHECK_RUN_CREATED", "FEATURE_RUN", run.getId(), publication.getHeadSha());
-        }
-        if (publication.getPullRequestNumber() == null) {
-            publication.recordPullRequest(github.createDraftPullRequest(installationId, run.getRepository(), publication.getBranch(), run.getSourceRef(), run.getTitle(), summary));
-            audit.record("GITHUB_DRAFT_PR_CREATED", "FEATURE_RUN", run.getId(), String.valueOf(publication.getPullRequestNumber()));
-        }
+        if (publication.getHeadSha() == null || !publication.getHeadSha().equals(github.getBranchHead(installationId, run.getRepository(), publication.getBranch()))) throw new IllegalStateException("Runner-pushed branch head does not match the integrated commit");
+        if (publication.getCheckRunId() == null) { publication.recordCheckRun(github.createCompletedCheck(installationId, run.getRepository(), publication.getHeadSha(), "ForgeLoop verification", summary)); audit.record("GITHUB_CHECK_RUN_CREATED", "FEATURE_RUN", run.getId(), publication.getHeadSha()); }
+        if (publication.getPullRequestNumber() == null) { publication.recordPullRequest(github.createDraftPullRequest(installationId, run.getRepository(), publication.getBranch(), run.getBaseBranch(), run.getTitle(), pullRequestBody(run, summary))); audit.record("GITHUB_DRAFT_PR_CREATED", "FEATURE_RUN", run.getId(), String.valueOf(publication.getPullRequestNumber())); }
         return publications.save(publication);
     }
-    private static String branch(FeatureRun run) { return "forgeloop/" + run.getId(); }
-    private static String key(FeatureRun run) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((run.getRepository() + "|" + run.getSourceRef()).getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException("SHA-256 unavailable", exception); } }
+
+    /** Links issue-originated work so GitHub closes the source issue when the verified PR merges. */
+    static String pullRequestBody(FeatureRun run, String summary) {
+        if (run.getSourceRef() != null && run.getSourceRef().matches("issue-[1-9][0-9]*")) {
+            return summary + "\n\nCloses #" + run.getSourceRef().substring("issue-".length());
+        }
+        return summary;
+    }
 }

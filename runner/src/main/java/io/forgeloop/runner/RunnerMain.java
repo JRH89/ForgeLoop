@@ -6,6 +6,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.nio.file.Files;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.ArrayList;
 
 /**
  * CLI entry point for explicit, operator-initiated runner registration.
@@ -16,6 +20,10 @@ public final class RunnerMain {
     }
 
     public static void main(String[] arguments) throws Exception {
+        if (arguments.length > 0 && ("serve".equals(arguments[0]) || "work-until-idle".equals(arguments[0]))) {
+            workLoop(arguments, "serve".equals(arguments[0]));
+            return;
+        }
         if (arguments.length > 0 && "heartbeat".equals(arguments[0])) {
             heartbeat(arguments);
             return;
@@ -226,7 +234,11 @@ public final class RunnerMain {
             return;
         }
         if ("PLANNER".equals(task.role())) {
-            executePlannerTask(client, identity, task, policy, Path.of(arguments[8]));
+            executePlannerTask(client, identity, task, arguments[4], policy, Path.of(arguments[8]));
+            return;
+        }
+        if ("REVIEW".equals(task.role())) {
+            executeReviewTask(client, identity, task, arguments[4], arguments[5], policy, Path.of(arguments[8]));
             return;
         }
         String policyPrefixes = task.ownedPaths().isEmpty() ? arguments[7] : String.join(",", task.ownedPaths());
@@ -268,11 +280,13 @@ public final class RunnerMain {
         RunnerLease lease = client.claimTask(identity, task.id());
         new RunnerLeaseStore().save(leaseFile, lease);
         Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot), task.repository());
-        Path worktree = new GitWorktreeManager().create(repository, task.baseBranch(), task.id(), Path.of(workspaceRoot));
+        Path worktree = new GitWorktreeManager().create(repository, task.executionBaseRef(), task.id(), Path.of(workspaceRoot));
         client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
         try {
             String integratedSha = new GitWorktreeManager().integrate(worktree, task.dependencyChangeShas());
-            client.completeIntegration(identity, lease, integratedSha);
+            GithubPushGrant push = client.issueGithubPushGrant(identity, lease);
+            new GitWorktreeManager().pushIntegrated(worktree, push.repository(), push.branch(), push.expectedHeadSha(), integratedSha, push.token());
+            client.completeGithubPush(identity, lease, integratedSha);
             System.out.println("Integration task completed: commit=" + integratedSha);
         } catch (Exception conflict) {
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
@@ -282,12 +296,14 @@ public final class RunnerMain {
 
     /** Executes a non-writing planner under the same authenticated lease and telemetry boundary. */
     private static void executePlannerTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
-                                           ProviderExecutionPolicy policy, Path leaseFile) throws Exception {
+                                           String repositoriesRoot, ProviderExecutionPolicy policy, Path leaseFile) throws Exception {
         RunnerLease lease = client.claimTask(identity, task.id());
         new RunnerLeaseStore().save(leaseFile, lease);
         client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
         try {
-            PlannerResult result = new PlannerWorker().execute(policy, new ProviderClientFactory().create(policy), task, lease.leaseId());
+            Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot), task.repository());
+            String context = new RepositoryContextBuilder().build(repository, List.of("README.md", "AGENTS.md"));
+            PlannerResult result = new PlannerWorker().execute(policy, new ProviderClientFactory().create(policy), task, context, lease.leaseId());
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
             client.submitTaskPlan(identity, lease, result.plan());
             System.out.println("Planner task completed: tasks=" + result.plan().tasks().size());
@@ -302,6 +318,77 @@ public final class RunnerMain {
         }
     }
 
+    /** Polls server-authorized work and executes independent eligible tasks concurrently. */
+    private static void workLoop(String[] arguments, boolean continuous) throws Exception {
+        if (arguments.length != 9) throw new IllegalArgumentException("Usage: serve|work-until-idle <control-plane-url> <identity-file> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <state-root> <parallelism>");
+        int parallelism = Integer.parseInt(arguments[8]);
+        if (parallelism < 1 || parallelism > 16) throw new IllegalArgumentException("Runner parallelism must be between 1 and 16");
+        Path stateRoot = Path.of(arguments[7]).toAbsolutePath().normalize();
+        Files.createDirectories(stateRoot);
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
+        int idlePolls = 0;
+        int failedPolls = 0;
+        try (var workers = Executors.newFixedThreadPool(parallelism)) {
+            while (continuous || idlePolls < 3) {
+                List<RunnerTask> available;
+                try {
+                    client.heartbeat(identity);
+                    available = client.availableTasks(identity);
+                    failedPolls = 0;
+                } catch (Exception unavailable) {
+                    failedPolls++;
+                    System.err.println("Control-plane poll failed; retrying: " + safeDiagnostic(unavailable.getMessage()));
+                    if (!continuous && failedPolls >= 5) throw unavailable;
+                    Thread.sleep(2000);
+                    continue;
+                }
+                if (available.isEmpty()) {
+                    idlePolls++;
+                    Thread.sleep(2000);
+                    continue;
+                }
+                idlePolls = 0;
+                List<Future<?>> futures = new ArrayList<>();
+                for (RunnerTask task : available.stream().limit(parallelism).toList()) {
+                    futures.add(workers.submit(() -> executeDispatchedTask(arguments, stateRoot, task)));
+                }
+                for (Future<?> future : futures) future.get();
+            }
+        }
+    }
+
+    private static void executeDispatchedTask(String[] arguments, Path stateRoot, RunnerTask task) {
+        Path leasePath = stateRoot.resolve(task.id() + ".lease");
+        try {
+            // A task can be advertised only after its prior lease is inactive, so stale local
+            // nonce/worktree state is safe to remove before a crash-recovery attempt.
+            Files.deleteIfExists(leasePath);
+            cleanupWorktree(task, arguments[3], arguments[4]);
+            executePolicyTask(new String[]{"execute-policy-task", arguments[1], arguments[2], task.id(),
+                    arguments[3], arguments[4], arguments[5], arguments[6], leasePath.toString()});
+        } catch (Exception failure) {
+            String detail = failure.getCause() == null ? failure.getMessage() : failure.getCause().getMessage();
+            System.err.println("Task execution failed: task=" + task.id() + " type=" + failure.getClass().getSimpleName()
+                    + " detail=" + safeDiagnostic(detail));
+        } finally {
+            try { Files.deleteIfExists(leasePath); }
+            catch (Exception cleanup) { System.err.println("Task lease cleanup failed: task=" + task.id()); }
+            cleanupWorktree(task, arguments[3], arguments[4]);
+        }
+    }
+    /** Keeps diagnostics actionable without allowing provider output or credentials into runner logs. */
+    private static String safeDiagnostic(String detail){if(detail==null||detail.isBlank())return "unavailable";String singleLine=detail.replaceAll("[\\r\\n]+"," ").replaceAll("(?i)(api[_-]?key|authorization|token|secret)\\s*[:=]\\s*\\S+","$1=[REDACTED]");return singleLine.substring(0,Math.min(singleLine.length(),240));}
+    private static void cleanupWorktree(RunnerTask task,String repositoriesRoot,String workspaceRoot){try{Path workspace=Path.of(workspaceRoot).toAbsolutePath().normalize().resolve(task.id());if(Files.exists(workspace)){Path repository=new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot),task.repository());new GitWorktreeManager().remove(repository,task.id(),Path.of(workspaceRoot));}}catch(Exception cleanup){System.err.println("Task worktree cleanup failed: task="+task.id());}}
+
+    private static void executeReviewTask(RunnerClient client,RunnerIdentity identity,RunnerTask task,String repositoriesRoot,String workspaceRoot,ProviderExecutionPolicy policy,Path leaseFile)throws Exception{
+        if(task.dependencyChangeShas().isEmpty())throw new IllegalArgumentException("Review task has no integrated dependency");
+        RunnerLease lease=client.claimTask(identity,task.id());new RunnerLeaseStore().save(leaseFile,lease);Path repository=new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot),task.repository());Path worktree=new GitWorktreeManager().create(repository,task.dependencyChangeShas().getLast(),task.id(),Path.of(workspaceRoot));client.acknowledgeLease(identity,lease.leaseId(),lease.nonce());
+        try{String diff=new GitWorktreeManager().boundedDiff(worktree,task.baseBranch());ReviewResult result=new ReviewWorker().execute(policy,new ProviderClientFactory().create(policy),task,diff,lease.leaseId());client.recordReviewEvidence(identity,lease,result);client.recordProviderAttempt(identity,lease,ProviderAttemptReport.succeeded(result.usage()));client.completeLease(identity,lease.leaseId(),lease.nonce(),result.approved());if(!result.approved())throw new IllegalStateException("Independent review rejected the integrated change: "+result.summary());System.out.println("Independent review passed.");}
+        catch(ProviderExecutionFailure failure){client.recordProviderAttempt(identity,lease,ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy,failure,lease.leaseId())));client.completeLease(identity,lease.leaseId(),lease.nonce(),false);throw failure;}
+        catch(GuardedPatchFailure invalid){client.recordProviderAttempt(identity,lease,ProviderAttemptReport.rejected(invalid.usage(),invalid.category()));client.completeLease(identity,lease.leaseId(),lease.nonce(),false);throw invalid;}
+    }
+
     private static void executeProviderTask(String controlPlane, String identityFile, RunnerTask task, String repositoriesRoot,
                                             String workspaceRoot, ProviderExecutionPolicy policy, String allowedPrefixes,
                                             String leaseFile) throws Exception {
@@ -311,7 +398,7 @@ public final class RunnerMain {
         RunnerLease lease = client.claimTask(identity, task.id());
         new RunnerLeaseStore().save(Path.of(leaseFile), lease);
         Path repository = new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot), task.repository());
-        Path worktree = new GitWorktreeManager().create(repository, task.baseBranch(), task.id(), Path.of(workspaceRoot));
+        Path worktree = new GitWorktreeManager().create(repository, task.executionBaseRef(), task.id(), Path.of(workspaceRoot));
         client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
         GuardedPatchResult result;
         try {
@@ -327,6 +414,7 @@ public final class RunnerMain {
             throw unsafeOutput;
         }
         client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
+        new GitWorktreeManager().pinTaskCommit(worktree, task.id(), result.commitSha());
         client.completeProviderWork(identity, lease, result.commitSha());
         System.out.println("Provider task completed: commit=" + result.commitSha());
     }

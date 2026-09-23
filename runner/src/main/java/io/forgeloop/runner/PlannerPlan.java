@@ -57,24 +57,30 @@ public record PlannerPlan(List<String> acceptanceCriteria, List<PlannedTask> tas
                 || acceptanceCriteria.stream().anyMatch(value -> value == null || value.isBlank())) {
             throw new IllegalArgumentException("Planner criteria or task count is invalid");
         }
-        Set<String> roles = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "INTEGRATION", "REPAIR", "REVIEW");
+        Set<String> roles = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "INTEGRATION");
         Set<String> writingRoles = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "REPAIR");
+        Map<String, String> roleCapabilities = Map.of(
+                "IMPLEMENTATION", "provider", "BACKEND", "provider", "FRONTEND", "provider",
+                "INDEPENDENT_TEST", "provider", "INTEGRATION", "git");
         Map<String, PlannedTask> byKey = new HashMap<>();
         long allocated = 0;
         for (PlannedTask task : tasks) {
             if (task.key() == null || !task.key().matches("[A-Za-z0-9_.-]{1,80}") || byKey.put(task.key(), task) != null
                     || !roles.contains(task.role()) || task.title() == null || task.title().isBlank()
                     || task.requiredCapability() == null || !task.requiredCapability().matches("[A-Za-z0-9_.-]{1,80}")
+                    || !roleCapabilities.get(task.role()).equals(task.requiredCapability())
                     || task.attemptBudget() < 1 || task.attemptBudget() > 5 || task.budgetMicros() < 0
                     || new HashSet<>(task.dependencies()).size() != task.dependencies().size()
                     || new HashSet<>(task.ownedPaths()).size() != task.ownedPaths().size()
                     || (writingRoles.contains(task.role()) && task.ownedPaths().isEmpty())
+                    || (writingRoles.contains(task.role()) && !task.dependencies().isEmpty())
                     || task.ownedPaths().stream().anyMatch(PlannerPlan::unsafePath)) {
                 throw new IllegalArgumentException("Planner task semantics are invalid");
             }
             allocated = Math.addExact(allocated, task.budgetMicros());
         }
         if (allocated > Math.round(budgetUsd * 1_000_000d)) throw new IllegalArgumentException("Planner task budgets exceed the run budget");
+        List<PlannedTask> integration=tasks.stream().filter(task->"INTEGRATION".equals(task.role())).toList();Set<String> writing=tasks.stream().filter(task->writingRoles.contains(task.role())).map(PlannedTask::key).collect(java.util.stream.Collectors.toSet());if(integration.size()!=1||!integration.getFirst().dependencies().containsAll(writing)||!integration.getFirst().ownedPaths().isEmpty())throw new IllegalArgumentException("Planner must produce one pathless integration task depending on all writing tasks");
         tasks.forEach(task -> task.dependencies().forEach(dependency -> {
             if (dependency.equals(task.key()) || !byKey.containsKey(dependency)) throw new IllegalArgumentException("Planner dependency is invalid");
         }));

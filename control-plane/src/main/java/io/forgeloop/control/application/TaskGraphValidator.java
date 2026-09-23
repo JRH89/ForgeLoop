@@ -11,8 +11,11 @@ import org.springframework.stereotype.Component;
 /** Validates planner output before any task is persisted or exposed to a runner. */
 @Component
 public final class TaskGraphValidator {
-    private static final Set<String> ROLES = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "INTEGRATION", "REPAIR", "REVIEW");
+    private static final Set<String> ROLES = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "INTEGRATION");
     private static final Set<String> WRITING_ROLES = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "REPAIR");
+    private static final Map<String, String> ROLE_CAPABILITIES = Map.of(
+            "IMPLEMENTATION", "provider", "BACKEND", "provider", "FRONTEND", "provider",
+            "INDEPENDENT_TEST", "provider", "INTEGRATION", "git");
     private static final int MAX_TASKS = 32;
 
     public void validate(TaskPlanSubmission plan, double runBudgetUsd) {
@@ -31,16 +34,25 @@ public final class TaskGraphValidator {
             if (!ROLES.contains(task.role())) throw new IllegalArgumentException("Unsupported task role: " + task.role());
             if (task.title() == null || task.title().isBlank() || task.title().length() > 300) throw new IllegalArgumentException("Task title is invalid");
             requireToken(task.requiredCapability(), "Required capability");
+            if (!ROLE_CAPABILITIES.get(task.role()).equals(task.requiredCapability())) {
+                throw new IllegalArgumentException("Task capability does not match its role: " + task.role());
+            }
             if (task.attemptBudget() < 1 || task.attemptBudget() > 5) throw new IllegalArgumentException("Attempt budget must be between 1 and 5");
             if (task.budgetMicros() < 0) throw new IllegalArgumentException("Task budget cannot be negative");
             allocatedMicros = Math.addExact(allocatedMicros, task.budgetMicros());
             requireDistinctNonBlank(task.dependencies(), "Task dependencies");
             requireDistinctNonBlank(task.ownedPaths(), "Owned paths");
             if (WRITING_ROLES.contains(task.role()) && task.ownedPaths().isEmpty()) throw new IllegalArgumentException("Writing tasks require owned paths");
+            if (WRITING_ROLES.contains(task.role()) && !task.dependencies().isEmpty()) {
+                throw new IllegalArgumentException("Writing tasks must be independent; integration is the only fan-in stage");
+            }
             task.ownedPaths().forEach(this::validatePathPrefix);
         }
         long runBudgetMicros = Math.round(runBudgetUsd * 1_000_000d);
         if (allocatedMicros > runBudgetMicros) throw new IllegalArgumentException("Task budgets exceed the run budget");
+        List<PlannedTaskSubmission> integration=plan.tasks().stream().filter(task->"INTEGRATION".equals(task.role())).toList();
+        Set<String> writing=plan.tasks().stream().filter(task->WRITING_ROLES.contains(task.role())).map(PlannedTaskSubmission::key).collect(java.util.stream.Collectors.toSet());
+        if(integration.size()!=1||!integration.getFirst().dependencies().containsAll(writing)||!integration.getFirst().ownedPaths().isEmpty())throw new IllegalArgumentException("A plan requires exactly one pathless integration task depending on all writing tasks");
         plan.tasks().forEach(task -> task.dependencies().forEach(dependency -> {
             if (dependency.equals(task.key())) throw new IllegalArgumentException("A task cannot depend on itself");
             if (!tasks.containsKey(dependency)) throw new IllegalArgumentException("Unknown task dependency: " + dependency);

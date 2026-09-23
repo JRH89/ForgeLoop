@@ -25,6 +25,8 @@ class GitWorktreeManagerTest {
         run("git", "-C", temporaryDirectory.toString(), "config", "user.name", "ForgeLoop Runner");
         Files.writeString(temporaryDirectory.resolve("README.md"), "base");
         run("git", "-C", temporaryDirectory.toString(), "add", "."); run("git", "-C", temporaryDirectory.toString(), "commit", "-m", "base");
+        run("git", "-C", temporaryDirectory.toString(), "config", "--unset", "user.email");
+        run("git", "-C", temporaryDirectory.toString(), "config", "--unset", "user.name");
         Path worktree = new GitWorktreeManager().create(temporaryDirectory, "HEAD", "task-1", temporaryDirectory.resolve("worktrees"));
         Files.writeString(worktree.resolve("README.md"), "changed");
         assertFalse(new GitWorktreeManager().commit(worktree, "feat: task change").isBlank());

@@ -22,8 +22,7 @@ public class LeaseRecoveryService {
     @Transactional public void recoverExpiredLeases() {
         List<TaskLease> expired = leases.findByCompletedAtIsNullAndExpiresAtBefore(Instant.now());
         for (TaskLease lease : expired) {
-            lease.recover();
-            repairPackages.save(new RepairPackage(lease.getTask(), "LEASE_EXPIRED", null));
+            if (lease.recover()) repairPackages.save(new RepairPackage(lease.getTask(), "LEASE_EXPIRED", null));
         }
         leases.deleteAll(expired);
     }

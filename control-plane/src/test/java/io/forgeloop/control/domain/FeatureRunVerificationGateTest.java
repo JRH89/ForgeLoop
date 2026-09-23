@@ -104,7 +104,8 @@ class FeatureRunVerificationGateTest {
 
     assertEquals(true, run.isApproved());
     assertEquals("operator@example.com", run.getApprovedBy());
-    assertThrows(IllegalStateException.class, () -> run.approve("another@example.com"));
+    run.approve("another@example.com");
+    assertEquals("operator@example.com", run.getApprovedBy());
   }
 
   @Test
@@ -121,10 +122,28 @@ class FeatureRunVerificationGateTest {
     run.block();
 
     task.retryByOperator();
-    run.resumeAfterRetry();
+    run.resumeAfterRetry(task);
 
     assertEquals(TaskState.REPAIR_QUEUED, task.getState());
     assertEquals(3, task.getAttemptBudget());
     assertEquals(RunState.EXECUTING, run.getState());
+  }
+
+  @Test
+  void operatorRetryReturnsPlannerTaskToPlanningState() {
+    FeatureRun run = new FeatureRun("acme/widget", "main", "Add search", "spec", 10, "default", 1);
+    run.addTask("PLANNER", "Plan", "provider");
+    DeliveryTask task = run.getTasks().getFirst();
+    for (int attempt = 0; attempt < 3; attempt++) {
+      task.transition(TaskState.LEASED);
+      task.transition(TaskState.REPAIR_QUEUED);
+    }
+    run.block();
+
+    task.retryByOperator();
+    run.resumeAfterRetry(task);
+
+    assertEquals(TaskState.REPAIR_QUEUED, task.getState());
+    assertEquals(RunState.PLANNING, run.getState());
   }
 }

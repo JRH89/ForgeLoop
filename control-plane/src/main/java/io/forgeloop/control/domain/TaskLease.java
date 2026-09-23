@@ -5,10 +5,9 @@ import java.time.Instant;
 
 /** A short-lived, single-owner authorization to execute exactly one task. */
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = "task_id"))
 public class TaskLease {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
-    @OneToOne(optional = false) @JoinColumn(name = "task_id") private DeliveryTask task;
+    @ManyToOne(optional = false) @JoinColumn(name = "task_id") private DeliveryTask task;
     @ManyToOne(optional = false) private Runner runner;
     @Column(nullable = false, unique = true) private String nonceHash;
     @Column(nullable = false) private Instant expiresAt;
@@ -32,6 +31,11 @@ public class TaskLease {
         if (passed) task.getRun().evaluateReviewReadiness();
         completedAt = Instant.now();
     }
+    /** Closes a failed quality-stage lease before the run atomically materializes its code-repair cycle. */
+    public void closeForRepairCycle() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        completedAt = Instant.now();
+    }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */
     public void completeChangeReady(String changeSha) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
@@ -53,11 +57,18 @@ public class TaskLease {
         task.transition(TaskState.INTEGRATED);
         completedAt = Instant.now();
     }
-    /** Requeues expired work; the caller removes this lease so the task can be safely re-claimed. */
-    public void recover() {
+    /** Requeues expired work; terminal work is merely closed and reports that no repair package is needed. */
+    public boolean recover() {
         if (completedAt != null || Instant.now().isBefore(expiresAt)) throw new IllegalStateException("Only expired incomplete leases can be recovered");
+        if (java.util.List.of(RunState.COMPLETE, RunState.CANCELLED, RunState.REJECTED, RunState.FAILED).contains(task.getRun().getState())
+                || java.util.List.of(TaskState.VERIFIED, TaskState.FAILED, TaskState.HELD).contains(task.getState())) {
+            completedAt = Instant.now();
+            return false;
+        }
         task.transition(TaskState.REPAIR_QUEUED);
         if (task.getState() == TaskState.FAILED) task.getRun().block();
+        completedAt = Instant.now();
+        return true;
     }
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public DeliveryTask getTask() { return task; }

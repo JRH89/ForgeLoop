@@ -31,5 +31,6 @@ public class RepositoryConnectionService {
     if (!connection.belongsTo(operators.organizationId()) || !connection.isEnabled()) throw new IllegalStateException("Repository connection is unavailable");
     return connection;
   }
-  public List<RepositoryConnection> list() { String organizationId = operators.organizationId(); return connections.findAll().stream().filter(connection -> connection.belongsTo(organizationId)).toList(); }
+  @Transactional(readOnly = true)
+  public List<RepositoryConnection> list() { return connections.findByOrganizationId(operators.organizationId()); }
 }

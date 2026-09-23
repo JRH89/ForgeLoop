@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,20 +24,33 @@ public final class AnthropicMessagesProviderClient implements ProviderClient {
 
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
         try {
-            String body = JSON.writeValueAsString(Map.of("model", request.model(), "system", request.instructions(), "max_tokens", request.maxOutputTokens(),
-                    "messages", List.of(Map.of("role", "user", "content", request.input()))));
+            String body = requestBody(request);
             HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5))
                     .header("x-api-key", apiKey).header("anthropic-version", "2023-06-01").header("content-type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ProviderException("Anthropic provider request failed with HTTP " + response.statusCode(), response.statusCode() == 429 || response.statusCode() >= 500);
+            if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("Anthropic", response.statusCode(), response.body());
             return parse(response.body());
         } catch (ProviderException exception) { throw exception;
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("Anthropic provider request was interrupted", true, exception);
         } catch (Exception exception) { throw new ProviderException("Anthropic provider request failed", true, exception); }
     }
 
+    static String requestBody(ProviderRequest request) throws Exception {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", request.model());
+        payload.put("system", request.instructions());
+        payload.put("max_tokens", request.maxOutputTokens());
+        payload.put("messages", List.of(Map.of("role", "user", "content", request.input())));
+        if (request.outputSchema() != null) {
+            payload.put("output_config", Map.of("format", Map.of("type", "json_schema", "schema", request.outputSchema())));
+        }
+        return JSON.writeValueAsString(payload);
+    }
+
     static ProviderResult parse(String body) throws Exception {
-        JsonNode response = JSON.readTree(body); StringBuilder output = new StringBuilder();
+        JsonNode response = JSON.readTree(body);
+        if ("max_tokens".equals(response.path("stop_reason").asText())) throw new IllegalArgumentException("Anthropic output reached the token limit");
+        StringBuilder output = new StringBuilder();
         for (JsonNode content : response.path("content")) if ("text".equals(content.path("type").asText())) output.append(content.path("text").asText());
         JsonNode usage = response.path("usage");
         return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null));
