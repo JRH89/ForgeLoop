@@ -24,7 +24,7 @@ Exit criteria: authorization-matrix tests prove tenant isolation; production sta
 
 Completed evidence: persisted organization membership role checks, tenant-scoped repository/run services, privileged-action audit coverage, a tenant-scoped run timeline query, production configuration tests, and 38 passing control-plane tests. Initial tenant-administrator bootstrap remains a controlled deployment task rather than an unauthenticated product endpoint.
 
-## Slice 2 — GitHub App delivery lifecycle
+## Slice 2 — GitHub App delivery lifecycle — complete
 
 Turn intake into a usable repository-delivery integration.
 
@@ -36,9 +36,9 @@ Turn intake into a usable repository-delivery integration.
 
 Exit criteria: a signed issue event creates exactly one run, a synthetic completed change produces exactly one draft PR/check run, and all GitHub identifiers are persisted and reconciled.
 
-Progress evidence: the Ticketly GitHub App installation has been authenticated with a real App JWT and installation token, synchronized from GitHub, and a signed `issues` webhook created Ticketly issue run `issue-1`. The remaining exit criterion depends on Slice 3 producing a verified change for the existing idempotent GitHub delivery adapter.
+Completed evidence: the Ticketly GitHub App installation was authenticated with a real App JWT and installation token, synchronized from GitHub, and signed issue delivery was idempotent. Ticketly issue 7 completed the delivery lifecycle through check creation, draft PR 8, passing GitHub checks, and merge.
 
-## Slice 3 — Runner execution lifecycle
+## Slice 3 — Runner execution lifecycle — complete
 
 Make the self-hosted runner safely execute assigned work, not merely verify an operator-supplied command.
 
@@ -49,7 +49,7 @@ Make the self-hosted runner safely execute assigned work, not merely verify an o
 
 Exit criteria: two runners claim distinct compatible tasks, a killed runner is recovered safely, worktrees are cleaned, and artifacts verify before the control plane accepts results.
 
-Implementation progress: dispatch now gives authenticated runners structured, policy-derived repository, base-branch, source-reference, and capability context. The runner can claim one eligible task and prepare an isolated detached worktree from only a pre-cloned checkout beneath its configured repository root. Automatic provider execution, policy-selected commands, and lifecycle reconciliation remain in progress.
+Completed evidence: authenticated dispatch provides policy-derived repository context; runners execute provider, integration, independent-review, and verification roles in isolated worktrees, reconcile bounded leases, upload checksummed artifacts, and publish redacted lifecycle events. Ticketly issue 7 exercised the complete runner path without operator repository edits.
 
 ## Slice 4 — Provider contracts and guarded agent workers — complete
 
@@ -125,7 +125,7 @@ Prepare the verified product for a staging burn-in and production decision.
 
 Exit criteria: all operational checks have evidence, a restore drill passes, the pilot is stable, and no production claim is made before the external credentials/infrastructure have been supplied and validated.
 
-Implementation progress: verification artifacts now use an authenticated active-lease upload endpoint, bounded JSON payloads, SHA-256 validation, idempotent lease binding, tenant/run/task object keys, filesystem and S3-compatible backends, mandatory read-after-write verification, retention metadata, and operator-console discovery. Production configuration accepts only the implemented `s3://` backend. Liveness/readiness probes and authenticated Prometheus metrics are available. Hosted storage policy, managed infrastructure, alert routing, restore/load drills, burn-in, and go/no-go evidence remain deployment gates.
+Implementation progress: verification artifacts now use an authenticated active-lease upload endpoint, bounded JSON payloads, SHA-256 validation, idempotent lease binding, tenant/run/task object keys, filesystem and S3-compatible backends, mandatory read-after-write verification, retention metadata, and operator-console discovery. Production configuration accepts only the implemented `s3://` backend. Liveness/readiness probes, authenticated Prometheus metrics, structured production logs, rate limiting, image/dependency/secret scanning, SBOMs, a passing PostgreSQL restore drill, and a local load gate are available. Runner events and durable human escalation cover operational diagnosis and safe intervention. Hosted storage policy, managed infrastructure, alert routing, burn-in, and go/no-go evidence remain deployment gates.
 
 ## Execution discipline
 

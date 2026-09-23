@@ -32,7 +32,8 @@ class TaskLeaseServiceTest {
     VerificationEvidenceRepository evidence = mock(VerificationEvidenceRepository.class);
     ProviderAttemptRepository providerAttempts = mock(ProviderAttemptRepository.class);
     RepairPackageRepository repairPackages = mock(RepairPackageRepository.class);
-    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts, repairPackages);
+    HumanEscalationService escalations = mock(HumanEscalationService.class);
+    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts, repairPackages, escalations);
 
     @Test
     void claimCreatesExpiringSingleOwnerLease() {
@@ -133,6 +134,7 @@ class TaskLeaseServiceTest {
                 new ProviderAttemptSubmission("anthropic", "claude", "b".repeat(64), 1, 2, 1, "SUCCEEDED", 50, true, false, "COMPLETED"));
 
         assertEquals(RunState.BLOCKED, run.getState());
+        verify(escalations).escalate(task, "BUDGET_EXHAUSTED", "Provider spend reached the configured task or run budget");
     }
 
     @Test

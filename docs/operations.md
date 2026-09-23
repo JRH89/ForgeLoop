@@ -42,4 +42,6 @@ Run `node scripts/load-test.mjs` against a development or staging control plane;
 
 Use `/actuator/health/liveness` for process restarts and `/actuator/health/readiness` for load-balancer routing. Prometheus metrics are available at the authenticated `/actuator/prometheus` endpoint; do not expose it publicly. Preserve the feature evidence bundle and immutable audit events during an incident. Disable worker execution rather than bypassing a failed verification gate; a blocked run is safer than an unverified change.
 
+Runner progress and automated intervention are documented in [runner-events-and-escalation.md](runner-events-and-escalation.md). Alert on open `HIGH` escalations and on escalations remaining unacknowledged beyond the response SLO. Acknowledging an escalation is not approval to retry or ship.
+
 The application safety net permits 600 requests per minute per runner or network peer by default and returns `429` with `Retry-After`; configure `FORGELOOP_HTTP_REQUESTS_PER_MINUTE` for measured traffic. Health probes bypass this limiter. Production ingress must independently enforce connection, request-body, and distributed tenant/IP limits because an in-process limiter is neither a WAF nor a cross-replica quota system.

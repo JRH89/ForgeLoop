@@ -19,13 +19,14 @@ public class TaskLeaseService {
     private final VerificationEvidenceRepository evidence;
     private final ProviderAttemptRepository providerAttempts;
     private final RepairPackageRepository repairPackages;
+    private final HumanEscalationService escalations;
     private final SecureRandom random = new SecureRandom();
 
     public TaskLeaseService(DeliveryTaskRepository tasks, RunnerRepository runners, TaskLeaseRepository leases,
                             VerificationEvidenceRepository evidence, ProviderAttemptRepository providerAttempts,
-                            RepairPackageRepository repairPackages) {
+                            RepairPackageRepository repairPackages, HumanEscalationService escalations) {
         this.tasks = tasks; this.runners = runners; this.leases = leases; this.evidence = evidence;
-        this.providerAttempts = providerAttempts; this.repairPackages = repairPackages;
+        this.providerAttempts = providerAttempts; this.repairPackages = repairPackages; this.escalations = escalations;
     }
 
     @Transactional public LeaseGrant claim(String taskId, String runnerId) {
@@ -68,6 +69,7 @@ public class TaskLeaseService {
             lease.closeForRepairCycle();
             RepairPackage repair = task.getRun().scheduleQualityRepair(task, category, digest);
             if (repair != null) repairPackages.save(repair);
+            else escalations.escalate(task, "ATTEMPT_BUDGET_EXHAUSTED", "Autonomous quality repair budget is exhausted for " + task.getTitle());
             return lease;
         }
         lease.complete(passed);
@@ -76,6 +78,7 @@ public class TaskLeaseService {
             String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
                     .map(VerificationEvidence::getDigest).orElse(null);
             repairPackages.save(new RepairPackage(task, category, digest));
+            if (task.getState() == TaskState.FAILED) escalations.escalate(task, "ATTEMPT_BUDGET_EXHAUSTED", "Task failed after all autonomous attempts: " + task.getTitle());
         }
         return lease;
     }
@@ -120,7 +123,10 @@ public class TaskLeaseService {
         long taskSpent = providerAttempts.sumKnownCostByTaskId(task.getId());
         long runSpent = providerAttempts.sumKnownCostByRunId(task.getRun().getId());
         long runBudget = Math.round(task.getRun().getBudgetUsd() * 1_000_000d);
-        if ((task.getBudgetMicros() > 0 && taskSpent >= task.getBudgetMicros()) || runSpent >= runBudget) task.getRun().block();
+        if ((task.getBudgetMicros() > 0 && taskSpent >= task.getBudgetMicros()) || runSpent >= runBudget) {
+            task.getRun().block();
+            escalations.escalate(task, "BUDGET_EXHAUSTED", "Provider spend reached the configured task or run budget");
+        }
         return recorded;
     }
 

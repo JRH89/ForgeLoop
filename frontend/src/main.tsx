@@ -9,6 +9,7 @@ import {
 import { createRoot } from "react-dom/client";
 import {
   approveFeatureRun,
+  acknowledgeEscalation,
   cancelFeatureRun,
   loadOperator,
   loadRepositoryConnections,
@@ -16,6 +17,7 @@ import {
   loadRunOperations,
   loadRuns,
   retryFeatureTask,
+  resolveEscalation,
   submitFeature,
   type FeatureRun,
   type OperatorSession,
@@ -430,6 +432,14 @@ function RunDetail({
         </section>
       </div>
       <section className="panel">
+        <div className="section-heading"><div><h2>Runner event stream</h2><p>Redacted lease progress refreshes while this run is active.</p></div></div>
+        {operations.events.length ? operations.events.map(event=><div className="timeline" key={event.id}><i/><div><b>{event.eventType.replaceAll("_"," ")}</b><small>{event.message} · {stamp(event.occurredAt)}</small></div></div>):<p className="empty">No runner events have been received.</p>}
+      </section>
+      <section className="panel">
+        <div className="section-heading"><div><h2>Human escalation queue</h2><p>Automation stops safely when a configured boundary is reached.</p></div></div>
+        {operations.escalations.length ? operations.escalations.map(item=><div className="item" key={item.id}><div><b>{item.reason.replaceAll("_"," ")}</b><small>{item.summary} · {item.severity} · {stamp(item.createdAt)}</small></div><div className="actions"><span className={`status ${item.status.toLowerCase()}`}>{item.status}</span>{canOperate&&item.status==="OPEN"&&<button className="secondary" disabled={!!busy} onClick={()=>void action(`ack-${item.id}`,()=>acknowledgeEscalation(item.id))}>Acknowledge</button>}{canOperate&&item.status!=="RESOLVED"&&<button className="secondary" disabled={!!busy} onClick={()=>void action(`resolve-${item.id}`,()=>resolveEscalation(item.id))}>Resolve</button>}</div></div>):<p className="empty">No human intervention is required.</p>}
+      </section>
+      <section className="panel">
         <h2>Independent review</h2>
         {operations.reviews.length ? (
           operations.reviews.map((review) => (
@@ -592,6 +602,8 @@ function RunsPage({
     evidence: [],
     reviews: [],
     artifacts: [],
+    events: [],
+    escalations: [],
     audit: [],
   });
   const [creating, setCreating] = useState(false);
