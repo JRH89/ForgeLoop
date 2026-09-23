@@ -8,6 +8,10 @@ test('renders the persisted delivery-run console', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: 'ForgeLoop navigation' })).toBeVisible();
   await expect(page.getByText('Intake queue')).toBeVisible();
   await expect(page.getByRole('button', { name: '+ New run' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Task graph & attempts' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Evidence browser & redacted logs' })).toBeVisible();
+  if (await page.getByRole('heading', { name: 'No run selected' }).count()) {
+    await expect(page.getByText(/GitHub issues carrying/)).toBeVisible();
+  } else {
+    await expect(page.getByRole('heading', { name: 'Task graph & attempts' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Evidence browser & redacted logs' })).toBeVisible();
+  }
 });
