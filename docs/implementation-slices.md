@@ -8,7 +8,7 @@ ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signe
 
 Ticketly is now a separate support SaaS repository. It has no ForgeLoop delivery dashboard, fabricated agent runs, fabricated cost data, or fabricated verification data. It remains the primary target application for the eventual real GitHub issue-to-PR validation.
 
-The product can invoke policy-selected models with schema-constrained output, create guarded task-scoped commits, integrate declared changes, push an exact runner-produced head with a lease-bound GitHub credential, perform independent criterion-level review, dispatch immutable repository-policy verification tasks, and route failed quality gates through a fresh code-repair task. Ticketly issue 7 completed that full path and ForgeLoop created check run and draft PR 8 after explicit approval; the PR was subsequently merged. Object-store artifacts and a second unrelated repository proof remain incomplete.
+The product can invoke policy-selected models with schema-constrained output, create guarded task-scoped commits, integrate declared changes, push an exact runner-produced head with a lease-bound GitHub credential, perform independent criterion-level review, dispatch immutable repository-policy verification tasks, and route failed quality gates through a fresh code-repair task. Ticketly issue 7 completed that full path and ForgeLoop created check run and draft PR 8 after explicit approval; the PR was subsequently merged. Lease-bound S3-compatible artifact persistence is implemented. A second unrelated repository proof remains deferred because the configured provider account has insufficient credit.
 
 ## Slice 1 — Multi-tenant security and auditable operations — complete
 
@@ -113,7 +113,7 @@ Prove repo-agnostic delivery using separate repositories.
 
 Exit criteria: both repositories complete from fresh GitHub issues without manual repository edits by an operator, and their policies/evidence remain independent.
 
-Progress evidence: Ticketly issue 7 entered through the signed public GitHub App webhook, produced a schema-constrained plan, generated and integrated commit `044e5067cb9c94d353baf1b9bcd2e377a077ebe6`, pushed it with a lease-bound installation token, passed independent criterion review, and passed the authorization, backend, browser, Compose, and frontend policy gates with checksummed evidence. Explicit ForgeLoop approval created a successful GitHub check and draft PR 8; both GitHub checks passed and the PR merged as `73476b5964e4ce65b08bbed33f151def2493a6f5`. The remaining Slice 8 exit criterion is the same fresh-issue proof against a second installed, unrelated repository.
+Progress evidence: Ticketly issue 7 entered through the signed public GitHub App webhook, produced a schema-constrained plan, generated and integrated commit `044e5067cb9c94d353baf1b9bcd2e377a077ebe6`, pushed it with a lease-bound installation token, passed independent criterion review, and passed the authorization, backend, browser, Compose, and frontend policy gates with checksummed evidence. Explicit ForgeLoop approval created a successful GitHub check and draft PR 8; both GitHub checks passed and the PR merged as `73476b5964e4ce65b08bbed33f151def2493a6f5`. A fresh `JRH89/project-hub` issue reached provider execution through its independent repository policy, then stopped truthfully with Anthropic `credit balance is too low`; this proves connection and dispatch but does not satisfy the second end-to-end exit criterion.
 
 ## Slice 9 — Production launch readiness
 
@@ -124,6 +124,8 @@ Prepare the verified product for a staging burn-in and production decision.
 - Run security review, staging burn-in, controlled pilot, backup restore, and explicit go/no-go review.
 
 Exit criteria: all operational checks have evidence, a restore drill passes, the pilot is stable, and no production claim is made before the external credentials/infrastructure have been supplied and validated.
+
+Implementation progress: verification artifacts now use an authenticated active-lease upload endpoint, bounded JSON payloads, SHA-256 validation, idempotent lease binding, tenant/run/task object keys, filesystem and S3-compatible backends, mandatory read-after-write verification, retention metadata, and operator-console discovery. Production configuration accepts only the implemented `s3://` backend. Liveness/readiness probes and authenticated Prometheus metrics are available. Hosted storage policy, managed infrastructure, alert routing, restore/load drills, burn-in, and go/no-go evidence remain deployment gates.
 
 ## Execution discipline
 

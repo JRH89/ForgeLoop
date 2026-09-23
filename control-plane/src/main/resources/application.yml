@@ -12,7 +12,19 @@ spring:
     baseline-on-migrate: true
     baseline-version: "0"
 management:
-  endpoints: { web: { exposure: { include: health,info } } }
+  endpoint:
+    health: { probes: { enabled: true } }
+    info: { access: read-only }
+    prometheus: { access: read-only }
+  endpoints:
+    web:
+      exposure:
+        include: [health, info, prometheus]
+  metrics:
+    tags: { application: "${spring.application.name}" }
+  prometheus:
+    metrics:
+      export: { enabled: true }
 forgeloop:
   security:
     mode: "${FORGELOOP_SECURITY_MODE:production}"
@@ -21,6 +33,12 @@ forgeloop:
     encryption-key: "${FORGELOOP_ENCRYPTION_KEY:}"
   artifacts:
     storage-uri: "${FORGELOOP_ARTIFACT_STORAGE_URI:}"
+    retention-days: "${FORGELOOP_ARTIFACT_RETENTION_DAYS:30}"
+    max-bytes: "${FORGELOOP_ARTIFACT_MAX_BYTES:1048576}"
+    s3-endpoint: "${FORGELOOP_ARTIFACT_S3_ENDPOINT:}"
+    s3-region: "${FORGELOOP_ARTIFACT_S3_REGION:us-east-1}"
+  http:
+    requests-per-minute: "${FORGELOOP_HTTP_REQUESTS_PER_MINUTE:600}"
   github:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
     app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"

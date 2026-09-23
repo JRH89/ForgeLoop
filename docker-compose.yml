@@ -31,10 +31,13 @@ services:
       FORGELOOP_GITHUB_DEFAULT_HARNESS_PROFILE: ${FORGELOOP_GITHUB_DEFAULT_HARNESS_PROFILE:-GENERIC}
       FORGELOOP_GITHUB_DEFAULT_REQUIRED_GATES: ${FORGELOOP_GITHUB_DEFAULT_REQUIRED_GATES:-unit}
       FORGELOOP_GITHUB_DEFAULT_MAX_BUDGET_USD: ${FORGELOOP_GITHUB_DEFAULT_MAX_BUDGET_USD:-25}
+      FORGELOOP_ARTIFACT_STORAGE_URI: file:/var/lib/forgeloop/artifacts
+    volumes:
+      - forgeloop-artifacts:/var/lib/forgeloop/artifacts
     depends_on:
       postgres: { condition: service_healthy }
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -66,3 +69,5 @@ services:
     depends_on:
       control-plane: { condition: service_healthy }
       webhook-edge: { condition: service_started }
+volumes:
+  forgeloop-artifacts:

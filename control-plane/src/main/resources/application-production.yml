@@ -1,0 +1,12 @@
+logging:
+  structured:
+    format: { console: ecs }
+    ecs:
+      service:
+        environment: production
+
+# Detailed health components remain hidden from unauthenticated callers while probes expose status.
+management:
+  endpoint:
+    health:
+      show-details: when-authorized

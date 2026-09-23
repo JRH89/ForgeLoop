@@ -41,7 +41,7 @@ public class ProductionConfigurationValidator implements SmartInitializingSingle
         if (webhookSecret.isBlank()) missing.add("FORGELOOP_GITHUB_WEBHOOK_SECRET");
         if (datasourceUrl.isBlank() || datasourceUrl.startsWith("jdbc:h2:")) missing.add("production PostgreSQL datasource");
         if (!"validate".equals(ddlAuto)) missing.add("SPRING_JPA_DDL_AUTO=validate");
-        if (artifactStorageUri.isBlank() || !(artifactStorageUri.startsWith("s3://") || artifactStorageUri.startsWith("gs://") || artifactStorageUri.startsWith("azure://"))) missing.add("FORGELOOP_ARTIFACT_STORAGE_URI");
+        if (artifactStorageUri.isBlank() || !artifactStorageUri.startsWith("s3://")) missing.add("FORGELOOP_ARTIFACT_STORAGE_URI (s3:// bucket required)");
         if (encryptionKey.length() < 32) missing.add("FORGELOOP_ENCRYPTION_KEY (minimum 32 characters)");
         if (githubAppId.isBlank() || githubPrivateKey.isBlank()) missing.add("GitHub App ID and private key");
         if (installationStateSecret.length() < 32) missing.add("FORGELOOP_GITHUB_INSTALLATION_STATE_SECRET (minimum 32 characters)");
