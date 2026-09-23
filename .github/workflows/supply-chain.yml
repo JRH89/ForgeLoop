@@ -21,9 +21,9 @@ jobs:
           exit-code: '1'
       - name: Build release images
         run: |
-          docker build -t forgeloop/control-plane:${GITHUB_SHA} control-plane
-          docker build -t forgeloop/runner:${GITHUB_SHA} runner
-          docker build -t forgeloop/web:${GITHUB_SHA} frontend
+          docker build -t "forgeloop/control-plane:${GITHUB_SHA}" control-plane
+          docker build -t "forgeloop/runner:${GITHUB_SHA}" runner
+          docker build -t "forgeloop/web:${GITHUB_SHA}" frontend
       - name: Scan control-plane image
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
