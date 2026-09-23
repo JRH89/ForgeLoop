@@ -31,9 +31,14 @@ class FileSystemArtifactStoreTest {
                 .putVerified("../escaped.json", content, "application/json", ArtifactDigests.sha256(content)));
     }
 
-    @Test void removesContentThatFailsChecksumVerification() {
+    @Test void rejectsDifferentContentAtAnImmutableKeyWithoutReplacingIt() throws Exception {
         byte[] content = "{}".getBytes(StandardCharsets.UTF_8);
+        Path target = root.resolve("org/run/bad.json");
+        Files.createDirectories(target.getParent());
+        Files.writeString(target, "different");
+
         assertThrows(IllegalStateException.class, () -> new FileSystemArtifactStore(root)
-                .putVerified("org/run/bad.json", content, "application/json", "0".repeat(64)));
+                .putVerified("org/run/bad.json", content, "application/json", ArtifactDigests.sha256(content)));
+        assertEquals("different", Files.readString(target));
     }
 }
