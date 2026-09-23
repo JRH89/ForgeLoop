@@ -33,7 +33,7 @@ public class SecurityConfiguration {
             throw new IllegalStateException("FORGELOOP_SECURITY_MODE must be development or production");
         } else {
             http.authorizeHttpRequests(authorize -> authorize
-                    .requestMatchers("/actuator/health", "/actuator/health/**", "/api/github/webhooks", "/api/github/app/callback", "/api/runner/artifacts").permitAll()
+                    .requestMatchers("/actuator/health", "/actuator/health/**", "/api/github/webhooks", "/api/github/app/callback", "/api/runner/artifacts", "/api/runner/events").permitAll()
                     .anyRequest().authenticated());
             http.oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt.decoder(issuerAudienceDecoder(issuerUri, audience))));
         }

@@ -50,12 +50,13 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] Authenticated, lease-bound persistence of redacted verification evidence with independently recomputed output/bundle digests, provenance, artifact references, and exact policy metadata matching.
 - [x] Repository-policy-selected verification orchestration with server-created gate tasks, image/argv/network/timeout snapshots, criterion coverage, and bounded verification repair retries.
 - [x] Lease-bound, checksummed artifact upload through filesystem and S3-compatible storage backends, with read-after-write verification, retention metadata, and operator-console visibility.
-- [ ] Git clone, local MCP processes, and streamed redacted events.
+- [ ] Git clone and local MCP processes.
+- [x] Lease-authenticated, redacted runner lifecycle events with idempotent sequence handling and a durable near-real-time operator timeline.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
 - [x] Role-aware, confirmed, audited human cancellation, bounded task retry, and verified-run approval controls.
 - [x] Independent review-agent orchestration with criterion-level immutable evidence.
-- [ ] Automated human escalation policy.
+- [x] Automated human escalation for attempt and spend boundaries, with tenant-scoped acknowledgement/resolution and audit history.
 
 ### Evidence and repository delivery
 
@@ -750,7 +751,7 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [x] repository registration
 * [x] runner registration
 * [x] task dispatch
-* [ ] live runner events
+* [x] live runner events
 
 ### Phase 2: Agent Execution
 
@@ -768,7 +769,7 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [x] structured failure evidence
 * [x] autonomous repair
 * [x] retry budgets
-* [ ] human escalation
+* [x] human escalation
 * [x] evidence bundles
 
 ### Phase 4: Multi-Agent Orchestration

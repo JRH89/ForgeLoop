@@ -11,6 +11,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
 
 /** Minimal GraphQL transport; never writes credentials or source content to stdout. */
 public final class RunnerClient {
@@ -93,6 +94,16 @@ public final class RunnerClient {
             throw new IllegalStateException("Artifact upload response was malformed");
         }
         return reference;
+    }
+    /** Streams bounded metadata through the active lease; source, prompts, output, and paths are prohibited. */
+    public void recordEvent(RunnerIdentity identity,RunnerLease lease,long sequence,String level,String type,String message)throws Exception{
+        String body=JSON.writeValueAsString(java.util.Map.of("sequence",sequence,"level",level,"eventType",type,"message",message,"occurredAt",Instant.now().toString()));
+        HttpRequest request=HttpRequest.newBuilder(controlPlane.resolve("/api/runner/events"))
+                .header("Content-Type","application/json").header("X-ForgeLoop-Runner-Id",identity.runnerId())
+                .header("X-ForgeLoop-Runner-Credential",identity.credential()).header("X-ForgeLoop-Lease-Id",lease.leaseId())
+                .header("X-ForgeLoop-Lease-Nonce",lease.nonce()).POST(HttpRequest.BodyPublishers.ofString(body)).build();
+        HttpResponse<String> response=http.send(request,HttpResponse.BodyHandlers.ofString());
+        if(response.statusCode()!=200)throw new IllegalStateException("Runner event upload failed with HTTP "+response.statusCode());
     }
     /** Sends metadata-only provider evidence through the same authenticated lease boundary as verification evidence. */
     public String recordProviderAttempt(RunnerIdentity identity, RunnerLease lease, ProviderAttemptReport report) throws Exception {

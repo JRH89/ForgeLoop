@@ -15,14 +15,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class LeaseRecoveryService {
     private final TaskLeaseRepository leases;
     private final RepairPackageRepository repairPackages;
-    public LeaseRecoveryService(TaskLeaseRepository leases, RepairPackageRepository repairPackages) {
-        this.leases = leases; this.repairPackages = repairPackages;
+    private final HumanEscalationService escalations;
+    public LeaseRecoveryService(TaskLeaseRepository leases, RepairPackageRepository repairPackages, HumanEscalationService escalations) {
+        this.leases = leases; this.repairPackages = repairPackages; this.escalations=escalations;
     }
     @Scheduled(fixedDelayString = "${forgeloop.runner.lease-recovery-delay-ms:30000}")
     @Transactional public void recoverExpiredLeases() {
         List<TaskLease> expired = leases.findByCompletedAtIsNullAndExpiresAtBefore(Instant.now());
         for (TaskLease lease : expired) {
-            if (lease.recover()) repairPackages.save(new RepairPackage(lease.getTask(), "LEASE_EXPIRED", null));
+            if (lease.recover()) {
+                repairPackages.save(new RepairPackage(lease.getTask(), "LEASE_EXPIRED", null));
+                if (lease.getTask().getState() == io.forgeloop.control.domain.TaskState.FAILED)
+                    escalations.escalate(lease.getTask(), "ATTEMPT_BUDGET_EXHAUSTED", "Runner lease expired after all autonomous attempts");
+            }
         }
         leases.deleteAll(expired);
     }

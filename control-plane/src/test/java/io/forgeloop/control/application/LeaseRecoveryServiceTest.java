@@ -19,7 +19,8 @@ import org.mockito.Mockito;
 class LeaseRecoveryServiceTest {
     private final TaskLeaseRepository leases = Mockito.mock(TaskLeaseRepository.class);
     private final RepairPackageRepository repairs = Mockito.mock(RepairPackageRepository.class);
-    private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases, repairs);
+    private final HumanEscalationService escalations = Mockito.mock(HumanEscalationService.class);
+    private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases, repairs, escalations);
 
     @Test
     void returnsExpiredLeaseTaskToRepairQueueAndRemovesLease() {
