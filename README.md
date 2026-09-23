@@ -17,7 +17,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 ### Control plane
 
 - [x] Spring Boot GraphQL control plane with persisted delivery-run, task, gate, criterion, and GitHub-delivery records.
-- [x] React operator console for persisted runs and connected repositories.
+- [x] React operator console with intake queue, task DAG/attempts, live polling, redacted evidence logs, acceptance gates, budgets, audit timeline, approval/cancel/retry controls, and GitHub PR links.
+- [x] Permissioned MCP gateway calls static control-plane GraphQL documents with explicit tool grants and bearer identity; it exposes no cloud-side repository or shell execution.
 - [x] Generic repository connection policy: installation ID, branch, issue label, harness profile, required gates, and budget enforcement.
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
 - [x] Docker Compose deployment with PostgreSQL, control-plane health checks, and operator-console GraphQL proxy.
@@ -45,7 +46,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [ ] Git clone, local MCP processes, streamed redacted events, and immutable object-store artifact upload.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
-- [ ] Review-agent orchestration, human escalation, and approval controls.
+- [x] Role-aware, confirmed, audited human cancellation, bounded task retry, and verified-run approval controls.
+- [ ] Review-agent orchestration and automated human escalation policy.
 
 ### Evidence and repository delivery
 
@@ -63,7 +65,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 ### Current capability boundary
 
-ForgeLoop can persist and display policy-bound delivery runs and repository connections. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch dependency-ready non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, and route failures through bounded task-owned repair context. Required verification commands are selected from an immutable repository-policy snapshot and produce redacted, checksummed evidence tied to acceptance criteria. ForgeLoop **cannot yet complete review/approval orchestration, upload evidence to production object storage, or publish runner-produced work as a pull request**; those capabilities remain unchecked until their slices are implemented and verified.
+ForgeLoop can persist and operate policy-bound delivery runs and repository connections through its role-aware web console or permission-scoped MCP gateway. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch dependency-ready non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, and route failures through bounded task-owned repair context. Required verification commands are selected from an immutable repository-policy snapshot and produce redacted, checksummed evidence tied to acceptance criteria; a verified run requires explicit administrator approval before GitHub delivery. ForgeLoop **cannot yet orchestrate the independent review agent, upload evidence to production object storage, or publish runner-produced work as a pull request without the temporary delivery handoff**; those capabilities remain unchecked until their slices are implemented and verified.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 

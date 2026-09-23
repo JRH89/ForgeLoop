@@ -92,4 +92,39 @@ class FeatureRunVerificationGateTest {
     run.recordGate("security", true, false);
     assertEquals("COVERED", run.getCriteria().getFirst().getCoverageState());
   }
+
+  @Test
+  void approvalIsExplicitAndOnlyAvailableAfterVerification() {
+    FeatureRun run = new FeatureRun("acme/widget", "main", "Add search", "spec", 10, "default", 1);
+    assertThrows(IllegalStateException.class, () -> run.approve("operator@example.com"));
+    run.addGate("unit");
+    run.recordGate("unit", true);
+
+    run.approve("operator@example.com");
+
+    assertEquals(true, run.isApproved());
+    assertEquals("operator@example.com", run.getApprovedBy());
+    assertThrows(IllegalStateException.class, () -> run.approve("another@example.com"));
+  }
+
+  @Test
+  void operatorRetryGrantsOneBoundedAttemptAndResumesBlockedRun() {
+    FeatureRun run = new FeatureRun("acme/widget", "main", "Add search", "spec", 10, "default", 1);
+    run.addTask("IMPLEMENTATION", "Implement", "provider");
+    DeliveryTask task = run.getTasks().getFirst();
+    for (int attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) task.transition(TaskState.LEASED);
+      else task.transition(TaskState.LEASED);
+      task.transition(TaskState.REPAIR_QUEUED);
+    }
+    assertEquals(TaskState.FAILED, task.getState());
+    run.block();
+
+    task.retryByOperator();
+    run.resumeAfterRetry();
+
+    assertEquals(TaskState.REPAIR_QUEUED, task.getState());
+    assertEquals(3, task.getAttemptBudget());
+    assertEquals(RunState.EXECUTING, run.getState());
+  }
 }

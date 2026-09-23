@@ -24,7 +24,7 @@ public class GithubDeliveryService {
     public GithubPublication deliver(FeatureRun run, long installationId, String baseSha, List<GithubChange> changes, String summary) {
         GithubPublication publication = publications.findByFeatureRunId(run.getId()).orElseGet(() -> publications.save(new GithubPublication(run.getId(), run.getRepository(), branch(run), key(run))));
         if (publication.isDelivered()) return publication;
-        if (run.getState() != RunState.READY_FOR_REVIEW) throw new IllegalStateException("Only a fully verified run can be delivered to GitHub");
+        if (run.getState() != RunState.READY_FOR_REVIEW || !run.isApproved()) throw new IllegalStateException("Only an approved, fully verified run can be delivered to GitHub");
         if (baseSha == null || baseSha.isBlank() || changes == null || changes.isEmpty()) throw new IllegalArgumentException("A base commit and at least one verified change are required");
         if (publication.getHeadSha() == null) {
             github.createBranch(installationId, run.getRepository(), publication.getBranch(), baseSha);
