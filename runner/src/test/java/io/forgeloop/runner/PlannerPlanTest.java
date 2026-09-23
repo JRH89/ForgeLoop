@@ -11,7 +11,7 @@ class PlannerPlanTest {
         PlannerPlan plan = PlannerPlan.parse("""
                 {"acceptanceCriteria":["works"],"tasks":[
                   {"key":"backend","role":"BACKEND","title":"Implement","requiredCapability":"provider","dependencies":[],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":500000},
-                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":["backend"],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":500000},
+                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":[],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":500000},
                   {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["backend","test"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
                 ]}
                 """).validate(1);
@@ -26,6 +26,17 @@ class PlannerPlanTest {
                 {"acceptanceCriteria":["x"],"tasks":[
                   {"key":"a","role":"BACKEND","title":"A","requiredCapability":"provider","dependencies":["b"],"ownedPaths":["../src"],"attemptBudget":2,"budgetMicros":1},
                   {"key":"b","role":"FRONTEND","title":"B","requiredCapability":"provider","dependencies":["a"],"ownedPaths":["web"],"attemptBudget":2,"budgetMicros":1}
+                ]}
+                """).validate(1));
+    }
+
+    @Test
+    void rejectsDependenciesBetweenIsolatedWritingTasks() {
+        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse("""
+                {"acceptanceCriteria":["x"],"tasks":[
+                  {"key":"implementation","role":"IMPLEMENTATION","title":"Implement","requiredCapability":"provider","dependencies":[],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":["implementation"],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["implementation","test"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
                 ]}
                 """).validate(1));
     }

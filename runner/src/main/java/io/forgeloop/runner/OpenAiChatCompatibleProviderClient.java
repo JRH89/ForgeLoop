@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,12 +22,19 @@ public final class OpenAiChatCompatibleProviderClient implements ProviderClient 
     }
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
         try {
-            String body = JSON.writeValueAsString(Map.of("model", request.model(), "max_tokens", request.maxOutputTokens(),
-                    "messages", List.of(Map.of("role", "system", "content", request.instructions()), Map.of("role", "user", "content", request.input()))));
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", request.model());
+            payload.put("max_tokens", request.maxOutputTokens());
+            payload.put("messages", List.of(Map.of("role", "system", "content", request.instructions()), Map.of("role", "user", "content", request.input())));
+            if (request.outputSchema() != null) {
+                payload.put("response_format", Map.of("type", "json_schema", "json_schema", Map.of(
+                        "name", "forgeloop_output", "strict", true, "schema", request.outputSchema())));
+            }
+            String body = JSON.writeValueAsString(payload);
             HttpRequest.Builder builder = HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5)).header("content-type", "application/json");
             if (!apiKey.isBlank()) builder.header("authorization", "Bearer " + apiKey);
             HttpResponse<String> response = http.send(builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ProviderException("Local provider request failed with HTTP " + response.statusCode(), response.statusCode() == 429 || response.statusCode() >= 500);
+            if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("Local", response.statusCode(), response.body());
             return parse(response.body());
         } catch (ProviderException exception) { throw exception;
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("Local provider request was interrupted", true, exception);

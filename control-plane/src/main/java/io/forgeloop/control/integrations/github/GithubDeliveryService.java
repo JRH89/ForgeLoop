@@ -24,7 +24,15 @@ public class GithubDeliveryService {
         if (run.getState() != RunState.READY_FOR_REVIEW || !run.isApproved()) throw new IllegalStateException("Only an approved, fully verified run can be delivered to GitHub");
         if (publication.getHeadSha() == null || !publication.getHeadSha().equals(github.getBranchHead(installationId, run.getRepository(), publication.getBranch()))) throw new IllegalStateException("Runner-pushed branch head does not match the integrated commit");
         if (publication.getCheckRunId() == null) { publication.recordCheckRun(github.createCompletedCheck(installationId, run.getRepository(), publication.getHeadSha(), "ForgeLoop verification", summary)); audit.record("GITHUB_CHECK_RUN_CREATED", "FEATURE_RUN", run.getId(), publication.getHeadSha()); }
-        if (publication.getPullRequestNumber() == null) { publication.recordPullRequest(github.createDraftPullRequest(installationId, run.getRepository(), publication.getBranch(), run.getBaseBranch(), run.getTitle(), summary)); audit.record("GITHUB_DRAFT_PR_CREATED", "FEATURE_RUN", run.getId(), String.valueOf(publication.getPullRequestNumber())); }
+        if (publication.getPullRequestNumber() == null) { publication.recordPullRequest(github.createDraftPullRequest(installationId, run.getRepository(), publication.getBranch(), run.getBaseBranch(), run.getTitle(), pullRequestBody(run, summary))); audit.record("GITHUB_DRAFT_PR_CREATED", "FEATURE_RUN", run.getId(), String.valueOf(publication.getPullRequestNumber())); }
         return publications.save(publication);
+    }
+
+    /** Links issue-originated work so GitHub closes the source issue when the verified PR merges. */
+    static String pullRequestBody(FeatureRun run, String summary) {
+        if (run.getSourceRef() != null && run.getSourceRef().matches("issue-[1-9][0-9]*")) {
+            return summary + "\n\nCloses #" + run.getSourceRef().substring("issue-".length());
+        }
+        return summary;
     }
 }

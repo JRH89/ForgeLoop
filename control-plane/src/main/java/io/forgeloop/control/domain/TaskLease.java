@@ -57,11 +57,18 @@ public class TaskLease {
         task.transition(TaskState.INTEGRATED);
         completedAt = Instant.now();
     }
-    /** Requeues expired work; the caller removes this lease so the task can be safely re-claimed. */
-    public void recover() {
+    /** Requeues expired work; terminal work is merely closed and reports that no repair package is needed. */
+    public boolean recover() {
         if (completedAt != null || Instant.now().isBefore(expiresAt)) throw new IllegalStateException("Only expired incomplete leases can be recovered");
+        if (java.util.List.of(RunState.COMPLETE, RunState.CANCELLED, RunState.REJECTED, RunState.FAILED).contains(task.getRun().getState())
+                || java.util.List.of(TaskState.VERIFIED, TaskState.FAILED, TaskState.HELD).contains(task.getState())) {
+            completedAt = Instant.now();
+            return false;
+        }
         task.transition(TaskState.REPAIR_QUEUED);
         if (task.getState() == TaskState.FAILED) task.getRun().block();
+        completedAt = Instant.now();
+        return true;
     }
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public DeliveryTask getTask() { return task; }

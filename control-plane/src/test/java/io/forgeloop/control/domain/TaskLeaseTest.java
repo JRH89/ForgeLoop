@@ -46,6 +46,25 @@ class TaskLeaseTest {
     }
 
     @Test
+    void retriesPreserveControlRolesAndOnlyConvertSourceWritersToRepair() {
+        FeatureRun run = new FeatureRun("owner/repository", "issue-1", "Feature", "criterion", 5, "GENERIC", 1);
+        DeliveryTask planner = run.addPlannedTask("planner", "PLANNER", "Plan", "provider", List.of(), 2, 1);
+        DeliveryTask integration = run.addPlannedTask("integration", "INTEGRATION", "Integrate", "git", List.of(), 2, 1);
+        DeliveryTask writer = run.addPlannedTask("writer", "BACKEND", "Write", "provider", List.of("src"), 2, 1);
+
+        planner.transition(TaskState.LEASED);
+        planner.transition(TaskState.REPAIR_QUEUED);
+        integration.transition(TaskState.LEASED);
+        integration.transition(TaskState.REPAIR_QUEUED);
+        writer.transition(TaskState.LEASED);
+        writer.transition(TaskState.REPAIR_QUEUED);
+
+        assertEquals("PLANNER", planner.getExecutionRole());
+        assertEquals("INTEGRATION", integration.getExecutionRole());
+        assertEquals("REPAIR", writer.getExecutionRole());
+    }
+
+    @Test
     void integrationAdvancesOnlyDeclaredChangeReadyDependencies() {
         FeatureRun run = new FeatureRun("owner/repository", "issue-1", "Feature", "criterion", 5, "GENERIC", 1);
         DeliveryTask backend = run.addPlannedTask("backend", "BACKEND", "Backend", "git", List.of("src"), 2, 1);

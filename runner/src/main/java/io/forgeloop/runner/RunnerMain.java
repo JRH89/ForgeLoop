@@ -319,11 +319,63 @@ public final class RunnerMain {
     }
 
     /** Polls server-authorized work and executes independent eligible tasks concurrently. */
-    private static void workLoop(String[] arguments,boolean continuous)throws Exception{
-        if(arguments.length!=9)throw new IllegalArgumentException("Usage: serve|work-until-idle <control-plane-url> <identity-file> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <state-root> <parallelism>");
-        int parallelism=Integer.parseInt(arguments[8]);if(parallelism<1||parallelism>16)throw new IllegalArgumentException("Runner parallelism must be between 1 and 16");
-        Path stateRoot=Path.of(arguments[7]).toAbsolutePath().normalize();Files.createDirectories(stateRoot);RunnerIdentity identity=new RunnerIdentityStore().load(Path.of(arguments[2]));RunnerClient client=new RunnerClient(HttpClient.newHttpClient(),URI.create(arguments[1]));int idlePolls=0;
-        try(var workers=Executors.newFixedThreadPool(parallelism)){while(continuous||idlePolls<3){client.heartbeat(identity);List<RunnerTask> available=client.availableTasks(identity);if(available.isEmpty()){idlePolls++;Thread.sleep(2000);continue;}idlePolls=0;List<Future<?>> futures=new ArrayList<>();for(RunnerTask task:available.stream().limit(parallelism).toList()){futures.add(workers.submit(()->{Path leasePath=stateRoot.resolve(task.id()+".lease");try{Files.deleteIfExists(leasePath);cleanupWorktree(task,arguments[3],arguments[4]);executePolicyTask(new String[]{"execute-policy-task",arguments[1],arguments[2],task.id(),arguments[3],arguments[4],arguments[5],arguments[6],leasePath.toString()});}catch(Exception failure){String detail=failure.getCause()==null?failure.getMessage():failure.getCause().getMessage();System.err.println("Task execution failed: task="+task.id()+" type="+failure.getClass().getSimpleName()+" detail="+safeDiagnostic(detail));}finally{try{Files.deleteIfExists(leasePath);}catch(Exception cleanup){System.err.println("Task lease cleanup failed: task="+task.id());}cleanupWorktree(task,arguments[3],arguments[4]);}}));}for(Future<?> future:futures)future.get();}}
+    private static void workLoop(String[] arguments, boolean continuous) throws Exception {
+        if (arguments.length != 9) throw new IllegalArgumentException("Usage: serve|work-until-idle <control-plane-url> <identity-file> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <state-root> <parallelism>");
+        int parallelism = Integer.parseInt(arguments[8]);
+        if (parallelism < 1 || parallelism > 16) throw new IllegalArgumentException("Runner parallelism must be between 1 and 16");
+        Path stateRoot = Path.of(arguments[7]).toAbsolutePath().normalize();
+        Files.createDirectories(stateRoot);
+        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
+        RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
+        int idlePolls = 0;
+        int failedPolls = 0;
+        try (var workers = Executors.newFixedThreadPool(parallelism)) {
+            while (continuous || idlePolls < 3) {
+                List<RunnerTask> available;
+                try {
+                    client.heartbeat(identity);
+                    available = client.availableTasks(identity);
+                    failedPolls = 0;
+                } catch (Exception unavailable) {
+                    failedPolls++;
+                    System.err.println("Control-plane poll failed; retrying: " + safeDiagnostic(unavailable.getMessage()));
+                    if (!continuous && failedPolls >= 5) throw unavailable;
+                    Thread.sleep(2000);
+                    continue;
+                }
+                if (available.isEmpty()) {
+                    idlePolls++;
+                    Thread.sleep(2000);
+                    continue;
+                }
+                idlePolls = 0;
+                List<Future<?>> futures = new ArrayList<>();
+                for (RunnerTask task : available.stream().limit(parallelism).toList()) {
+                    futures.add(workers.submit(() -> executeDispatchedTask(arguments, stateRoot, task)));
+                }
+                for (Future<?> future : futures) future.get();
+            }
+        }
+    }
+
+    private static void executeDispatchedTask(String[] arguments, Path stateRoot, RunnerTask task) {
+        Path leasePath = stateRoot.resolve(task.id() + ".lease");
+        try {
+            // A task can be advertised only after its prior lease is inactive, so stale local
+            // nonce/worktree state is safe to remove before a crash-recovery attempt.
+            Files.deleteIfExists(leasePath);
+            cleanupWorktree(task, arguments[3], arguments[4]);
+            executePolicyTask(new String[]{"execute-policy-task", arguments[1], arguments[2], task.id(),
+                    arguments[3], arguments[4], arguments[5], arguments[6], leasePath.toString()});
+        } catch (Exception failure) {
+            String detail = failure.getCause() == null ? failure.getMessage() : failure.getCause().getMessage();
+            System.err.println("Task execution failed: task=" + task.id() + " type=" + failure.getClass().getSimpleName()
+                    + " detail=" + safeDiagnostic(detail));
+        } finally {
+            try { Files.deleteIfExists(leasePath); }
+            catch (Exception cleanup) { System.err.println("Task lease cleanup failed: task=" + task.id()); }
+            cleanupWorktree(task, arguments[3], arguments[4]);
+        }
     }
     /** Keeps diagnostics actionable without allowing provider output or credentials into runner logs. */
     private static String safeDiagnostic(String detail){if(detail==null||detail.isBlank())return "unavailable";String singleLine=detail.replaceAll("[\\r\\n]+"," ").replaceAll("(?i)(api[_-]?key|authorization|token|secret)\\s*[:=]\\s*\\S+","$1=[REDACTED]");return singleLine.substring(0,Math.min(singleLine.length(),240));}

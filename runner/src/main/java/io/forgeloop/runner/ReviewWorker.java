@@ -10,7 +10,7 @@ public final class ReviewWorker {
     public ReviewResult execute(ProviderExecutionPolicy policy,ProviderClient provider,RunnerTask task,String diff,String correlationId)throws Exception{
         String instructions="Act as an independent software reviewer. Return JSON only with exactly these fields: {approved:boolean,summary:string,criteria:[{statement:string,status:'PASS'|'FAIL',evidence:string}]}. Assess every supplied criterion exactly once using the exact statement. Approve only when every criterion passes and the integrated diff has no obvious security or correctness defect.";
         String criteria=task.acceptanceCriteria().stream().map(value->"- "+value).reduce((a,b)->a+"\n"+b).orElse("- No criteria supplied");
-        ProviderExecutionResult execution=new ProviderExecutionService().executeDetailed(provider,new ProviderRequest(policy.model(),instructions,"Specification:\n"+task.specification()+"\n\nAcceptance criteria:\n"+criteria+"\n\nIntegrated diff:\n"+diff,8192),policy.maxAttempts());
+        ProviderExecutionResult execution=new ProviderExecutionService().executeDetailed(provider,new ProviderRequest(policy.model(),instructions,"Specification:\n"+task.specification()+"\n\nAcceptance criteria:\n"+criteria+"\n\nIntegrated diff:\n"+diff,8192,StructuredOutputSchemas.review()),policy.maxAttempts());
         ProviderUsageEvidence usage=ProviderUsageEvidence.from(policy,execution,new ProviderCostCalculator().fromEnvironment(policy,execution.result()),correlationId);
         try{
             JsonNode root=JSON.readTree(execution.result().output());

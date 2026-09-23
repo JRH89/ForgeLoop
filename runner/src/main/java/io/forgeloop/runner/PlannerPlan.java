@@ -73,6 +73,7 @@ public record PlannerPlan(List<String> acceptanceCriteria, List<PlannedTask> tas
                     || new HashSet<>(task.dependencies()).size() != task.dependencies().size()
                     || new HashSet<>(task.ownedPaths()).size() != task.ownedPaths().size()
                     || (writingRoles.contains(task.role()) && task.ownedPaths().isEmpty())
+                    || (writingRoles.contains(task.role()) && !task.dependencies().isEmpty())
                     || task.ownedPaths().stream().anyMatch(PlannerPlan::unsafePath)) {
                 throw new IllegalArgumentException("Planner task semantics are invalid");
             }

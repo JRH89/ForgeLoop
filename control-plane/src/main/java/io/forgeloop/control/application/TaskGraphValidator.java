@@ -43,6 +43,9 @@ public final class TaskGraphValidator {
             requireDistinctNonBlank(task.dependencies(), "Task dependencies");
             requireDistinctNonBlank(task.ownedPaths(), "Owned paths");
             if (WRITING_ROLES.contains(task.role()) && task.ownedPaths().isEmpty()) throw new IllegalArgumentException("Writing tasks require owned paths");
+            if (WRITING_ROLES.contains(task.role()) && !task.dependencies().isEmpty()) {
+                throw new IllegalArgumentException("Writing tasks must be independent; integration is the only fan-in stage");
+            }
             task.ownedPaths().forEach(this::validatePathPrefix);
         }
         long runBudgetMicros = Math.round(runBudgetUsd * 1_000_000d);

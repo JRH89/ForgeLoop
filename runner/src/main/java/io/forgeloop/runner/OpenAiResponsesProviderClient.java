@@ -8,6 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** OpenAI Responses API adapter. The API key is read only from the runner environment at construction time. */
 public final class OpenAiResponsesProviderClient implements ProviderClient {
@@ -23,12 +25,21 @@ public final class OpenAiResponsesProviderClient implements ProviderClient {
 
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
         try {
-            String body = JSON.writeValueAsString(java.util.Map.of("model", request.model(), "instructions", request.instructions(),
-                    "input", request.input(), "max_output_tokens", request.maxOutputTokens(), "store", false));
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("model", request.model());
+            payload.put("instructions", request.instructions());
+            payload.put("input", request.input());
+            payload.put("max_output_tokens", request.maxOutputTokens());
+            payload.put("store", false);
+            if (request.outputSchema() != null) {
+                payload.put("text", Map.of("format", Map.of("type", "json_schema", "name", "forgeloop_output",
+                        "strict", true, "schema", request.outputSchema())));
+            }
+            String body = JSON.writeValueAsString(payload);
             HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5))
                     .header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new ProviderException("OpenAI provider request failed with HTTP " + response.statusCode(), response.statusCode() == 429 || response.statusCode() >= 500);
+            if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("OpenAI", response.statusCode(), response.body());
             return parse(response.body());
         } catch (ProviderException exception) { throw exception;
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("OpenAI provider request was interrupted", true, exception);

@@ -108,7 +108,15 @@ public class DeliveryTask {
     }
 
     public String getId() { return id; } public String getPlanKey() { return planKey; } public String getRole() { return role; } public String getTitle() { return title; }
-    public String getExecutionRole() { return state == TaskState.REPAIR_QUEUED && !"VERIFICATION".equals(role) && !"REVIEW".equals(role) ? "REPAIR" : role; }
+    /**
+     * Converts a retry into a repair worker only when the original task was allowed to write source files.
+     * Control stages retain their original role so a planner or integrator can never inherit repair write access.
+     */
+    public String getExecutionRole() {
+        return state == TaskState.REPAIR_QUEUED && List.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "REPAIR").contains(role)
+                ? "REPAIR"
+                : role;
+    }
     public FeatureRun getRun() { return run; }
     /** Runner dispatch fields are derived from the policy-bound run, not runner input. */
     public String getRepository() { return run.getRepository(); }

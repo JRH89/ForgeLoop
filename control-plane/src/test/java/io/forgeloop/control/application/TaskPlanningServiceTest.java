@@ -36,14 +36,14 @@ class TaskPlanningServiceTest {
         when(runs.save(any())).thenAnswer(call -> call.getArgument(0));
         TaskPlanSubmission plan = new TaskPlanSubmission(List.of("behavior is verified"), List.of(
                 new PlannedTaskSubmission("backend", "BACKEND", "Backend", "provider", List.of(), List.of("src"), 2, 500_000),
-                new PlannedTaskSubmission("test", "INDEPENDENT_TEST", "Test", "provider", List.of("backend"), List.of("tests"), 2, 500_000),
+                new PlannedTaskSubmission("test", "INDEPENDENT_TEST", "Test", "provider", List.of(), List.of("tests"), 2, 500_000),
                 new PlannedTaskSubmission("integration", "INTEGRATION", "Integrate", "git", List.of("backend","test"), List.of(), 2, 0)));
 
         FeatureRun saved = planning.submit("planner", plan);
 
         assertEquals(RunState.QUEUED, saved.getState());
         assertEquals(TaskState.VERIFIED, planner.getState());
-        assertEquals(List.of("backend"), saved.getTasks().get(2).getDependencyKeys());
+        assertEquals(List.of("backend", "test"), saved.getTasks().get(3).getDependencyKeys());
         verify(lease).completePlanning();
     }
 

@@ -41,6 +41,12 @@ class GuardedPatchWorkerTest {
                 "PLANNER", "task", "spec", repository, List.of("src/")));
     }
 
+    @Test void normalizesAndBoundsProviderGeneratedCommitSubjects() {
+        String message = GuardedPatchWorker.commitMessage("Long summary\n" + "x".repeat(500));
+        assertEquals(200, message.length());
+        assertFalse(message.contains("\n"));
+    }
+
     private void initializeRepository() throws Exception {
         run("git", "init", repository.toString());
         run("git", "-C", repository.toString(), "config", "user.email", "runner@example.test");

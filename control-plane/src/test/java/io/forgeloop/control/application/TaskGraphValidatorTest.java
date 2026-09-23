@@ -14,7 +14,7 @@ class TaskGraphValidatorTest {
         TaskPlanSubmission plan = new TaskPlanSubmission(List.of("API returns the assigned user"), List.of(
                 task("backend", "BACKEND", List.of(), List.of("control-plane/src"), 2_000_000),
                 task("frontend", "FRONTEND", List.of(), List.of("frontend/src"), 2_000_000),
-                task("test", "INDEPENDENT_TEST", List.of("backend", "frontend"), List.of("harness"), 500_000),
+                task("test", "INDEPENDENT_TEST", List.of(), List.of("harness"), 500_000),
                 task("integration", "INTEGRATION", List.of("backend","frontend","test"), List.of(), 0)));
 
         assertDoesNotThrow(() -> validator.validate(plan, 5));
@@ -42,6 +42,16 @@ class TaskGraphValidatorTest {
 
         assertThrows(IllegalArgumentException.class, () -> validator.validate(
                 new TaskPlanSubmission(List.of("criterion"), List.of(invalid, integration)), 1));
+    }
+
+    @Test
+    void rejectsWritingTaskDependenciesThatCannotRunBeforeIntegration() {
+        TaskPlanSubmission plan = new TaskPlanSubmission(List.of("criterion"), List.of(
+                task("implementation", "IMPLEMENTATION", List.of(), List.of("src"), 100),
+                task("test", "INDEPENDENT_TEST", List.of("implementation"), List.of("tests"), 100),
+                task("integration", "INTEGRATION", List.of("implementation", "test"), List.of(), 0)));
+
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(plan, 1));
     }
 
     private static PlannedTaskSubmission task(String key, String role, List<String> dependencies, List<String> paths, long budget) {
