@@ -70,6 +70,11 @@ public class DeliveryTask {
         state = to;
     }
     public void dependsOn(DeliveryTask dependency) { dependencies.add(dependency); }
+    /** Reopens only server-owned pipeline stages after a bounded quality-gate repair is scheduled. */
+    void resetPipelineStage() {
+        if (!List.of("INTEGRATION", "REVIEW", "VERIFICATION").contains(role)) throw new IllegalStateException("Only pipeline stages can be reset");
+        state = TaskState.PENDING;
+    }
     public void attachVerificationGate(VerificationGate gate) { if (!"VERIFICATION".equals(role)) throw new IllegalStateException("Only verification tasks can own gates"); this.verificationGate = gate; }
     public void recordChangeSha(String sha) {
         if (sha == null || !sha.matches("[0-9a-f]{40,64}")) throw new IllegalArgumentException("Change SHA is invalid");
@@ -103,7 +108,7 @@ public class DeliveryTask {
     }
 
     public String getId() { return id; } public String getPlanKey() { return planKey; } public String getRole() { return role; } public String getTitle() { return title; }
-    public String getExecutionRole() { return state == TaskState.REPAIR_QUEUED && !"VERIFICATION".equals(role) ? "REPAIR" : role; }
+    public String getExecutionRole() { return state == TaskState.REPAIR_QUEUED && !"VERIFICATION".equals(role) && !"REVIEW".equals(role) ? "REPAIR" : role; }
     public FeatureRun getRun() { return run; }
     /** Runner dispatch fields are derived from the policy-bound run, not runner input. */
     public String getRepository() { return run.getRepository(); }
@@ -111,7 +116,7 @@ public class DeliveryTask {
     public String getSourceRef() { return run.getSourceRef(); }
     public String getSpecification() { return run.getSpecification(); }
     public String getExecutionSpecification() {
-        if (state != TaskState.REPAIR_QUEUED || repairPackages.isEmpty()) return run.getSpecification();
+        if ((state != TaskState.REPAIR_QUEUED && !"REPAIR".equals(role)) || repairPackages.isEmpty()) return run.getSpecification();
         RepairPackage repair = repairPackages.getLast();
         return run.getSpecification() + "\n\nBounded repair context:\nFailure category: " + repair.getFailureCategory()
                 + "\nChange SHA: " + (repair.getChangeSha() == null ? "unknown" : repair.getChangeSha())
@@ -130,6 +135,9 @@ public class DeliveryTask {
     public List<DeliveryTask> getDependencies() { return List.copyOf(dependencies); }
     public List<String> getDependencyKeys() { return dependencies.stream().map(DeliveryTask::getPlanKey).toList(); }
     public List<String> getDependencyChangeShas() { return dependencies.stream().map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).toList(); }
+    public List<String> getAcceptanceCriteria() { return run.getCriteria().stream().map(AcceptanceCriterion::getStatement).toList(); }
+    /** Repair workers start from the last integrated head; all other workers start from repository policy base. */
+    public String getExecutionBaseRef() { if ("REPAIR".equals(role)) return run.getTasks().stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch()); return run.getBaseBranch(); }
     public List<ProviderAttempt> getProviderAttempts() { return List.copyOf(providerAttempts); }
     public List<RepairPackage> getRepairPackages() { return List.copyOf(repairPackages); }
     public VerificationGate getVerificationGate() { return verificationGate; }

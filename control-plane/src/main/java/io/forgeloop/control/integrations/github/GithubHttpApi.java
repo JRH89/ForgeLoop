@@ -35,10 +35,22 @@ public class GithubHttpApi implements GithubApi {
         for (JsonNode repository : response.path("repositories")) repositories.add(new GithubInstalledRepository(repository.path("full_name").asText(), repository.path("default_branch").asText("main")));
         return List.copyOf(repositories);
     }
-    @Override public void createBranch(long installationId, String repository, String branch, String baseSha) { request(installationId, "POST", "/repos/" + repository + "/git/refs", Map.of("ref", "refs/heads/" + branch, "sha", baseSha)); }
-    @Override public String putFile(long installationId, String repository, String branch, GithubChange change) {
-        JsonNode response = request(installationId, "PUT", "/repos/" + repository + "/contents/" + change.path(), Map.of("branch", branch, "message", change.message(), "content", Base64.getEncoder().encodeToString(change.content().getBytes(StandardCharsets.UTF_8))));
-        return response.path("commit").path("sha").asText();
+    @Override public String issueInstallationToken(long installationId) {
+        JsonNode response = requestAsApp("POST", "/app/installations/" + installationId + "/access_tokens", Map.of());
+        String token = response.path("token").asText(); if (token.isBlank()) throw new IllegalStateException("GitHub installation token was absent"); return token;
+    }
+    @Override public String getBranchHead(long installationId, String repository, String branch) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl + "/repos/" + repository + "/git/ref/heads/" + branch))
+                    .header("Accept", "application/vnd.github+json")
+                    .header("Authorization", "Bearer " + issueInstallationToken(installationId)).GET().build();
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 404) return null;
+            if (response.statusCode() < 200 || response.statusCode() >= 300) throw new IllegalStateException("GitHub API request failed with HTTP " + response.statusCode());
+            return json.readTree(response.body()).path("object").path("sha").asText();
+        } catch (Exception exception) {
+            throw new IllegalStateException("GitHub branch lookup failed", exception);
+        }
     }
     @Override public long createCompletedCheck(long installationId, String repository, String headSha, String name, String summary) {
         JsonNode response = request(installationId, "POST", "/repos/" + repository + "/check-runs", Map.of("name", name, "head_sha", headSha, "status", "completed", "conclusion", "success", "output", Map.of("title", name, "summary", summary)));
@@ -50,15 +62,11 @@ public class GithubHttpApi implements GithubApi {
     }
     private JsonNode request(long installationId, String method, String path, Object body) {
         try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + installationToken(installationId));
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + issueInstallationToken(installationId));
             HttpRequest request = "GET".equals(method) ? builder.GET().build() : builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
             HttpResponse<String> response = sendWithRetry(request);
             return json.readTree(response.body());
         } catch (Exception exception) { throw new IllegalStateException("GitHub API request failed", exception); }
-    }
-    private String installationToken(long installationId) {
-        JsonNode response = requestAsApp("POST", "/app/installations/" + installationId + "/access_tokens", Map.of());
-        String token = response.path("token").asText(); if (token.isBlank()) throw new IllegalStateException("GitHub installation token was absent"); return token;
     }
     private JsonNode requestAsApp(String method, String path, Object body) {
         try {

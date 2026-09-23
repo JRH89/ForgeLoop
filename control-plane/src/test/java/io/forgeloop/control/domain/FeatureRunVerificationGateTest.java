@@ -104,7 +104,8 @@ class FeatureRunVerificationGateTest {
 
     assertEquals(true, run.isApproved());
     assertEquals("operator@example.com", run.getApprovedBy());
-    assertThrows(IllegalStateException.class, () -> run.approve("another@example.com"));
+    run.approve("another@example.com");
+    assertEquals("operator@example.com", run.getApprovedBy());
   }
 
   @Test

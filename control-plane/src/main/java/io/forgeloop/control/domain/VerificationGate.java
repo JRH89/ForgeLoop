@@ -35,6 +35,8 @@ public class VerificationGate {
     public void record(boolean passed) { record(passed, false); }
     public void skipByPolicy() { if (required) throw new IllegalStateException("A required gate cannot be skipped by policy"); state = VerificationGateState.SKIPPED_BY_POLICY; }
     public void manualOverride() { if (state != VerificationGateState.FAILED && state != VerificationGateState.TIMED_OUT) throw new IllegalStateException("Only a failed or timed-out gate can be overridden"); state = VerificationGateState.MANUAL_OVERRIDE; }
+    /** A code repair invalidates prior gate results; every required check must prove the repaired head again. */
+    void resetForRepair() { state = required ? VerificationGateState.PENDING : state; }
     public boolean satisfiesReview() { return !required || state == VerificationGateState.PASSED; }
     public VerificationPolicySpec toSpec() {
         if (kind == null) throw new IllegalStateException("Legacy verification gate has no executable policy");

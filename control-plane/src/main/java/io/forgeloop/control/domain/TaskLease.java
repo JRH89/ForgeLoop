@@ -5,10 +5,9 @@ import java.time.Instant;
 
 /** A short-lived, single-owner authorization to execute exactly one task. */
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = "task_id"))
 public class TaskLease {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
-    @OneToOne(optional = false) @JoinColumn(name = "task_id") private DeliveryTask task;
+    @ManyToOne(optional = false) @JoinColumn(name = "task_id") private DeliveryTask task;
     @ManyToOne(optional = false) private Runner runner;
     @Column(nullable = false, unique = true) private String nonceHash;
     @Column(nullable = false) private Instant expiresAt;
@@ -30,6 +29,11 @@ public class TaskLease {
         task.transition(passed ? TaskState.VERIFIED : TaskState.REPAIR_QUEUED);
         if (task.getState() == TaskState.FAILED) task.getRun().block();
         if (passed) task.getRun().evaluateReviewReadiness();
+        completedAt = Instant.now();
+    }
+    /** Closes a failed quality-stage lease before the run atomically materializes its code-repair cycle. */
+    public void closeForRepairCycle() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         completedAt = Instant.now();
     }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */

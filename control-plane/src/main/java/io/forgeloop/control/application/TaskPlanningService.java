@@ -41,9 +41,10 @@ public class TaskPlanningService {
         plan.tasks().forEach(input -> materialized.put(input.key(), run.addPlannedTask(input.key(), input.role(), input.title(),
                 input.requiredCapability(), input.ownedPaths(), input.attemptBudget(), input.budgetMicros())));
         plan.tasks().forEach(input -> input.dependencies().forEach(key -> materialized.get(input.key()).dependsOn(materialized.get(key))));
+        run.addIndependentReviewTask();
         run.addPolicyVerificationTasks();
         planner.transition(TaskState.VERIFIED);
-        leases.findByTask_Id(plannerTaskId).orElseThrow(() -> new IllegalStateException("Planner lease not found")).completePlanning();
+        leases.findFirstByTask_IdOrderByExpiresAtDesc(plannerTaskId).orElseThrow(() -> new IllegalStateException("Planner lease not found")).completePlanning();
         run.queuePlannedWork();
         FeatureRun saved = runs.save(run);
         audit.record("TASK_GRAPH_MATERIALIZED", "FEATURE_RUN", run.getId(), "tasks=" + plan.tasks().size() + "|criteria=" + plan.acceptanceCriteria().size());

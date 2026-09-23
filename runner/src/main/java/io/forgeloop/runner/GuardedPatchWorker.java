@@ -24,7 +24,8 @@ public final class GuardedPatchWorker {
                 + "{summary:string,changes:[{path:string,content:string,message:string}]}. "
                 + "Propose complete file contents only. Do not use paths outside the allowed prefixes.";
         String input = "Task: " + title + "\nAllowed prefixes: " + String.join(",", allowedPrefixes)
-                + "\nSpecification:\n" + specification;
+                + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n"
+                + new RepositoryContextBuilder().build(worktree, allowedPrefixes);
         ProviderExecutionResult execution = new ProviderExecutionService().executeDetailed(provider,
                 new ProviderRequest(policy.model(), instructions, input, 8192), policy.maxAttempts());
         ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution,

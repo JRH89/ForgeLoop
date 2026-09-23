@@ -1,6 +1,8 @@
 package io.forgeloop.runner;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +11,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.regex.Pattern;
 
 /**
@@ -54,18 +58,48 @@ public final class ContainerVerificationExecutor {
 
         Instant startedAt = Instant.now();
         Process process = new ProcessBuilder(dockerCommand).redirectErrorStream(true).start();
+        // Drain concurrently: package managers can exceed the OS pipe buffer long before exit.
+        // Capturing remains bounded, while excess bytes are discarded instead of blocking Docker.
+        CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                return readBounded(process.getInputStream(), MAX_OUTPUT_BYTES);
+            } catch (IOException failure) {
+                throw new UncheckedIOException(failure);
+            }
+        });
         boolean completed = process.waitFor(timeout.toSeconds(), TimeUnit.SECONDS);
         if (!completed) {
             process.destroyForcibly();
             process.waitFor();
         }
-        byte[] output = process.getInputStream().readNBytes(MAX_OUTPUT_BYTES);
+        byte[] output;
+        try {
+            output = outputFuture.join();
+        } catch (CompletionException failure) {
+            if (failure.getCause() instanceof UncheckedIOException ioFailure) throw ioFailure.getCause();
+            throw failure;
+        }
         return new VerificationResult(
                 completed ? process.exitValue() : -1,
                 !completed,
                 new String(output, StandardCharsets.UTF_8),
                 startedAt,
                 Instant.now());
+    }
+
+    static byte[] readBounded(InputStream input, int limit) throws IOException {
+        if (limit < 1) throw new IllegalArgumentException("Output limit must be positive");
+        byte[] captured = new byte[limit];
+        byte[] buffer = new byte[8192];
+        int capturedBytes = 0;
+        for (int read; (read = input.read(buffer)) != -1; ) {
+            int copy = Math.min(read, limit - capturedBytes);
+            if (copy > 0) {
+                System.arraycopy(buffer, 0, captured, capturedBytes, copy);
+                capturedBytes += copy;
+            }
+        }
+        return java.util.Arrays.copyOf(captured, capturedBytes);
     }
 
     private void validate(Path worktree, Path dockerVisibleWorktree, String image, List<String> command, Duration timeout) throws IOException {

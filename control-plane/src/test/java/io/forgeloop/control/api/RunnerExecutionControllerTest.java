@@ -8,6 +8,8 @@ import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.TaskLeaseService;
 import io.forgeloop.control.application.VerificationEvidenceSubmission;
 import io.forgeloop.control.application.ProviderAttemptSubmission;
+import io.forgeloop.control.application.ReviewCriterionSubmission;
+import io.forgeloop.control.application.ReviewEvidenceSubmission;
 import io.forgeloop.control.domain.VerificationEvidence;
 import java.time.Instant;
 import java.util.List;
@@ -17,8 +19,10 @@ class RunnerExecutionControllerTest {
     private final TaskLeaseService leases = mock(TaskLeaseService.class);
     private final RunnerService runners = mock(RunnerService.class);
     private final RunnerDispatchService dispatch = mock(RunnerDispatchService.class);
+    private final io.forgeloop.control.integrations.github.GithubRunnerPushService githubPush = mock(io.forgeloop.control.integrations.github.GithubRunnerPushService.class);
+    private final io.forgeloop.control.application.ReviewEvidenceService reviews = mock(io.forgeloop.control.application.ReviewEvidenceService.class);
     private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch,
-            mock(io.forgeloop.control.application.TaskPlanningService.class));
+            mock(io.forgeloop.control.application.TaskPlanningService.class), githubPush, reviews);
 
     @Test
     void authenticatesRunnerBeforeClaimingLease() {
@@ -67,11 +71,30 @@ class RunnerExecutionControllerTest {
         verify(leases).completeProviderWork("lease-1", "runner-1", "nonce", "a".repeat(40));
     }
 
+    @Test void authenticatesRunnerBeforeIssuingPushCredential() {
+        controller.issueGithubPushGrant("lease-1", "runner-1", "nonce", "runner-credential");
+        verify(runners).authenticated("runner-1", "runner-credential"); verify(githubPush).grant("lease-1", "runner-1", "nonce");
+    }
+
     @Test
-    void authenticatesRunnerBeforeIntegrationCompletion() {
-        controller.completeIntegrationTaskLease("lease-1", "runner-1", "nonce", "runner-credential", "b".repeat(40));
+    void authenticatesRunnerBeforeRecordingReviewEvidence() {
+        ReviewEvidenceSubmission report = new ReviewEvidenceSubmission(
+                true,
+                "Implementation satisfies the criterion.",
+                List.of(new ReviewCriterionSubmission(
+                        "A user can create a ticket.",
+                        "PASS",
+                        "The create-ticket path is covered by an automated test.")));
+
+        controller.recordReviewEvidence("lease-1", "runner-1", "nonce", "runner-credential", report);
 
         verify(runners).authenticated("runner-1", "runner-credential");
-        verify(leases).completeIntegration("lease-1", "runner-1", "nonce", "b".repeat(40));
+        verify(reviews).record("lease-1", "runner-1", "nonce", report);
+    }
+
+    @Test void authenticatesRunnerBeforeRecordingPushedCommit() {
+        controller.completeGithubPush("lease-1", "runner-1", "nonce", "runner-credential", "b".repeat(40));
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(githubPush).complete("lease-1", "runner-1", "nonce", "b".repeat(40));
     }
 }

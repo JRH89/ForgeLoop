@@ -44,7 +44,7 @@ public class TaskLeaseService {
                 .filter(other -> other.getState() == TaskState.LEASED || other.getState() == TaskState.PREPARING || other.getState() == TaskState.RUNNING)
                 .anyMatch(task::pathConflictsWith);
         if (conflict) throw new IllegalStateException("Task path ownership conflicts with active work");
-        TaskLease existing = leases.findByTask_Id(taskId).orElse(null);
+        TaskLease existing = leases.findFirstByTask_IdOrderByExpiresAtDesc(taskId).orElse(null);
         if (existing != null && existing.active()) throw new IllegalStateException("Task already has an active lease");
         String nonce = secret();
         TaskLease lease = leases.save(new TaskLease(task, runner, hash(nonce), Instant.now().plus(Duration.ofMinutes(10))));
@@ -60,10 +60,19 @@ public class TaskLeaseService {
     @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        String latestProviderCategory = providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId()).map(ProviderAttempt::getCategory).orElse(null);
+        boolean rejectedByReviewer = "REVIEW".equals(task.getRole()) && "COMPLETED".equals(latestProviderCategory);
+        if (!passed && ("VERIFICATION".equals(task.getRole()) || rejectedByReviewer)) {
+            String category = rejectedByReviewer ? "REVIEW_REJECTED" : "VERIFICATION_FAILED";
+            String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId()).map(VerificationEvidence::getDigest).orElse(null);
+            lease.closeForRepairCycle();
+            RepairPackage repair = task.getRun().scheduleQualityRepair(task, category, digest);
+            if (repair != null) repairPackages.save(repair);
+            return lease;
+        }
         lease.complete(passed);
         if (!passed) {
-            String category = providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
-                    .map(ProviderAttempt::getCategory).orElse("VERIFICATION_FAILED");
+            String category = latestProviderCategory == null ? "EXECUTION_FAILED" : latestProviderCategory;
             String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
                     .map(VerificationEvidence::getDigest).orElse(null);
             repairPackages.save(new RepairPackage(task, category, digest));

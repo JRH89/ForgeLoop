@@ -11,11 +11,12 @@ class PlannerPlanTest {
         PlannerPlan plan = PlannerPlan.parse("""
                 {"acceptanceCriteria":["works"],"tasks":[
                   {"key":"backend","role":"BACKEND","title":"Implement","requiredCapability":"provider","dependencies":[],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":500000},
-                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":["backend"],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":500000}
+                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":["backend"],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":500000},
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["backend","test"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
                 ]}
                 """).validate(1);
 
-        assertEquals(2, plan.tasks().size());
+        assertEquals(3, plan.tasks().size());
     }
 
     @Test
