@@ -1,0 +1,8 @@
+tunnel: e0c976c6-b8ab-4f1a-8799-96e365adba3d
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: forgeloop.hookerhillstudios.com
+    service: http://webhook-edge:8080
+  # A required catch-all ensures no other local service can become public.
+  - service: http_status:404
