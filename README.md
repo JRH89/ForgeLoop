@@ -799,8 +799,8 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [x] per-agent tool permissions
 * [x] multiple model providers
 * [x] runner-managed BYOK
-* [ ] run analytics
-* [ ] model/harness comparisons
+* [x] run analytics
+* [x] model/harness comparisons
 
 ## What ForgeLoop Is Not
 

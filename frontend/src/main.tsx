@@ -12,6 +12,7 @@ import {
   acknowledgeEscalation,
   cancelFeatureRun,
   loadOperator,
+  loadRunAnalytics,
   loadRepositoryConnections,
   loadRun,
   loadRunOperations,
@@ -23,6 +24,7 @@ import {
   type OperatorSession,
   type RepositoryConnection,
   type RunOperations,
+  type RunAnalytics,
 } from "./api";
 import forgeLoopLogo from "./assets/logo.png";
 import processGraphic from "./assets/forgeloop_process_infographic.png";
@@ -88,6 +90,12 @@ function RepositoryPage({ items }: { items: RepositoryConnection[] }) {
       </section>
     </>
   );
+}
+
+function AnalyticsPage({analytics}:{analytics?:RunAnalytics}){
+  if(!analytics)return <p className="loading">Loading analytics…</p>;
+  const table=(title:string,items:RunAnalytics["modelComparisons"])=><section className="panel"><h2>{title}</h2>{items.length?items.map(item=><div className="item" key={item.name}><div><b>{item.name}</b><small>{item.runCount} runs · {item.requestCount} requests · {item.successfulRequests} succeeded · {(item.inputTokens+item.outputTokens).toLocaleString()} tokens</small></div><span>{money(item.knownCostMicros)}</span></div>):<p className="empty">No comparison data recorded yet.</p>}</section>;
+  return <><section className="hero"><p className="eyebrow">Measured delivery</p><h1>Run analytics</h1><p>Tenant-scoped facts from persisted provider telemetry—never fabricated estimates.</p></section><section className="metrics"><article><b>{analytics.totalRuns}</b><span>Total runs</span></article><article><b>{analytics.activeRuns}</b><span>Active runs</span></article><article><b>{analytics.deliveredRuns}</b><span>Delivered runs</span></article><article><b>{analytics.providerRequests}</b><span>Provider requests</span></article><article><b>{money(analytics.knownCostMicros)}</b><span>Known cost · {Math.round(analytics.costCoverage*100)}% coverage</span></article></section><div className="two-column">{table("Model comparison",analytics.modelComparisons)}{table("Harness comparison",analytics.harnessComparisons)}</div></>;
 }
 
 function NewRun({
@@ -710,17 +718,19 @@ function RunsPage({
 }
 
 function App() {
-  const [page, setPage] = useState<"Runs" | "Repositories">("Runs");
+  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics">("Runs");
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
   const [operator, setOperator] = useState<OperatorSession>();
+  const [analytics,setAnalytics]=useState<RunAnalytics>();
   const [error, setError] = useState("");
   useEffect(() => {
-    void Promise.all([loadRepositoryConnections(), loadRuns(), loadOperator()])
-      .then(([connected, loaded, current]) => {
+    void Promise.all([loadRepositoryConnections(), loadRuns(), loadOperator(),loadRunAnalytics()])
+      .then(([connected, loaded, current,metrics]) => {
         setRepositories(connected);
         setRuns(loaded);
         setOperator(current);
+        setAnalytics(metrics);
       })
       .catch((reason) =>
         setError(
@@ -760,6 +770,7 @@ function App() {
             >
               ◫ Runs
             </button>
+            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}>▥ Analytics</button>
             <button
               className={page === "Repositories" ? "active" : ""}
               onClick={() => setPage("Repositories")}
@@ -784,8 +795,10 @@ function App() {
               operator={operator}
               setRuns={setRuns}
             />
-          ) : (
+          ) : page === "Repositories" ? (
             <RepositoryPage items={repositories} />
+          ) : (
+            <AnalyticsPage analytics={analytics}/>
           )}
         </div>
       </div>

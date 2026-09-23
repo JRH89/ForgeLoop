@@ -10,6 +10,7 @@ function controlPlane(data: Record<string, unknown>) {
     const query = (JSON.parse(String(init.body)) as { query: string }).query;
     if (query.includes('currentOperator')) return { ok: true, json: async () => ({ data: { currentOperator: { subject: 'operator', organizationId: 'local-development', role: 'ADMIN' } } }) };
     if (query.includes('repositoryConnections')) return { ok: true, json: async () => ({ data: { repositoryConnections: data.repositoryConnections ?? [] } }) };
+    if (query.includes('runAnalytics')) return { ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) };
     return { ok: true, json: async () => ({ data: { featureRuns: data.featureRuns ?? [] } }) };
   });
 }
@@ -29,7 +30,8 @@ it('keeps viewers read-only', async () => {
   const fetch = vi.fn()
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { repositoryConnections: [] } }) })
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { featureRuns: [] } }) })
-    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { currentOperator: { subject: 'viewer', organizationId: 'acme', role: 'VIEWER' } } }) });
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { currentOperator: { subject: 'viewer', organizationId: 'acme', role: 'VIEWER' } } }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) });
   vi.stubGlobal('fetch', fetch);
   render(<App />);
   expect(await screen.findByText('Intake queue')).toBeInTheDocument();
