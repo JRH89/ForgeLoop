@@ -6,8 +6,9 @@ ForgeLoop uses the named Cloudflare Tunnel `forgeloop`
 
 Only the GitHub App webhook and installation callback are exposed. The edge
 proxy returns `404` for GraphQL, actuator endpoints, the operator UI, and all
-other paths. Keep operator and runner APIs behind their authenticated network
-boundary.
+other paths. During local development, operators use `http://localhost:5173`.
+Keep operator and runner APIs behind their authenticated network boundary; add
+a separate protected application hostname only after production OIDC is live.
 
 ## Start on this workstation
 
@@ -30,6 +31,18 @@ ignored `.env` file without printing either credential:
 node .\scripts\Update-GithubAppWebhook.mjs `
   https://forgeloop.hookerhillstudios.com/api/github/webhooks
 ```
+
+Inspect recent delivery status without printing payloads or signatures, and
+redeliver an exact failed delivery ID when the local stack was unavailable:
+
+```powershell
+node .\scripts\Update-GithubAppWebhook.mjs --deliveries
+node .\scripts\Update-GithubAppWebhook.mjs --redeliver <delivery-id>
+```
+
+GitHub does not automatically retry failed webhook deliveries, so production
+operations must schedule bounded redelivery reconciliation rather than relying
+on an operator to notice a failed delivery.
 
 GitHub does not expose setup-URL changes through the webhook configuration API;
 set that value in the GitHub App settings page.

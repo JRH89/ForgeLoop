@@ -14,6 +14,12 @@ This checklist is maintained as implementation progresses. A checked item is imp
 
 Copy `.env.example` to `.env`, create a GitHub App with the required repository permissions and webhook URL, then set `FORGELOOP_GITHUB_APP_SLUG` and `FORGELOOP_GITHUB_WEBHOOK_SECRET`. In the ForgeLoop console, select **Repositories** and choose **Install ForgeLoop GitHub App**. GitHub—not the user—supplies the installation identity after the App callback/repository-sync phase is configured.
 
+## Open the operator dashboard
+
+With the Compose stack running, open `http://localhost:5173`. The dashboard is ForgeLoop's operator surface: **Runs** shows the live task graph, attempts, evidence, audit trail, approval controls, and PR links; **Repositories** installs the GitHub App and displays synchronized repositories.
+
+The named development tunnel deliberately exposes only GitHub webhook and setup-callback routes. It does not publish the dashboard or GraphQL API. A public dashboard requires the production OIDC configuration and a separately protected application hostname; see [Cloudflare Tunnel](docs/cloudflare-tunnel.md).
+
 ### Control plane
 
 - [x] Spring Boot GraphQL control plane with persisted delivery-run, task, gate, criterion, and GitHub-delivery records.
@@ -47,7 +53,8 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
 - [x] Role-aware, confirmed, audited human cancellation, bounded task retry, and verified-run approval controls.
-- [ ] Review-agent orchestration and automated human escalation policy.
+- [x] Independent review-agent orchestration with criterion-level immutable evidence.
+- [ ] Automated human escalation policy.
 
 ### Evidence and repository delivery
 
@@ -60,12 +67,13 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
 - [x] GitHub App JWT signing, short-lived installation-token exchange, idempotent branch/file/check-run/draft-PR delivery records, and transient GitHub API retry handling.
 - [x] Live GitHub App credential validation, installation-token repository discovery, installation reconciliation, and signed GitHub Issue intake verified against the separate Ticketly repository.
-- [ ] Runner-produced verified changes wired into GitHub delivery, including a live draft-PR/check-run proof.
-- [ ] Ticketly end-to-end issue-to-verified-PR proof, followed by a second unrelated repository profile.
+- [x] Runner-produced verified changes wired into GitHub delivery, including a live draft-PR/check-run proof.
+- [x] Ticketly end-to-end issue-to-verified-PR proof.
+- [ ] Second unrelated repository profile proving repository independence.
 
 ### Current capability boundary
 
-ForgeLoop can persist and operate policy-bound delivery runs and repository connections through its role-aware web console or permission-scoped MCP gateway. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch dependency-ready non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, and route failures through bounded task-owned repair context. Required verification commands are selected from an immutable repository-policy snapshot and produce redacted, checksummed evidence tied to acceptance criteria; a verified run requires explicit administrator approval before GitHub delivery. ForgeLoop **cannot yet orchestrate the independent review agent, upload evidence to production object storage, or publish runner-produced work as a pull request without the temporary delivery handoff**; those capabilities remain unchecked until their slices are implemented and verified.
+ForgeLoop can persist and operate policy-bound delivery runs and repository connections through its role-aware web console or permission-scoped MCP gateway. A self-hosted runner can execute a policy-selected planner, materialize a validated acyclic task graph, dispatch non-conflicting tasks, create schema- and server-path-validated commits, integrate declared dependency commits, push the exact integrated head with a lease-bound installation token, perform criterion-level independent review, and route failed review or verification through a bounded code-repair cycle. Required verification commands come from an immutable repository-policy snapshot and produce redacted, checksummed evidence; a verified run requires explicit administrator approval before the control plane creates its check run and draft PR. Ticketly issue 7 proved this path live and produced merged PR 8 without operator repository edits. Immutable production object storage, a second unrelated repository proof, hosted OIDC, and production operations remain incomplete.
 
 > **Specification → Plan → Parallel Agents → Integration → Verification → Repair → Review → Pull Request**
 
@@ -745,7 +753,7 @@ The priority is reliable closed-loop execution rather than maximizing the number
 
 ### Phase 2: Agent Execution
 
-* [ ] repository context builder
+* [x] repository context builder
 * [x] provider abstraction
 * [x] structured agent tasks
 * [x] Git worktree isolation
@@ -778,8 +786,8 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [x] service health checks
 * [x] Playwright
 * [ ] screenshots
-* [ ] independent verification agent
-* [ ] acceptance-criteria review
+* [x] independent verification agent
+* [x] acceptance-criteria review
 
 ### Phase 6: Harness Platform
 

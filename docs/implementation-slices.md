@@ -8,7 +8,7 @@ ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signe
 
 Ticketly is now a separate support SaaS repository. It has no ForgeLoop delivery dashboard, fabricated agent runs, fabricated cost data, or fabricated verification data. It remains the primary target application for the eventual real GitHub issue-to-PR validation.
 
-The product can now invoke policy-selected models, create guarded task-scoped commits, integrate declared changes, dispatch immutable repository-policy verification tasks with independently validated evidence, and let an authorized operator diagnose and control runs without database or shell access. It does **not** yet create a branch/PR/check run directly from runner-produced work, persist object-store artifacts, or complete the two-repository issue-to-PR proving loop. These are the critical path.
+The product can invoke policy-selected models with schema-constrained output, create guarded task-scoped commits, integrate declared changes, push an exact runner-produced head with a lease-bound GitHub credential, perform independent criterion-level review, dispatch immutable repository-policy verification tasks, and route failed quality gates through a fresh code-repair task. Ticketly issue 7 completed that full path and ForgeLoop created check run and draft PR 8 after explicit approval; the PR was subsequently merged. Object-store artifacts and a second unrelated repository proof remain incomplete.
 
 ## Slice 1 — Multi-tenant security and auditable operations — complete
 
@@ -112,6 +112,8 @@ Prove repo-agnostic delivery using separate repositories.
 - Preserve redacted evidence and a reproducible test report for both runs.
 
 Exit criteria: both repositories complete from fresh GitHub issues without manual repository edits by an operator, and their policies/evidence remain independent.
+
+Progress evidence: Ticketly issue 7 entered through the signed public GitHub App webhook, produced a schema-constrained plan, generated and integrated commit `044e5067cb9c94d353baf1b9bcd2e377a077ebe6`, pushed it with a lease-bound installation token, passed independent criterion review, and passed the authorization, backend, browser, Compose, and frontend policy gates with checksummed evidence. Explicit ForgeLoop approval created a successful GitHub check and draft PR 8; both GitHub checks passed and the PR merged as `73476b5964e4ce65b08bbed33f151def2493a6f5`. The remaining Slice 8 exit criterion is the same fresh-issue proof against a second installed, unrelated repository.
 
 ## Slice 9 — Production launch readiness
 

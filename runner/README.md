@@ -59,6 +59,11 @@ work-until-idle <control-plane-url> <identity-file> <repositories-root> <workspa
 
 Copy `provider-policy.example.json` outside the repository and choose only models enabled for that runner. Provider credentials use `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`. A local adapter uses `FORGELOOP_LOCAL_PROVIDER_URL` and optional `FORGELOOP_LOCAL_PROVIDER_API_KEY`; non-loopback endpoints require `FORGELOOP_LOCAL_PROVIDER_ALLOW_REMOTE=true`.
 
+Inject only the selected provider credential into the runner. Do not pass the
+control plane's `.env` wholesale: GitHub App private keys, webhook secrets,
+OIDC configuration, and storage credentials are outside the runner trust
+boundary.
+
 Cost estimates are enabled per provider/model with environment variables derived from upper-cased names, for example `FORGELOOP_ANTHROPIC_CLAUDE_SONNET_5_INPUT_MICROS_PER_MILLION` and the matching `_OUTPUT_MICROS_PER_MILLION`. Values are micro-dollars per million tokens. When either rate is absent, usage is persisted with `costKnown=false` instead of a fabricated estimate.
 
 After building the runner image, validate an Anthropic key from the same PowerShell window that contains `ANTHROPIC_API_KEY`:
