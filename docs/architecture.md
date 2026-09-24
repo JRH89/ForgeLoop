@@ -18,7 +18,7 @@ Specification -> Planner -> Task graph -> isolated workers
 | --- | --- |
 | `control-plane` | Spring Boot GraphQL API for repository connections, delivery runs, task scheduling, evidence, and GitHub intake. |
 | `frontend` | React ForgeLoop operator console; it never makes authorization decisions and does not contain target-application CRUD. |
-| `runner` | Separately versioned local/self-hosted execution client; it clones connected repositories and runs isolated worktrees, containers, tests, browsers, and local MCP tools. |
+| `runner` | Separately versioned local/self-hosted execution client; it uses lease-bound GitHub App credentials to clone or refresh connected repositories and runs isolated worktrees, containers, tests, and browsers. Local MCP process routing remains planned. |
 | `harness` | State machine, evidence writer, model-selection records, and worker contracts. |
 | `mcp-server` | Stdio MCP gateway for least-privilege control-plane run, policy, task, evidence, and cancellation operations. It cannot execute repository commands. |
 

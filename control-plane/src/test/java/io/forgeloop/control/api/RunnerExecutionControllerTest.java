@@ -22,7 +22,8 @@ class RunnerExecutionControllerTest {
     private final io.forgeloop.control.integrations.github.GithubRunnerPushService githubPush = mock(io.forgeloop.control.integrations.github.GithubRunnerPushService.class);
     private final io.forgeloop.control.application.ReviewEvidenceService reviews = mock(io.forgeloop.control.application.ReviewEvidenceService.class);
     private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch,
-            mock(io.forgeloop.control.application.TaskPlanningService.class), githubPush, reviews);
+            mock(io.forgeloop.control.application.TaskPlanningService.class), githubPush,
+            mock(io.forgeloop.control.integrations.github.GithubRunnerCheckoutService.class), reviews);
 
     @Test
     void authenticatesRunnerBeforeClaimingLease() {

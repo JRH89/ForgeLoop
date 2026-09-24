@@ -43,14 +43,15 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] Exact capability matching for runner discovery and server-side task-claim enforcement.
 - [x] Scheduled lease-expiry recovery into the bounded repair queue.
 - [x] Operator cancellation holds non-terminal tasks, records an audit event, and is exposed in the operator console.
-- [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, nonce-backed lease acknowledgement, authenticated task discovery, and policy-selected provider execution against pre-cloned repositories.
+- [x] Containerized local/self-hosted runner CLI with validated registration, persisted local identity, authenticated heartbeat, nonce-backed lease acknowledgement, authenticated task discovery, lease-bound automatic repository checkout, and policy-selected provider execution.
 - [x] Runner-managed, task-scoped detached Git worktree creation with repository, path-traversal, duplicate, command-failure, and timeout guards.
 - [x] Shell-free host verification executor constrained to task Git worktrees, bounded by timeout and output capture limits.
 - [x] Disposable Docker verification executor that copies a read-only task mount into an ephemeral writable filesystem, bounds output/time/storage, requires digest-pinned images, and denies network access unless policy enables egress.
 - [x] Authenticated, lease-bound persistence of redacted verification evidence with independently recomputed output/bundle digests, provenance, artifact references, and exact policy metadata matching.
 - [x] Repository-policy-selected verification orchestration with server-created gate tasks, image/argv/network/timeout snapshots, criterion coverage, and bounded verification repair retries.
 - [x] Lease-bound, checksummed artifact upload through filesystem and S3-compatible storage backends, with read-after-write verification, retention metadata, and operator-console visibility.
-- [ ] Git clone and local MCP processes.
+- [x] Lease-bound automatic GitHub clone/refresh using short-lived installation credentials kept out of arguments and logs.
+- [ ] Local MCP processes.
 - [x] Lease-authenticated, redacted runner lifecycle events with idempotent sequence handling and a durable near-real-time operator timeline.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
