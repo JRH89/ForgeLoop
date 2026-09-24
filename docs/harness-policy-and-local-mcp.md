@@ -4,7 +4,7 @@ ForgeLoop stores reusable execution configuration in the control plane while ret
 
 ## Organization policy
 
-An administrator configures the maximum run budget, maximum parallel task count, permitted model providers, and whether human approval is required. Submission rejects a run above the organization budget before it creates work. Repository budgets remain an additional, narrower boundary.
+An administrator configures the maximum run budget, maximum parallel task count, permitted model providers, whether human approval is required, and whether an approved delivery may auto-merge after GitHub checks pass. Auto-merge defaults off. Enabling it does not bypass verification or approval: the exact reviewed head SHA is persisted when the PR is created, every GitHub check and commit status must succeed, and the merge request includes that expected SHA. Submission rejects a run above the organization budget before it creates work. Repository budgets remain an additional, narrower boundary.
 
 The `organizationPolicy` query and `configureOrganizationPolicy` mutation are tenant-scoped and administrator-controlled. Every change increments the policy revision and creates a digest-only audit entry.
 

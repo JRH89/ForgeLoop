@@ -56,9 +56,28 @@ public class GithubHttpApi implements GithubApi {
         JsonNode response = request(installationId, "POST", "/repos/" + repository + "/check-runs", Map.of("name", name, "head_sha", headSha, "status", "completed", "conclusion", "success", "output", Map.of("title", name, "summary", summary)));
         return response.path("id").asLong();
     }
-    @Override public long createDraftPullRequest(long installationId, String repository, String head, String base, String title, String body) {
-        JsonNode response = request(installationId, "POST", "/repos/" + repository + "/pulls", Map.of("title", title, "head", head, "base", base, "body", body, "draft", true));
+    @Override public long createPullRequest(long installationId, String repository, String head, String base, String title, String body, boolean draft) {
+        JsonNode response = request(installationId, "POST", "/repos/" + repository + "/pulls", Map.of("title", title, "head", head, "base", base, "body", body, "draft", draft));
         return response.path("number").asLong();
+    }
+    @Override public boolean checksPass(long installationId, String repository, String headSha) {
+        JsonNode checks = request(installationId, "GET", "/repos/" + repository + "/commits/" + headSha + "/check-runs?filter=latest&per_page=100", Map.of());
+        if (checks.path("total_count").asInt() == 0) return false;
+        for (JsonNode check : checks.path("check_runs")) {
+            if (!"completed".equals(check.path("status").asText()) || !List.of("success", "neutral", "skipped").contains(check.path("conclusion").asText())) return false;
+        }
+        JsonNode statuses = request(installationId, "GET", "/repos/" + repository + "/commits/" + headSha + "/status", Map.of());
+        return statuses.path("statuses").isEmpty() || "success".equals(statuses.path("state").asText());
+    }
+    @Override public String getPullRequestHead(long installationId, String repository, long pullRequestNumber) {
+        return request(installationId, "GET", "/repos/" + repository + "/pulls/" + pullRequestNumber, Map.of()).path("head").path("sha").asText();
+    }
+    @Override public String mergePullRequest(long installationId, String repository, long pullRequestNumber, String expectedHeadSha) {
+        JsonNode response = request(installationId, "PUT", "/repos/" + repository + "/pulls/" + pullRequestNumber + "/merge", Map.of("sha", expectedHeadSha, "merge_method", "squash"));
+        if (!response.path("merged").asBoolean()) throw new IllegalStateException("GitHub declined the pull request merge");
+        String sha = response.path("sha").asText();
+        if (sha.isBlank()) throw new IllegalStateException("GitHub merge receipt did not contain a commit SHA");
+        return sha;
     }
     private JsonNode request(long installationId, String method, String path, Object body) {
         try {

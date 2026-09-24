@@ -9,5 +9,8 @@ public interface GithubApi {
     String issueInstallationToken(long installationId);
     String getBranchHead(long installationId, String repository, String branch);
     long createCompletedCheck(long installationId, String repository, String headSha, String name, String summary);
-    long createDraftPullRequest(long installationId, String repository, String head, String base, String title, String body);
+    long createPullRequest(long installationId, String repository, String head, String base, String title, String body, boolean draft);
+    boolean checksPass(long installationId, String repository, String headSha);
+    String getPullRequestHead(long installationId, String repository, long pullRequestNumber);
+    String mergePullRequest(long installationId, String repository, long pullRequestNumber, String expectedHeadSha);
 }
