@@ -11,8 +11,12 @@ import {
   approveFeatureRun,
   acknowledgeEscalation,
   cancelFeatureRun,
+  configureOrganizationPolicy,
+  createHarnessDefinition,
+  createLocalMcpConfiguration,
   loadOperator,
   loadRunAnalytics,
+  loadPlatformConfiguration,
   loadRepositoryConnections,
   loadRun,
   loadRunOperations,
@@ -25,9 +29,9 @@ import {
   type RepositoryConnection,
   type RunOperations,
   type RunAnalytics,
+  type PlatformConfiguration,
 } from "./api";
-import forgeLoopLogo from "./assets/logo.png";
-import processGraphic from "./assets/forgeloop_process_infographic.png";
+import favicon from "./assets/favicon.png";
 import "./styles.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
@@ -51,11 +55,6 @@ function RepositoryPage({ items }: { items: RepositoryConnection[] }) {
           remains on an authorized runner.
         </p>
       </section>
-      <img
-        className="process-graphic"
-        src={processGraphic}
-        alt="ForgeLoop delivery process"
-      />
       <section className="panel">
         <div className="section-heading">
           <div>
@@ -490,16 +489,7 @@ function RunDetail({
       </section>
       <section className="panel">
         <h2>Evidence browser & redacted logs</h2>
-        {operations.artifacts.length > 0 && (
-          <div className="item">
-            <div>
-              <b>Durable evidence artifacts</b>
-              <small>
-                {operations.artifacts.length} checksummed object{operations.artifacts.length === 1 ? "" : "s"} retained by policy
-              </small>
-            </div>
-          </div>
-        )}
+        {operations.artifacts.length > 0 && <div className="artifact-grid">{operations.artifacts.map(artifact=><a className={`artifact-card ${artifact.artifactType === "SCREENSHOT" ? "screenshot" : ""}`} href={`/api/artifacts/${artifact.id}`} target="_blank" rel="noreferrer" key={artifact.id}>{artifact.artifactType === "SCREENSHOT" && <img src={`/api/artifacts/${artifact.id}`} alt={artifact.displayName}/>}<span><b>{artifact.displayName}</b><small>{artifact.artifactType.replaceAll("_"," ")} · {(artifact.sizeBytes/1024).toFixed(1)} KiB</small><small>SHA-256 {artifact.sha256.slice(0,12)}…</small></span></a>)}</div>}
         {operations.evidence.length ? (
           operations.evidence.map((item) => (
             <details className="evidence" key={item.id}>
@@ -717,8 +707,28 @@ function RunsPage({
   );
 }
 
+function ConfigurationPage({operator}:{operator:OperatorSession}) {
+  const [configuration,setConfiguration]=useState<PlatformConfiguration>();
+  const [error,setError]=useState("");
+  const [busy,setBusy]=useState("");
+  const [harness,setHarness]=useState({name:"",description:"",allowedRoles:"PLANNER,BACKEND,FRONTEND,INDEPENDENT_TEST,INTEGRATION,REVIEW,VERIFICATION",defaultAttemptBudget:2});
+  const [mcp,setMcp]=useState({name:"",command:"",arguments:"",allowedRoles:"PLANNER,BACKEND,FRONTEND,REVIEW",contextTool:"",toolArguments:"{}"});
+  useEffect(()=>{void loadPlatformConfiguration().then(setConfiguration).catch(reason=>setError(reason instanceof Error?reason.message:"Unable to load configuration"));},[]);
+  const admin=operator.role==="ADMIN";
+  const csv=(value:string)=>value.split(",").map(item=>item.trim()).filter(Boolean);
+  async function perform(label:string,work:()=>Promise<unknown>){setBusy(label);setError("");try{await work();setConfiguration(await loadPlatformConfiguration());}catch(reason){setError(reason instanceof Error?reason.message:"Configuration update failed");}finally{setBusy("");}}
+  if(!configuration)return <p className="loading">Loading execution policy…</p>;
+  return <>
+    <section className="page-title"><div><p className="eyebrow">Execution governance</p><h1>Harness & policy</h1><p>Reusable delivery rules and runner-local context routes for this organization.</p></div><span className="revision">Policy revision {configuration.policy.revision}</span></section>
+    {error&&<p role="alert">{error}</p>}
+    <section className="panel policy-card"><div><p className="eyebrow">Organization boundary</p><h2>Execution policy</h2><p>Hard limits applied before work enters the runner queue.</p></div><form onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);void perform("policy",()=>configureOrganizationPolicy({maxRunBudgetUsd:Number(form.get("budget")),maxParallelTasks:Number(form.get("parallel")),allowedProviders:csv(String(form.get("providers"))),requireHumanApproval:form.get("approval")==="on"}));}}><label>Maximum run budget<input name="budget" type="number" min="1" step="1" defaultValue={configuration.policy.maxRunBudgetUsd} disabled={!admin}/></label><label>Parallel task ceiling<input name="parallel" type="number" min="1" max="16" defaultValue={configuration.policy.maxParallelTasks} disabled={!admin}/></label><label>Allowed providers<input name="providers" defaultValue={configuration.policy.allowedProviders.join(", ")} disabled={!admin}/></label><label className="check"><input name="approval" type="checkbox" defaultChecked={configuration.policy.requireHumanApproval} disabled={!admin}/> Require human approval before delivery</label>{admin&&<button className="primary compact" disabled={!!busy}>Save policy</button>}</form></section>
+    <div className="config-columns"><section className="panel"><div className="section-heading"><div><p className="eyebrow">Reusable orchestration</p><h2>Harness definitions</h2></div><span className="count">{configuration.harnesses.length}</span></div>{configuration.harnesses.map(item=><article className="definition" key={item.id}><div><b>{item.name}</b><span className={`status ${item.enabled?"complete":"failed"}`}>{item.enabled?"ACTIVE":"DISABLED"}</span></div><p>{item.description}</p><small>{item.allowedRoles.join(" · ")} · {item.defaultAttemptBudget} attempts · v{item.revision}</small></article>)}{admin&&<form className="subform" onSubmit={event=>{event.preventDefault();void perform("harness",()=>createHarnessDefinition({...harness,allowedRoles:csv(harness.allowedRoles)}));}}><h3>Add harness</h3><input aria-label="Harness name" placeholder="BUG_FIX" value={harness.name} onChange={event=>setHarness({...harness,name:event.target.value.toUpperCase()})} required/><textarea aria-label="Harness description" placeholder="Describe the bounded workflow" value={harness.description} onChange={event=>setHarness({...harness,description:event.target.value})} required/><input aria-label="Harness roles" value={harness.allowedRoles} onChange={event=>setHarness({...harness,allowedRoles:event.target.value})} required/><input aria-label="Default attempt budget" type="number" min="1" max="10" value={harness.defaultAttemptBudget} onChange={event=>setHarness({...harness,defaultAttemptBudget:Number(event.target.value)})}/><button className="secondary" disabled={!!busy}>Create harness</button></form>}</section>
+    <section className="panel"><div className="section-heading"><div><p className="eyebrow">Runner-local context</p><h2>MCP routes</h2></div><span className="count">{configuration.mcp.length}</span></div>{configuration.mcp.length?configuration.mcp.map(item=><article className="definition" key={item.id}><div><b>{item.name}</b><span className={`status ${item.enabled?"complete":"failed"}`}>{item.enabled?"ROUTED":"DISABLED"}</span></div><p><code>{item.command} {item.arguments.join(" ")}</code></p><small>{item.contextTool} · {item.allowedRoles.join(" · ")} · v{item.revision}</small></article>):<p className="empty">No local MCP context routes configured.</p>}{admin&&<form className="subform" onSubmit={event=>{event.preventDefault();try{JSON.parse(mcp.toolArguments);}catch{setError("MCP tool arguments must be valid JSON");return;}void perform("mcp",()=>createLocalMcpConfiguration({...mcp,arguments:csv(mcp.arguments),allowedRoles:csv(mcp.allowedRoles)}));}}><h3>Add local route</h3><input aria-label="MCP route name" placeholder="repository-context" value={mcp.name} onChange={event=>setMcp({...mcp,name:event.target.value})} required/><input aria-label="MCP command" placeholder="node" value={mcp.command} onChange={event=>setMcp({...mcp,command:event.target.value})} required/><input aria-label="MCP command arguments" placeholder="server.js, --stdio" value={mcp.arguments} onChange={event=>setMcp({...mcp,arguments:event.target.value})}/><input aria-label="MCP allowed roles" value={mcp.allowedRoles} onChange={event=>setMcp({...mcp,allowedRoles:event.target.value})} required/><input aria-label="MCP context tool" placeholder="repository.get_context" value={mcp.contextTool} onChange={event=>setMcp({...mcp,contextTool:event.target.value})} required/><textarea aria-label="MCP tool arguments" value={mcp.toolArguments} onChange={event=>setMcp({...mcp,toolArguments:event.target.value})} required/><button className="secondary" disabled={!!busy}>Create route</button></form>}</section></div>
+  </>;
+}
+
 function App() {
-  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics">("Runs");
+  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration">("Runs");
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
   const [operator, setOperator] = useState<OperatorSession>();
@@ -747,9 +757,10 @@ function App() {
       <header>
         <div>
           <a className="brand" href="/">
-            <img src={forgeLoopLogo} alt="ForgeLoop" />
+            <img src={favicon} alt="" />
+            <strong>ForgeLoop</strong>
           </a>
-          <span>Autonomous software delivery control plane</span>
+          <span>Evidence-backed software delivery</span>
         </div>
         <div className="session">
           <i />
@@ -768,15 +779,16 @@ function App() {
               className={page === "Runs" ? "active" : ""}
               onClick={() => setPage("Runs")}
             >
-              ◫ Runs
+              <span className="nav-icon">01</span> Runs
             </button>
-            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}>▥ Analytics</button>
+            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}><span className="nav-icon">02</span> Analytics</button>
             <button
               className={page === "Repositories" ? "active" : ""}
               onClick={() => setPage("Repositories")}
             >
-              ⌘ Repositories
+              <span className="nav-icon">03</span> Repositories
             </button>
+            <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon">04</span> Harness &amp; policy</button>
           </nav>
           <p className="sidebar-note">
             Repository code and commands execute only on an enrolled customer
@@ -797,6 +809,8 @@ function App() {
             />
           ) : page === "Repositories" ? (
             <RepositoryPage items={repositories} />
+          ) : page === "Configuration" ? (
+            <ConfigurationPage operator={operator}/>
           ) : (
             <AnalyticsPage analytics={analytics}/>
           )}

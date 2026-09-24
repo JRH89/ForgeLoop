@@ -16,14 +16,14 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 ## Open the operator dashboard
 
-With the Compose stack running, open `http://localhost:5173`. The dashboard is ForgeLoop's operator surface: **Runs** shows the live task graph, attempts, evidence, audit trail, approval controls, and PR links; **Repositories** installs the GitHub App and displays synchronized repositories.
+With the Compose stack running, open `http://localhost:5173`. The dashboard is ForgeLoop's operator surface: **Runs** shows the live task graph, attempts, screenshot and log evidence, audit trail, approval controls, and PR links; **Analytics** compares persisted provider and harness telemetry; **Repositories** manages GitHub App authorization; and **Harness & policy** manages organization limits, reusable harness definitions, and runner-local MCP context routes.
 
 The named development tunnel deliberately exposes only GitHub webhook and setup-callback routes. It does not publish the dashboard or GraphQL API. A public dashboard requires the production OIDC configuration and a separately protected application hostname; see [Cloudflare Tunnel](docs/cloudflare-tunnel.md).
 
 ### Control plane
 
 - [x] Spring Boot GraphQL control plane with persisted delivery-run, task, gate, criterion, and GitHub-delivery records.
-- [x] React operator console with intake queue, task DAG/attempts, live polling, redacted evidence logs, acceptance gates, budgets, audit timeline, approval/cancel/retry controls, and GitHub PR links.
+- [x] Responsive React operator console with intake queue, task DAG/attempts, live polling, screenshot and redacted-log evidence, acceptance gates, budgets, analytics, harness/policy administration, audit timeline, approval/cancel/retry controls, and GitHub PR links.
 - [x] Permissioned MCP gateway calls static control-plane GraphQL documents with explicit tool grants and bearer identity; it exposes no cloud-side repository or shell execution.
 - [x] Generic repository connection policy: installation ID, branch, issue label, harness profile, required gates, and budget enforcement.
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
