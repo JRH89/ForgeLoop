@@ -24,4 +24,11 @@ class RepositoryWorkspaceResolverTest {
         assertThrows(IllegalArgumentException.class, () -> resolver.resolve(temporaryDirectory, "../outside"));
         assertThrows(IllegalArgumentException.class, () -> resolver.resolve(temporaryDirectory, "JRH89/Ticketly"));
     }
+
+    @Test
+    void rejectsUnsafeOrCredentiallessCloneGrants() {
+        RepositoryWorkspaceResolver resolver = new RepositoryWorkspaceResolver();
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveOrClone(temporaryDirectory, new GithubCheckoutGrant("../outside", "main", "token")));
+        assertThrows(IllegalArgumentException.class, () -> resolver.resolveOrClone(temporaryDirectory, new GithubCheckoutGrant("JRH89/Ticketly", "main", "")));
+    }
 }

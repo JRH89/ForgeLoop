@@ -17,6 +17,8 @@ import io.forgeloop.control.domain.TaskLease;
 import io.forgeloop.control.domain.VerificationEvidence;
 import io.forgeloop.control.domain.ReviewEvidence;
 import io.forgeloop.control.integrations.github.GithubPushGrant;
+import io.forgeloop.control.integrations.github.GithubCheckoutGrant;
+import io.forgeloop.control.integrations.github.GithubRunnerCheckoutService;
 import io.forgeloop.control.integrations.github.GithubRunnerPushService;
 import java.util.List;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -32,10 +34,11 @@ public class RunnerExecutionController {
     private final RunnerDispatchService dispatch;
     private final TaskPlanningService planning;
     private final GithubRunnerPushService githubPush;
+    private final GithubRunnerCheckoutService githubCheckout;
     private final ReviewEvidenceService reviews;
 
-    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, ReviewEvidenceService reviews) {
-        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.reviews = reviews;
+    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews) {
+        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews;
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
@@ -56,6 +59,7 @@ public class RunnerExecutionController {
     @MutationMapping public GithubPushGrant issueGithubPushGrant(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
         runners.authenticated(runnerId, credential); return githubPush.grant(leaseId, runnerId, nonce);
     }
+    @MutationMapping public GithubCheckoutGrant issueGithubCheckoutGrant(@Argument String leaseId,@Argument String runnerId,@Argument String nonce,@Argument String credential){runners.authenticated(runnerId,credential);return githubCheckout.grant(leaseId,runnerId,nonce);}
     @MutationMapping public TaskLease completeGithubPush(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String integratedSha) {
         runners.authenticated(runnerId, credential); return githubPush.complete(leaseId, runnerId, nonce, integratedSha);
     }
