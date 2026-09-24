@@ -49,3 +49,16 @@ it('keeps viewers read-only', async () => {
   expect(await screen.findByText('Intake queue')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '+ New run' })).not.toBeInTheDocument();
 });
+
+it('provides an in-app operator guide as the fifth navigation item', async () => {
+  vi.stubGlobal('fetch', controlPlane({ repositoryConnections: [] }));
+  render(<App />);
+  await screen.findByText('Intake queue');
+  const guide = screen.getByRole('button', { name: /05 User guide/ });
+  expect(guide).toBeInTheDocument();
+  fireEvent.click(guide);
+  expect(screen.getByRole('heading', { name: 'Using ForgeLoop' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'What every setting does' })).toBeInTheDocument();
+  expect(screen.getByText('Auto-merge', { selector: 'dt' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'When something does not move' })).toBeInTheDocument();
+});
