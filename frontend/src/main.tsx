@@ -32,6 +32,7 @@ import {
   type PlatformConfiguration,
 } from "./api";
 import favicon from "./assets/favicon.png";
+import UserGuidePage from "./UserGuidePage";
 import "./styles.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
@@ -728,7 +729,7 @@ function ConfigurationPage({operator}:{operator:OperatorSession}) {
 }
 
 function App() {
-  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration">("Runs");
+  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide">("Runs");
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
   const [operator, setOperator] = useState<OperatorSession>();
@@ -789,6 +790,7 @@ function App() {
               <span className="nav-icon">03</span> Repositories
             </button>
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon">04</span> Harness &amp; policy</button>
+            <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon">05</span> User guide</button>
           </nav>
           <p className="sidebar-note">
             Repository code and commands execute only on an enrolled customer
@@ -811,6 +813,8 @@ function App() {
             <RepositoryPage items={repositories} />
           ) : page === "Configuration" ? (
             <ConfigurationPage operator={operator}/>
+          ) : page === "Guide" ? (
+            <UserGuidePage />
           ) : (
             <AnalyticsPage analytics={analytics}/>
           )}
