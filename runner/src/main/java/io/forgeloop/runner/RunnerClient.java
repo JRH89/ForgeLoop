@@ -78,13 +78,20 @@ public final class RunnerClient {
     }
     /** Uploads a bounded local evidence file through the active lease without base64/GraphQL inflation. */
     public String uploadArtifact(RunnerIdentity identity, RunnerLease lease, byte[] content, String sha256) throws Exception {
+        return uploadArtifact(identity, lease, content, sha256, "application/json", "VERIFICATION_BUNDLE", "evidence.json");
+    }
+    /** Uploads a typed artifact with a safe display name through the same lease boundary. */
+    public String uploadArtifact(RunnerIdentity identity, RunnerLease lease, byte[] content, String sha256,
+                                 String contentType, String artifactType, String displayName) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(controlPlane.resolve("/api/runner/artifacts"))
-                .header("Content-Type", "application/json")
+                .header("Content-Type", contentType)
                 .header("X-ForgeLoop-Runner-Id", identity.runnerId())
                 .header("X-ForgeLoop-Runner-Credential", identity.credential())
                 .header("X-ForgeLoop-Lease-Id", lease.leaseId())
                 .header("X-ForgeLoop-Lease-Nonce", lease.nonce())
                 .header("X-ForgeLoop-Artifact-Sha256", sha256)
+                .header("X-ForgeLoop-Artifact-Type", artifactType)
+                .header("X-ForgeLoop-Artifact-Name", displayName)
                 .POST(HttpRequest.BodyPublishers.ofByteArray(content)).build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) throw new IllegalStateException("Artifact upload failed with HTTP " + response.statusCode());

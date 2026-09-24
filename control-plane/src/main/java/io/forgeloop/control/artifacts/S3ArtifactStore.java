@@ -29,4 +29,13 @@ final class S3ArtifactStore implements ArtifactStore {
         if (persisted.length != content.length || !actual.equals(sha256)) throw new IllegalStateException("Immutable S3 artifact key contains different or corrupt content");
         return new StoredObject(persisted.length, actual);
     }
+
+    @Override public byte[] getVerified(String key, String sha256, long maxBytes) {
+        String objectKey = prefix.isBlank() ? key : prefix + "/" + key;
+        byte[] content = client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(objectKey).build()).asByteArray();
+        if (content.length > maxBytes || !ArtifactDigests.sha256(content).equals(sha256)) {
+            throw new IllegalStateException("Stored artifact failed retrieval policy");
+        }
+        return content;
+    }
 }

@@ -35,6 +35,18 @@ final class FileSystemArtifactStore implements ArtifactStore {
         } catch (java.io.IOException failure) { throw new IllegalStateException("Artifact storage failed", failure); }
     }
 
+    @Override public byte[] getVerified(String key, String sha256, long maxBytes) {
+        try {
+            Path target = root.resolve(key).normalize();
+            if (!target.startsWith(root) || !Files.isRegularFile(target) || Files.size(target) > maxBytes) {
+                throw new IllegalArgumentException("Artifact is unavailable");
+            }
+            byte[] content = Files.readAllBytes(target);
+            if (!ArtifactDigests.sha256(content).equals(sha256)) throw new IllegalStateException("Stored artifact checksum mismatch");
+            return content;
+        } catch (java.io.IOException failure) { throw new IllegalStateException("Artifact retrieval failed", failure); }
+    }
+
     private static StoredObject verifyExisting(Path target, int expectedLength, String expectedSha256) throws java.io.IOException {
         byte[] persisted = Files.readAllBytes(target);
         String actual = ArtifactDigests.sha256(persisted);

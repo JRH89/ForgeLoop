@@ -788,7 +788,7 @@ The priority is reliable closed-loop execution rather than maximizing the number
 * [x] Docker Compose execution
 * [x] service health checks
 * [x] Playwright
-* [ ] screenshots
+* [x] browser screenshots captured from isolated Playwright output, checksummed, retained as typed evidence, and tenant-authorized for inline viewing
 * [x] independent verification agent
 * [x] acceptance-criteria review
 

@@ -18,12 +18,12 @@ class RunnerArtifactControllerTest {
         when(metadata.getStorageReference()).thenReturn("artifact://org/run/task/lease.json");
         when(metadata.getSha256()).thenReturn("a".repeat(64));
         when(metadata.getRetainUntil()).thenReturn("2026-10-23T00:00:00Z");
-        when(artifacts.upload("lease", "runner", "nonce", "application/json", "a".repeat(64), content)).thenReturn(metadata);
+        when(artifacts.upload("lease", "runner", "nonce", "application/json", "VERIFICATION_BUNDLE", "evidence.json", "a".repeat(64), content)).thenReturn(metadata);
 
         new RunnerArtifactController(runners, artifacts)
-                .upload("runner", "credential", "lease", "nonce", "a".repeat(64), content);
+                .upload("runner", "credential", "lease", "nonce", "a".repeat(64), "VERIFICATION_BUNDLE", "evidence.json", "application/json", content);
 
         verify(runners).authenticated("runner", "credential");
-        verify(artifacts).upload("lease", "runner", "nonce", "application/json", "a".repeat(64), content);
+        verify(artifacts).upload("lease", "runner", "nonce", "application/json", "VERIFICATION_BUNDLE", "evidence.json", "a".repeat(64), content);
     }
 }
