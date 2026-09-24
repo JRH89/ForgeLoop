@@ -14,10 +14,12 @@ import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.VerificationPolicySpec;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 
 class FeatureRunServiceTest {
-  private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections, audit);
+  private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class); private final PlatformConfigurationService platform=Mockito.mock(PlatformConfigurationService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections, audit, platform);
+  @BeforeEach void configurePlatform(){when(platform.policy()).thenReturn(new io.forgeloop.control.domain.OrganizationPolicy("local-development",100,4,List.of("anthropic"),true));when(platform.requireHarness(Mockito.anyString())).thenReturn(Mockito.mock(io.forgeloop.control.domain.HarnessDefinition.class));}
   @Test void submissionUsesConnectedRepositoryPolicy() {
     String image = "node@sha256:" + "a".repeat(64);
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of(

@@ -12,11 +12,13 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class FeatureRunService {
-  private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections; private final AuditLedgerService audit;
-  public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections, AuditLedgerService audit) { this.runs = runs; this.tasks = tasks; this.connections = connections; this.audit = audit; }
+  private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections; private final AuditLedgerService audit; private final PlatformConfigurationService platform;
+  public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections, AuditLedgerService audit, PlatformConfigurationService platform) { this.runs = runs; this.tasks = tasks; this.connections = connections; this.audit = audit; this.platform=platform; }
   @Transactional public FeatureRun submit(FeatureSubmission input) {
     if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
     RepositoryConnection connection = connections.requireEnabled(input.repository());
+    if(!platform.policy().permitsBudget(input.budgetUsd()))throw new IllegalArgumentException("Requested budget exceeds organization policy");
+    platform.requireHarness(connection.getHarnessProfile());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
     FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
