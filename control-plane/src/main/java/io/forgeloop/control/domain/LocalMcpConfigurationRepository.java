@@ -1,0 +1,1 @@
+package io.forgeloop.control.domain;import java.util.*;import org.springframework.data.jpa.repository.JpaRepository;public interface LocalMcpConfigurationRepository extends JpaRepository<LocalMcpConfiguration,String>{List<LocalMcpConfiguration> findByOrganizationIdAndEnabledTrueOrderByNameAsc(String org);List<LocalMcpConfiguration> findByOrganizationIdOrderByNameAsc(String org);}

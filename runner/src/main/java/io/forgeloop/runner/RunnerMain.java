@@ -317,7 +317,8 @@ public final class RunnerMain {
         try {
             Path repository = checkout(client,identity,lease,repositoriesRoot,task.repository());
             Path worktree=new GitWorktreeManager().create(repository,checkoutRef(task,task.executionBaseRef()),task.id(),Path.of(workspaceRoot));
-            String context = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"));
+            String context = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"))
+                    + collectMcpOrFail(client, identity, lease, task, worktree);
             PlannerResult result = new PlannerWorker().execute(policy, new ProviderClientFactory().create(policy), task, context, lease.leaseId());
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
             events.info("TASK_COMPLETED","Validated task plan submitted");client.submitTaskPlan(identity, lease, result.plan());
@@ -399,7 +400,7 @@ public final class RunnerMain {
     private static void executeReviewTask(RunnerClient client,RunnerIdentity identity,RunnerTask task,String repositoriesRoot,String workspaceRoot,ProviderExecutionPolicy policy,Path leaseFile)throws Exception{
         if(task.dependencyChangeShas().isEmpty())throw new IllegalArgumentException("Review task has no integrated dependency");
         RunnerLease lease=client.claimTask(identity,task.id());new RunnerLeaseStore().save(leaseFile,lease);Path repository=checkout(client,identity,lease,repositoriesRoot,task.repository());Path worktree=new GitWorktreeManager().create(repository,task.dependencyChangeShas().getLast(),task.id(),Path.of(workspaceRoot));client.acknowledgeLease(identity,lease.leaseId(),lease.nonce());RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);events.info("LEASE_ACKNOWLEDGED","Review lease acknowledged");events.info("EXECUTION_STARTED","Independent review started");
-        try{String diff=new GitWorktreeManager().boundedDiff(worktree,task.baseBranch());ReviewResult result=new ReviewWorker().execute(policy,new ProviderClientFactory().create(policy),task,diff,lease.leaseId());client.recordReviewEvidence(identity,lease,result);client.recordProviderAttempt(identity,lease,ProviderAttemptReport.succeeded(result.usage()));events.info(result.approved()?"TASK_COMPLETED":"TASK_FAILED",result.approved()?"Independent review passed":"Independent review rejected the change");client.completeLease(identity,lease.leaseId(),lease.nonce(),result.approved());if(!result.approved())throw new IllegalStateException("Independent review rejected the integrated change: "+result.summary());System.out.println("Independent review passed.");}
+        try{String diff=new GitWorktreeManager().boundedDiff(worktree,task.baseBranch());RunnerTask contextualTask=withAdditionalContext(task,collectMcpOrFail(client,identity,lease,task,worktree));ReviewResult result=new ReviewWorker().execute(policy,new ProviderClientFactory().create(policy),contextualTask,diff,lease.leaseId());client.recordReviewEvidence(identity,lease,result);client.recordProviderAttempt(identity,lease,ProviderAttemptReport.succeeded(result.usage()));events.info(result.approved()?"TASK_COMPLETED":"TASK_FAILED",result.approved()?"Independent review passed":"Independent review rejected the change");client.completeLease(identity,lease.leaseId(),lease.nonce(),result.approved());if(!result.approved())throw new IllegalStateException("Independent review rejected the integrated change: "+result.summary());System.out.println("Independent review passed.");}
         catch(ProviderExecutionFailure failure){client.recordProviderAttempt(identity,lease,ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy,failure,lease.leaseId())));client.completeLease(identity,lease.leaseId(),lease.nonce(),false);throw failure;}
         catch(GuardedPatchFailure invalid){client.recordProviderAttempt(identity,lease,ProviderAttemptReport.rejected(invalid.usage(),invalid.category()));client.completeLease(identity,lease.leaseId(),lease.nonce(),false);throw invalid;}
     }
@@ -418,8 +419,10 @@ public final class RunnerMain {
         RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);events.info("LEASE_ACKNOWLEDGED","Implementation lease acknowledged");events.info("EXECUTION_STARTED","Guarded implementation started");
         GuardedPatchResult result;
         try {
+            RunnerTask contextualTask = withAdditionalContext(task,
+                    collectMcpOrFail(client, identity, lease, task, worktree));
             result = new GuardedPatchWorker().execute(policy, new ProviderClientFactory().create(policy), task.role(),
-                    task.title(), task.specification(), worktree, List.of(allowedPrefixes.split(",")), lease.leaseId());
+                    task.title(), contextualTask.specification(), worktree, List.of(allowedPrefixes.split(",")), lease.leaseId());
         } catch (ProviderExecutionFailure failure) {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
@@ -458,6 +461,26 @@ public final class RunnerMain {
     }
     private static Path checkout(RunnerClient client,RunnerIdentity identity,RunnerLease lease,String repositoriesRoot,String expectedRepository)throws Exception{GithubCheckoutGrant grant=client.issueGithubCheckoutGrant(identity,lease);if(!expectedRepository.equals(grant.repository()))throw new IllegalStateException("Checkout grant repository mismatch");return new RepositoryWorkspaceResolver().resolveOrClone(Path.of(repositoriesRoot),grant);}
     private static String checkoutRef(RunnerTask task,String requested){return task.baseBranch().equals(requested)?"refs/remotes/origin/"+task.baseBranch():requested;}
+
+    private static RunnerTask withAdditionalContext(RunnerTask task, String context) {
+        if (context == null || context.isBlank()) return task;
+        return new RunnerTask(task.id(), task.role(), task.title(), task.repository(), task.baseBranch(), task.sourceRef(),
+                task.specification() + context, task.requiredCapability(), task.budgetUsd(), task.ownedPaths(),
+                task.dependencyChangeShas(), task.verificationGateName(), task.verificationKind(),
+                task.verificationImageDigest(), task.verificationCommand(), task.verificationNetworkPolicy(),
+                task.verificationTimeoutSeconds(), task.verificationBaseRef(), task.executionBaseRef(),
+                task.acceptanceCriteria(), task.mcpConfigurations());
+    }
+
+    private static String collectMcpOrFail(RunnerClient client, RunnerIdentity identity, RunnerLease lease,
+                                           RunnerTask task, Path worktree) throws Exception {
+        try {
+            return new LocalMcpContextClient().collect(task.mcpConfigurations(), worktree);
+        } catch (Exception failure) {
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
+        }
+    }
 
     private static void removeWorktree(String[] arguments) throws Exception {
         if (arguments.length != 4) throw new IllegalArgumentException("Usage: remove-worktree <repository-path> <task-id> <workspace-root>");

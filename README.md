@@ -51,7 +51,7 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] Repository-policy-selected verification orchestration with server-created gate tasks, image/argv/network/timeout snapshots, criterion coverage, and bounded verification repair retries.
 - [x] Lease-bound, checksummed artifact upload through filesystem and S3-compatible storage backends, with read-after-write verification, retention metadata, and operator-console visibility.
 - [x] Lease-bound automatic GitHub clone/refresh using short-lived installation credentials kept out of arguments and logs.
-- [ ] Local MCP processes.
+- [x] Runner-local MCP stdio processes use organization-managed task routing plus a runner-owned command allowlist, bounded time and context, and no cloud-side process execution.
 - [x] Lease-authenticated, redacted runner lifecycle events with idempotent sequence handling and a durable near-real-time operator timeline.
 - [x] Runner-local Anthropic, OpenAI, Gemini, and local-model adapters; role/model policy; bounded retries; strict patch validation; guarded code-producing workers; and redacted token/cost/outcome persistence.
 - [x] Strict planner output, bounded task-DAG scheduling, dependency/path conflict enforcement, parallel-ready dispatch, deterministic integration, and task-owned bounded repair routing.
@@ -794,9 +794,9 @@ The priority is reliable closed-loop execution rather than maximizing the number
 
 ### Phase 6: Harness Platform
 
-* [ ] reusable harness definitions
-* [ ] organization rules
-* [ ] MCP configuration
+* [x] reusable harness definitions
+* [x] organization execution policies
+* [x] runner-local MCP configuration and task context routing
 * [x] per-agent tool permissions
 * [x] multiple model providers
 * [x] runner-managed BYOK

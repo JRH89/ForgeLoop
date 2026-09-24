@@ -1,0 +1,3 @@
+package io.forgeloop.control.api;
+import io.forgeloop.control.application.PlatformConfigurationService;import io.forgeloop.control.domain.*;import java.util.*;import org.springframework.graphql.data.method.annotation.SchemaMapping;import org.springframework.stereotype.Controller;
+@Controller public class TaskMcpController{private final PlatformConfigurationService platform;public TaskMcpController(PlatformConfigurationService platform){this.platform=platform;}@SchemaMapping(typeName="Task",field="mcpConfigurations")public List<LocalMcpConfiguration> configurations(DeliveryTask task){return platform.taskMcp(task.getRun().getOrganizationId(),task.getExecutionRole());}}

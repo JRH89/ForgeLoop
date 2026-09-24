@@ -1,0 +1,1 @@
+package io.forgeloop.control.domain;import java.util.*;import org.springframework.data.jpa.repository.JpaRepository;public interface HarnessDefinitionRepository extends JpaRepository<HarnessDefinition,String>{Optional<HarnessDefinition> findByOrganizationIdAndName(String org,String name);List<HarnessDefinition> findByOrganizationIdOrderByNameAsc(String org);}
