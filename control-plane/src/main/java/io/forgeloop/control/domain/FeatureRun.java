@@ -44,6 +44,8 @@ public class FeatureRun {
   public void cancel(){if(state==RunState.COMPLETE||state==RunState.CANCELLED)throw new IllegalStateException("Run is already terminal");tasks.forEach(DeliveryTask::hold);state=RunState.CANCELLED;}
   /** Records the human release decision separately from automated verification. */
   public void approve(String actor){if(state!=RunState.READY_FOR_REVIEW)throw new IllegalStateException("Only a verified run can be approved");if(approvedAt!=null)return;if(actor==null||actor.isBlank())throw new IllegalArgumentException("Approver is required");approvedAt=Instant.now();approvedBy=actor;}
+  /** Completes delivery only after GitHub confirms the expected commit was merged. */
+  public void completeDelivery(){if(state!=RunState.READY_FOR_REVIEW&&state!=RunState.PR_OPEN)throw new IllegalStateException("Run is not awaiting delivery");if(!isApproved())throw new IllegalStateException("Run is not approved");state=RunState.COMPLETE;}
   public void resumeAfterRetry(DeliveryTask task){if(state!=RunState.BLOCKED&&state!=RunState.FAILED)throw new IllegalStateException("Run is not blocked");if(task.getRun()!=this)throw new IllegalArgumentException("Retry task does not belong to run");state="PLANNER".equals(task.getRole())?RunState.PLANNING:RunState.EXECUTING;approvedAt=null;approvedBy=null;}
   public long getSpentCostMicros(){return tasks.stream().mapToLong(DeliveryTask::getSpentCostMicros).sum();}
   public boolean hasBudgetRemaining(){return getSpentCostMicros()<Math.round(budgetUsd*1_000_000d);}

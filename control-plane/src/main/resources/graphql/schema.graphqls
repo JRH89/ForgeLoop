@@ -10,7 +10,7 @@ input PlannedTaskInput { key: String!, role: String!, title: String!, requiredCa
 input SubmitFeatureInput { repository: String!, sourceRef: String!, title: String!, specification: String!, budgetUsd: Float! }
 input ConnectRepositoryInput { repository: String!, installationId: Float!, defaultBranch: String!, issueLabel: String!, harnessProfile: String!, requiredGates: [String!]!, maxBudgetUsd: Float! }
 input RegisterRunnerInput { token: String!, name: String!, version: String!, capabilities: [String!]! }
-input OrganizationPolicyInput { maxRunBudgetUsd: Float!, maxParallelTasks: Int!, allowedProviders: [String!]!, requireHumanApproval: Boolean! }
+input OrganizationPolicyInput { maxRunBudgetUsd: Float!, maxParallelTasks: Int!, allowedProviders: [String!]!, requireHumanApproval: Boolean!, autoMergeEnabled: Boolean! }
 input HarnessDefinitionInput { name: String!, description: String!, allowedRoles: [String!]!, defaultAttemptBudget: Int! }
 input LocalMcpConfigurationInput { name: String!, command: String!, arguments: [String!]!, allowedRoles: [String!]!, contextTool: String!, toolArguments: String! }
 enum RunState { RECEIVED VALIDATING PLANNING QUEUED EXECUTING INTEGRATING VERIFYING REVIEWING READY_FOR_REVIEW PR_OPEN COMPLETE REJECTED BLOCKED CANCELLED FAILED }
@@ -24,7 +24,7 @@ type RunnerEnrollment { runner: Runner!, credential: String! }
 type OrganizationMembership { id: ID!, subject: String!, role: OperatorRole! }
 type OperatorSession { subject: String!, organizationId: String!, role: OperatorRole! }
 type AuditLedgerEntry { id: ID!, actor: String!, action: String!, resourceType: String!, resourceId: String!, payloadDigest: String!, occurredAt: String! }
-type GithubPublication { id: ID!, featureRunId: ID!, repository: String!, branch: String!, idempotencyKey: String!, headSha: String, checkRunId: Float, pullRequestNumber: Float, deliveredAt: String }
+type GithubPublication { id: ID!, featureRunId: ID!, repository: String!, branch: String!, idempotencyKey: String!, headSha: String, checkRunId: Float, pullRequestNumber: Float, deliveredAt: String, autoMergeRequested: Boolean!, mergedAt: String, mergeSha: String }
 type TaskLease { id: ID!, taskId: ID!, runnerId: ID!, expiresAt: String!, acknowledged: Boolean!, completed: Boolean! }
 type LeaseGrant { lease: TaskLease!, nonce: String! }
 type GithubPushGrant { repository: String!, branch: String!, expectedHeadSha: String, token: String! }
@@ -42,6 +42,6 @@ type RunnerEvent { id: ID!, runId: ID!, taskId: ID!, runnerId: ID!, leaseId: ID!
 type HumanEscalation { id: ID!, runId: ID!, taskId: ID, reason: String!, severity: String!, status: String!, summary: String!, createdAt: String!, acknowledgedAt: String, acknowledgedBy: String, resolvedAt: String, resolvedBy: String }
 type RunAnalytics { totalRuns: Float!, activeRuns: Float!, deliveredRuns: Float!, providerRequests: Float!, inputTokens: Float!, outputTokens: Float!, knownCostMicros: Float!, costCoverage: Float!, modelComparisons: [RunComparison!]!, harnessComparisons: [RunComparison!]! }
 type RunComparison { dimension: String!, name: String!, runCount: Float!, requestCount: Float!, successfulRequests: Float!, inputTokens: Float!, outputTokens: Float!, knownCostMicros: Float! }
-type OrganizationPolicy { organizationId: ID!, maxRunBudgetUsd: Float!, maxParallelTasks: Int!, allowedProviders: [String!]!, requireHumanApproval: Boolean!, revision: Int! }
+type OrganizationPolicy { organizationId: ID!, maxRunBudgetUsd: Float!, maxParallelTasks: Int!, allowedProviders: [String!]!, requireHumanApproval: Boolean!, autoMergeEnabled: Boolean!, revision: Int! }
 type HarnessDefinition { id: ID!, organizationId: ID!, name: String!, description: String!, allowedRoles: [String!]!, defaultAttemptBudget: Int!, enabled: Boolean!, revision: Int! }
 type LocalMcpConfiguration { id: ID!, name: String!, command: String!, arguments: [String!]!, allowedRoles: [String!]!, contextTool: String!, toolArguments: String!, enabled: Boolean!, revision: Int! }

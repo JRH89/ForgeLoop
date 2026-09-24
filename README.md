@@ -68,7 +68,7 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] GitHub App installation entry point; operators are redirected to the configured GitHub App rather than asked to enter an installation ID.
 - [x] Signed, short-lived GitHub App callback state binds an installation to the initiating ForgeLoop organization before repository synchronization.
 - [x] Signed GitHub App `installation_repositories` delivery synchronizes newly installed repositories into a conservative, configurable default policy without accepting a typed installation ID.
-- [x] GitHub App JWT signing, short-lived installation-token exchange, idempotent branch/file/check-run/draft-PR delivery records, and transient GitHub API retry handling.
+- [x] GitHub App JWT signing, short-lived installation-token exchange, idempotent branch/check/PR delivery records, transient GitHub API retry handling, and opt-in expected-SHA auto-merge after all checks pass.
 - [x] Live GitHub App credential validation, installation-token repository discovery, installation reconciliation, and signed GitHub Issue intake verified against the separate Ticketly repository.
 - [x] Runner-produced verified changes wired into GitHub delivery, including a live draft-PR/check-run proof.
 - [x] Ticketly end-to-end issue-to-verified-PR proof.
@@ -551,9 +551,7 @@ A successful run becomes:
 READY FOR HUMAN REVIEW
 ```
 
-ForgeLoop does not need to automatically merge autonomous changes to provide autonomous engineering.
-
-Humans retain the final merge boundary.
+Auto-merge is disabled by default, so humans retain the final merge boundary. An organization administrator can opt in after validating branch protection and GitHub App permissions. The opt-in still requires ForgeLoop verification and the configured approval boundary, and it merges only when GitHub reports all checks successful and the PR head matches the reviewed commit.
 
 ## Reusable Harnesses
 

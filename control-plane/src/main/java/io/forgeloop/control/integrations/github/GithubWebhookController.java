@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /** Accepts only signed GitHub App deliveries and derives intake only from connected installed repositories. */
 @RestController
@@ -29,21 +30,29 @@ public class GithubWebhookController {
     private final RepositoryConnectionRepository connections;
     private final GithubInstallationRepository installationOwners;
     private final GithubInstallationRepositorySyncService installations;
+    private final GithubAutoMergeService autoMerge;
     private final ObjectMapper json;
     private final String secret;
 
-    public GithubWebhookController(GithubWebhookVerifier verifier, GithubDeliveryRepository deliveries, FeatureRunService runs,
+    @Autowired public GithubWebhookController(GithubWebhookVerifier verifier, GithubDeliveryRepository deliveries, FeatureRunService runs,
                                    RepositoryConnectionRepository connections, GithubInstallationRepository installationOwners,
                                    GithubInstallationRepositorySyncService installations,
-                                   ObjectMapper json, @Value("${forgeloop.github.webhook-secret:}") String secret) {
+                                   GithubAutoMergeService autoMerge, ObjectMapper json, @Value("${forgeloop.github.webhook-secret:}") String secret) {
         this.verifier = verifier;
         this.deliveries = deliveries;
         this.runs = runs;
         this.connections = connections;
         this.installationOwners = installationOwners;
         this.installations = installations;
+        this.autoMerge = autoMerge;
         this.json = json;
         this.secret = secret;
+    }
+
+    GithubWebhookController(GithubWebhookVerifier verifier, GithubDeliveryRepository deliveries, FeatureRunService runs,
+                            RepositoryConnectionRepository connections, GithubInstallationRepository installationOwners,
+                            GithubInstallationRepositorySyncService installations, ObjectMapper json, String secret) {
+        this(verifier, deliveries, runs, connections, installationOwners, installations, null, json, secret);
     }
 
     @PostMapping("/webhooks")
@@ -67,6 +76,10 @@ public class GithubWebhookController {
                 if (installationOwners.findByInstallationId(installationId).isPresent()) {
                     installations.synchronizeInstallation(installationId);
                 }
+            }
+            if (autoMerge != null && "completed".equals(payload.path("action").asText()) && ("check_run".equals(event) || "check_suite".equals(event))) {
+                JsonNode check = payload.path("check_run".equals(event) ? "check_run" : "check_suite");
+                autoMerge.reconcile(payload.path("repository").path("full_name").asText(), check.path("head_sha").asText(), payload.path("installation").path("id").asLong());
             }
         } catch (Exception exception) {
             throw new IllegalArgumentException("Invalid GitHub webhook payload", exception);
