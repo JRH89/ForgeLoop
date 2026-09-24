@@ -34,11 +34,33 @@ public final class ContainerVerificationExecutor {
             List<String> command,
             Duration timeout,
             boolean allowNetwork) throws IOException, InterruptedException {
+        Path temporaryEvidence = Files.createTempDirectory("forgeloop-verification-");
+        try {
+            return execute(worktree, dockerVisibleWorktree, temporaryEvidence, temporaryEvidence,
+                    image, command, timeout, allowNetwork);
+        } finally {
+            deleteRecursively(temporaryEvidence);
+        }
+    }
+
+    public VerificationResult execute(
+            Path worktree,
+            Path dockerVisibleWorktree,
+            Path evidenceDirectory,
+            Path dockerVisibleEvidenceDirectory,
+            String image,
+            List<String> command,
+            Duration timeout,
+            boolean allowNetwork) throws IOException, InterruptedException {
         validate(worktree, dockerVisibleWorktree, image, command, timeout);
+        Files.createDirectories(evidenceDirectory.resolve("test-results"));
+        Files.createDirectories(evidenceDirectory.resolve("playwright-report"));
 
         List<String> dockerCommand = new ArrayList<>(List.of(
                 "docker", "run", "--rm", "--init", "--read-only",
                 "--mount", "type=bind,src=" + dockerVisibleWorktree + ",dst=/source,readonly",
+                "--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("test-results") + ",dst=/workspace/test-results",
+                "--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("playwright-report") + ",dst=/workspace/playwright-report",
                 "--workdir", "/workspace",
                 "--tmpfs", "/tmp:rw,noexec,nosuid,size=128m",
                 "--tmpfs", "/workspace:rw,exec,nosuid,size=2g",
@@ -85,6 +107,13 @@ public final class ContainerVerificationExecutor {
                 new String(output, StandardCharsets.UTF_8),
                 startedAt,
                 Instant.now());
+    }
+
+    private static void deleteRecursively(Path directory) throws IOException {
+        if (!Files.exists(directory)) return;
+        try (var paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+        }
     }
 
     static byte[] readBounded(InputStream input, int limit) throws IOException {

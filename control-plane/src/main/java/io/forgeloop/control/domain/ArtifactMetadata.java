@@ -16,9 +16,11 @@ public class ArtifactMetadata {
     @Column(nullable = false) private String organizationId;
     @Column(nullable = false) private String runId;
     @Column(nullable = false) private String taskId;
-    @Column(nullable = false, unique = true) private String leaseId;
+    @Column(nullable = false) private String leaseId;
     @Column(nullable = false, unique = true, length = 1000) private String storageReference;
     @Column(nullable = false) private String contentType;
+    @Column(nullable = false, length = 40) private String artifactType;
+    @Column(nullable = false, length = 160) private String displayName;
     @Column(nullable = false) private long sizeBytes;
     @Column(nullable = false, length = 64) private String sha256;
     @Column(nullable = false) private String retentionClass;
@@ -27,9 +29,11 @@ public class ArtifactMetadata {
 
     protected ArtifactMetadata() { }
     public ArtifactMetadata(DeliveryTask task, String leaseId, String storageReference, String contentType,
+                            String artifactType, String displayName,
                             long sizeBytes, String sha256, Instant retainUntil) {
         this.organizationId = task.getRun().getOrganizationId(); this.runId = task.getRun().getId(); this.taskId = task.getId();
         this.leaseId = leaseId; this.storageReference = storageReference; this.contentType = contentType;
+        this.artifactType = artifactType; this.displayName = displayName;
         this.sizeBytes = sizeBytes; this.sha256 = sha256; this.retentionClass = "EVIDENCE";
         this.retainUntil = retainUntil; this.createdAt = Instant.now();
     }
@@ -37,6 +41,7 @@ public class ArtifactMetadata {
     public String getRunId() { return runId; } public String getTaskId() { return taskId; }
     public String getLeaseId() { return leaseId; } public String getStorageReference() { return storageReference; }
     public String getContentType() { return contentType; } public long getSizeBytes() { return sizeBytes; }
+    public String getArtifactType() { return artifactType; } public String getDisplayName() { return displayName; }
     public String getSha256() { return sha256; } public String getRetentionClass() { return retentionClass; }
     public String getRetainUntil() { return retainUntil.toString(); } public String getCreatedAt() { return createdAt.toString(); }
 }

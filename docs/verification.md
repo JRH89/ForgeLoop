@@ -6,6 +6,12 @@ Required gates are selected per repository by its versioned `RepositoryPolicy` o
 2. Frontend unit tests, lint, TypeScript check, and production build (`npm run check`).
 3. GraphQL contract scenario: valid in-organization assignment persists and emits an audit event.
 4. Authorization scenario: cross-organization assignment is rejected by the server.
+
+## Browser screenshot evidence
+
+Browser verification containers write Playwright's default `test-results` and `playwright-report` directories to a dedicated evidence mount outside the disposable source copy. The runner accepts at most ten PNG files per gate, verifies their signatures, limits each file to 1 MiB, computes SHA-256, and uploads each through the active lease. The control plane independently checks the content type, PNG signature, size, digest, tenant, and immutable storage key.
+
+Artifacts are listed through `featureRunArtifacts`; screenshot rows use `artifactType: SCREENSHOT`. An authenticated operator in the owning organization can view one at `/api/artifacts/{artifactId}`. Retrieval revalidates the persisted object checksum before returning it inline. Other organizations receive no artifact data.
 5. Container health: API actuator and PostgreSQL health checks are healthy.
 6. Browser scenario: an admin sees an assignment change and a non-admin cannot submit it.
 7. Acceptance-criteria review, with one evidence item per criterion.

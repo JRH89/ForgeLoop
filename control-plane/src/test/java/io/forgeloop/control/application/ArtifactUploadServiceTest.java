@@ -39,13 +39,13 @@ class ArtifactUploadServiceTest {
         when(task.getId()).thenReturn("task");
         when(run.getOrganizationId()).thenReturn("org");
         when(run.getId()).thenReturn("run");
-        when(store.putVerified("org/run/task/lease.json", content, "application/json", digest))
+        when(store.putVerified("org/run/task/lease/evidence.json", content, "application/json", digest))
                 .thenReturn(new ArtifactStore.StoredObject(content.length, digest));
         when(metadata.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ArtifactMetadata result = service.upload("lease", "runner", "nonce", "application/json", digest, content);
+        ArtifactMetadata result = service.upload("lease", "runner", "nonce", "application/json", "VERIFICATION_BUNDLE", "evidence.json", digest, content);
 
-        assertEquals("artifact://org/run/task/lease.json", result.getStorageReference());
+        assertEquals("artifact://org/run/task/lease/evidence.json", result.getStorageReference());
         assertEquals(digest, result.getSha256());
         verify(metadata).save(any(ArtifactMetadata.class));
     }
@@ -55,11 +55,11 @@ class ArtifactUploadServiceTest {
         String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
         ArtifactMetadata existing = mock(ArtifactMetadata.class);
         when(leases.requireActiveTaskId("lease", "runner", "nonce")).thenReturn("task");
-        when(metadata.findByLeaseId("lease")).thenReturn(Optional.of(existing));
+        when(metadata.findByLeaseIdAndDisplayName("lease", "evidence.json")).thenReturn(Optional.of(existing));
         when(existing.getSha256()).thenReturn(digest);
         when(existing.getSizeBytes()).thenReturn((long) content.length);
 
-        assertSame(existing, service.upload("lease", "runner", "nonce", "application/json", digest, content));
+        assertSame(existing, service.upload("lease", "runner", "nonce", "application/json", "VERIFICATION_BUNDLE", "evidence.json", digest, content));
         verify(store, never()).putVerified(any(), any(), any(), any());
     }
 
@@ -68,7 +68,17 @@ class ArtifactUploadServiceTest {
         when(leases.requireActiveTaskId("lease", "runner", "nonce")).thenReturn("task");
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.upload("lease", "runner", "nonce", "application/json", "0".repeat(64), content));
+                () -> service.upload("lease", "runner", "nonce", "application/json", "VERIFICATION_BUNDLE", "evidence.json", "0".repeat(64), content));
+        verify(store, never()).putVerified(any(), any(), any(), any());
+    }
+
+    @Test void rejectsAClaimedScreenshotWithoutAPngSignature() throws Exception {
+        byte[] content = "not-png".getBytes(StandardCharsets.UTF_8);
+        String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+        when(leases.requireActiveTaskId("lease", "runner", "nonce")).thenReturn("task");
+
+        assertThrows(IllegalArgumentException.class, () -> service.upload("lease", "runner", "nonce",
+                "image/png", "SCREENSHOT", "screen.png", digest, content));
         verify(store, never()).putVerified(any(), any(), any(), any());
     }
 }

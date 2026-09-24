@@ -27,25 +27,36 @@ public class ArtifactUploadService {
         this.leases=leases;this.tasks=tasks;this.metadata=metadata;this.store=store;this.maxBytes=maxBytes;this.retentionDays=retentionDays;
     }
     @Transactional public ArtifactMetadata upload(String leaseId, String runnerId, String nonce, String contentType,
-                                                    String claimedSha256, byte[] content) {
+                                                    String artifactType, String displayName, String claimedSha256, byte[] content) {
         String taskId = leases.requireActiveTaskId(leaseId, runnerId, nonce);
         if (content == null || content.length == 0 || content.length > maxBytes) throw new IllegalArgumentException("Artifact size is outside policy bounds");
-        if (contentType == null || !contentType.matches("application/json(?:; charset=utf-8)?")) throw new IllegalArgumentException("Artifact content type is not allowed");
+        if (!java.util.Set.of("application/json", "image/png").contains(contentType)) throw new IllegalArgumentException("Artifact content type is not allowed");
+        if (!java.util.Set.of("VERIFICATION_BUNDLE", "SCREENSHOT").contains(artifactType)) throw new IllegalArgumentException("Artifact type is not allowed");
+        if (displayName == null || !displayName.matches("[A-Za-z0-9][A-Za-z0-9_.-]{0,159}")) throw new IllegalArgumentException("Artifact display name is invalid");
+        if ("SCREENSHOT".equals(artifactType) != "image/png".equals(contentType)) throw new IllegalArgumentException("Artifact type does not match its content type");
+        if ("image/png".equals(contentType) && !isPng(content)) throw new IllegalArgumentException("Screenshot is not a valid PNG payload");
         String actual = digest(content);
         if (claimedSha256 == null || !claimedSha256.matches("[0-9a-f]{64}") || !actual.equals(claimedSha256)) throw new IllegalArgumentException("Artifact checksum mismatch");
-        ArtifactMetadata existing = metadata.findByLeaseId(leaseId).orElse(null);
+        ArtifactMetadata existing = metadata.findByLeaseIdAndDisplayName(leaseId, displayName).orElse(null);
         if (existing != null) {
             if (!existing.getSha256().equals(claimedSha256) || existing.getSizeBytes() != content.length) throw new IllegalStateException("Lease artifact was already recorded with different content");
             return existing;
         }
         DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found"));
-        String key = task.getRun().getOrganizationId() + "/" + task.getRun().getId() + "/" + taskId + "/" + leaseId + ".json";
+        String key = task.getRun().getOrganizationId() + "/" + task.getRun().getId() + "/" + taskId + "/" + leaseId + "/" + displayName;
         ArtifactStore.StoredObject stored = store.putVerified(key, content, contentType, actual);
         String reference = "artifact://" + key;
-        return metadata.save(new ArtifactMetadata(task, leaseId, reference, contentType, stored.sizeBytes(), stored.sha256(), Instant.now().plus(Duration.ofDays(retentionDays))));
+        return metadata.save(new ArtifactMetadata(task, leaseId, reference, contentType, artifactType, displayName,
+                stored.sizeBytes(), stored.sha256(), Instant.now().plus(Duration.ofDays(retentionDays))));
     }
     private static String digest(byte[] content) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)); }
         catch (Exception failure) { throw new IllegalStateException("SHA-256 is unavailable", failure); }
+    }
+    private static boolean isPng(byte[] content) {
+        byte[] signature = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        if (content.length < signature.length) return false;
+        for (int index = 0; index < signature.length; index++) if (content[index] != signature[index]) return false;
+        return true;
     }
 }

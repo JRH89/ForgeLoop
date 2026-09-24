@@ -259,10 +259,12 @@ public final class RunnerMain {
         events.info("LEASE_ACKNOWLEDGED","Verification lease acknowledged");
         events.info("EXECUTION_STARTED","Policy verification started");
         try {
+            Path evidenceDirectory = Path.of(workspaceRoot).resolve("evidence").resolve(task.id());
+            Files.createDirectories(evidenceDirectory);
             VerificationResult result = new ContainerVerificationExecutor().execute(worktree, dockerVisibleWorktree(worktree),
+                    evidenceDirectory, dockerVisibleWorktree(evidenceDirectory),
                     task.verificationImageDigest(), task.verificationCommand(), Duration.ofSeconds(task.verificationTimeoutSeconds()),
                     "EGRESS".equals(task.verificationNetworkPolicy()));
-            Path evidenceDirectory = Path.of(workspaceRoot).resolve("evidence").resolve(task.id());
             VerificationEvidenceReport localReport = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
                     task.verificationImageDigest(), task.verificationCommand(), result, null);
             EvidenceBundleWriter writer = new EvidenceBundleWriter();
@@ -271,6 +273,15 @@ public final class RunnerMain {
             byte[] artifactBytes = Files.readAllBytes(localArtifact);
             String artifactReference = client.uploadArtifact(identity, lease, artifactBytes, EvidenceDigests.sha256(artifactBytes));
             events.info("ARTIFACT_UPLOADED","Checksummed verification artifact uploaded");
+            if ("BROWSER".equals(task.verificationKind())) {
+                List<ScreenshotEvidenceCollector.Screenshot> screenshots = new ScreenshotEvidenceCollector().collect(evidenceDirectory);
+                for (ScreenshotEvidenceCollector.Screenshot screenshot : screenshots) {
+                    byte[] content = screenshot.content();
+                    client.uploadArtifact(identity, lease, content, EvidenceDigests.sha256(content),
+                            "image/png", "SCREENSHOT", screenshot.displayName());
+                }
+                if (!screenshots.isEmpty()) events.info("SCREENSHOTS_UPLOADED", "Browser screenshot evidence uploaded: " + screenshots.size());
+            }
             VerificationEvidenceReport report = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
                     task.verificationImageDigest(), task.verificationCommand(), result, artifactReference);
             writer.write(evidenceDirectory, report);
