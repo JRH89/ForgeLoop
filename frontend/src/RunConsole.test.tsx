@@ -11,6 +11,7 @@ function controlPlane(data: Record<string, unknown>) {
     if (query.includes('currentOperator')) return { ok: true, json: async () => ({ data: { currentOperator: { subject: 'operator', organizationId: 'local-development', role: 'ADMIN' } } }) };
     if (query.includes('repositoryConnections')) return { ok: true, json: async () => ({ data: { repositoryConnections: data.repositoryConnections ?? [] } }) };
     if (query.includes('runAnalytics')) return { ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) };
+    if (query.includes('organizationPolicy')) return { ok: true, json: async () => ({ data: { organizationPolicy: { organizationId: 'local-development', maxRunBudgetUsd: 100, maxParallelTasks: 4, allowedProviders: ['anthropic'], requireHumanApproval: true, revision: 2 }, harnessDefinitions: [{ id: 'h1', organizationId: 'local-development', name: 'FULL_STACK', description: 'Plan, implement, verify, and review', allowedRoles: ['PLANNER', 'BACKEND', 'FRONTEND', 'REVIEW'], defaultAttemptBudget: 2, enabled: true, revision: 1 }], localMcpConfigurations: [] } }) };
     return { ok: true, json: async () => ({ data: { featureRuns: data.featureRuns ?? [] } }) };
   });
 }
@@ -24,6 +25,17 @@ it('renders the real intake queue and role-aware creation flow', async () => {
   expect(screen.getByText('Start a delivery run')).toBeInTheDocument();
   expect(screen.getByLabelText('Authorized repository')).toBeInTheDocument();
   expect(screen.queryByText('Support Desk')).not.toBeInTheDocument();
+});
+
+it('shows persisted harness and runner-local MCP configuration', async () => {
+  vi.stubGlobal('fetch', controlPlane({ repositoryConnections: [] }));
+  render(<App />);
+  await screen.findByText('Intake queue');
+  fireEvent.click(screen.getByRole('button', { name: /Harness & policy/ }));
+  expect(await screen.findByText('Execution policy')).toBeInTheDocument();
+  expect(screen.getByText('FULL_STACK')).toBeInTheDocument();
+  expect(screen.getByText('No local MCP context routes configured.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Create harness' })).toBeInTheDocument();
 });
 
 it('keeps viewers read-only', async () => {
