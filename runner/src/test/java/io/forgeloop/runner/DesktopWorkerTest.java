@@ -27,6 +27,14 @@ class DesktopWorkerTest {
             worker.pause();deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();
             while(worker.running()&&System.nanoTime()<deadline)Thread.sleep(50);
             assertFalse(worker.running(),"Idle child should honor the graceful pause marker");
+            int before=requests.get();
+            worker.start(config,"fake-provider-key",line->{});
+            deadline=System.nanoTime()+java.time.Duration.ofSeconds(15).toNanos();
+            while(requests.get()<before+2&&System.nanoTime()<deadline)Thread.sleep(50);
+            assertTrue(requests.get()>=before+2,"Restart must remove the old pause marker and poll again");
+            worker.pause();deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();
+            while(worker.running()&&System.nanoTime()<deadline)Thread.sleep(50);
+            assertFalse(worker.running());
         } finally {worker.pause();server.stop(0);}
     }
 }

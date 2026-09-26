@@ -11,6 +11,12 @@ final class DesktopTheme {
         FlatDarkLaf.setup();
         UIManager.put("defaultFont", new Font(Font.SANS_SERIF, Font.PLAIN, 14));
         UIManager.put("Panel.background", new Color(0x101D2B));
+        for(String component:new String[]{"TextField","PasswordField","ComboBox","TabbedPane"})UIManager.put(component+".background",new Color(0x172A3D));
+        UIManager.put("Button.background",new Color(0x233B50));
+        UIManager.put("Button.disabledBackground",new Color(0x172A3D));
+        UIManager.put("TabbedPane.selectedBackground",new Color(0x1B3C42));
+        UIManager.put("TabbedPane.focusColor",new Color(0x37D9AF));
+        UIManager.put("Component.borderColor",new Color(0x345269));
         UIManager.put("TextArea.background", new Color(0x09131E));
         UIManager.put("Component.arc", 12);
         UIManager.put("Button.arc", 12);

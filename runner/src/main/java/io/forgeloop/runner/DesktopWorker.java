@@ -22,8 +22,10 @@ public final class DesktopWorker {
         for(String variable:List.of("ANTHROPIC_API_KEY","OPENAI_API_KEY","GEMINI_API_KEY"))builder.environment().remove(variable);
         builder.environment().put(config.keyVariable(),key);
         builder.environment().put("FORGELOOP_RUNNER_PAUSE_FILE",directory.resolve("pause").toString());
+        String credential=new RunnerIdentityStore().load(directory.resolve("identity")).credential();
         process=builder.start();Process child=process;
-        Thread.ofVirtual().start(()->{try(var reader=child.inputReader()){String line;while((line=reader.readLine())!=null)log.accept(line.replace(key,"[REDACTED]"));log.accept("Worker stopped. Exit code: "+child.waitFor());}catch(Exception ignored){log.accept("Worker log connection closed.");}});
+        Thread.ofVirtual().start(()->{try(var reader=child.inputReader()){String line;while((line=reader.readLine())!=null)log.accept(redact(line,key,credential));log.accept("Worker stopped. Exit code: "+child.waitFor());}catch(Exception ignored){log.accept("Worker log connection closed.");}});
     }
+    static String redact(String line,String key,String credential){return line.replace(key,"[REDACTED]").replace(credential,"[REDACTED]");}
     public synchronized void pause()throws Exception{if(running())Files.writeString(directory.resolve("pause"),"pause after current batch");}
 }
