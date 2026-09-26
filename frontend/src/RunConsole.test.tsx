@@ -24,10 +24,11 @@ it('separates archived runs and shows missing prices rather than zero cost',asyn
   ]}));
   render(<App/>);
   expect(await screen.findByText('Unpriced completed run')).toBeInTheDocument();
-  expect(screen.getByText('Cost unavailable — configure model pricing')).toBeInTheDocument();
+  expect(screen.getByText('N/A')).toHaveAttribute('title','Cost unavailable — configure model pricing');
   expect(screen.queryByText('Retained archive')).not.toBeInTheDocument();
   fireEvent.click(screen.getByLabelText('Show archived runs'));
   expect(screen.getByText('Retained archive')).toBeInTheDocument();
+  expect(screen.getByTitle('No usage recorded')).toHaveTextContent('N/A');
   expect(screen.getByRole('button',{name:'Restore'})).toBeInTheDocument();
 });
 

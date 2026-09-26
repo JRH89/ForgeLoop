@@ -44,9 +44,11 @@ import "./styles.css";
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
 const retryable = new Set(["FAILED", "HELD", "RETRYABLE_FAILURE"]);
 const money = (micros: number) => `$${(micros / 1_000_000).toFixed(micros > 0 && micros < 10000 ? 6 : 2)}`;
-const costSummary = (run:FeatureRun) => {
+const costSummary = (run:FeatureRun, compact = false) => {
   const attempts = run.tasks.flatMap(task=>task.providerAttempts??[]);
   const unknown = attempts.filter(attempt=>!attempt.costKnown).length;
+  // Keep queue cells short while retaining the full explanation in their tooltip.
+  if (compact && (attempts.length===0 || unknown===attempts.length)) return 'N/A';
   return attempts.length===0?'No usage recorded':unknown===attempts.length?'Cost unavailable — configure model pricing':`${money(run.spentCostMicros)} estimated${unknown?` + ${unknown} unpriced requests`:''}`;
 };
 const stamp = (value: string) =>
@@ -782,7 +784,7 @@ function RunsPage({
                       <td>{item.repository}</td>
                       <td><span className={`status ${displayedRunState(item).toLowerCase()}`}>{displayedRunState(item).replaceAll("_", " ")}</span></td>
                       <td><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
-                      <td>{costSummary(item)}</td>
+                      <td title={costSummary(item)}>{costSummary(item, true)}</td>
                       <td><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
                       <td>{operator.role!=='VIEWER'&&(item.archived||terminal.has(displayedRunState(item)))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
                     </tr>
