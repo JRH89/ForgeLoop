@@ -104,10 +104,22 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
   );
 }
 
-function AnalyticsPage({analytics}:{analytics?:RunAnalytics}){
+function AnalyticsPage({analytics:initialAnalytics}:{analytics?:RunAnalytics}){
+  const [analytics,setAnalytics]=useState(initialAnalytics);
+  const [status,setStatus]=useState('Refreshing analytics');
+  useEffect(()=>{
+    let stopped=false;
+    let timer:number;
+    async function refresh(){
+      try{const updated=await loadRunAnalytics();if(!stopped){setAnalytics(updated);setStatus(`Updated ${new Date().toLocaleTimeString()} · refreshes every 5 seconds`);}}
+      catch{if(!stopped)setStatus('Analytics updates interrupted. Showing last known data; retrying.');}
+      finally{if(!stopped)timer=window.setTimeout(()=>void refresh(),document.hidden?15000:5000);}
+    }
+    void refresh();return()=>{stopped=true;window.clearTimeout(timer);};
+  },[]);
   if(!analytics)return <p className="loading">Loading analytics…</p>;
   const table=(title:string,items:RunAnalytics["modelComparisons"])=><section className="panel"><h2>{title}</h2>{items.length?items.map(item=><div className="item" key={item.name}><div><b>{item.name}</b><small>{item.runCount} runs · {item.requestCount} requests · {item.successfulRequests} succeeded · {(item.inputTokens+item.outputTokens).toLocaleString()} tokens</small></div><span>{money(item.knownCostMicros)}</span></div>):<p className="empty">No comparison data recorded yet.</p>}</section>;
-  return <><section className="hero"><p className="eyebrow">Measured delivery</p><h1>Run analytics</h1><p>Tenant-scoped facts from persisted provider telemetry—never fabricated estimates.</p></section><section className="metrics analytics-metrics"><article><b>{analytics.totalRuns}</b><span>Total runs</span></article><article><b>{analytics.activeRuns}</b><span>Active runs</span></article><article><b>{analytics.deliveredRuns}</b><span>Delivered runs</span></article><article><b>{analytics.providerRequests}</b><span>Provider requests</span></article><article><b>{money(analytics.knownCostMicros)}</b><span>Known cost · {Math.round(analytics.costCoverage*100)}% coverage</span></article></section><div className="two-column">{table("Model comparison",analytics.modelComparisons)}{table("Harness comparison",analytics.harnessComparisons)}</div></>;
+  return <><section className="hero"><p className="eyebrow">Measured delivery</p><h1>Run analytics</h1><p role="status">{status}</p><p>Tenant-scoped facts from persisted provider telemetry—never fabricated estimates.</p></section><section className="metrics analytics-metrics"><article><b>{analytics.totalRuns}</b><span>Total runs</span></article><article><b>{analytics.activeRuns}</b><span>Active runs</span></article><article><b>{analytics.deliveredRuns}</b><span>Delivered runs</span></article><article><b>{analytics.providerRequests}</b><span>Provider requests</span></article><article><b>{analytics.costCoverage===0?"Unpriced":money(analytics.knownCostMicros)}</b><span>Known cost · {Math.round(analytics.costCoverage*100)}% coverage</span></article></section><div className="two-column">{table("Model comparison",analytics.modelComparisons)}{table("Harness comparison",analytics.harnessComparisons)}</div></>;
 }
 
 function NewRun({

@@ -1,0 +1,9 @@
+# Defense in depth if an operator extracts the package inside a Git checkout.
+identity
+provider-key.xml
+provider-policy.json
+runner-config.json
+worker.lock
+repositories/
+worktrees/
+leases/
