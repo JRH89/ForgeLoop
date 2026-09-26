@@ -10,14 +10,16 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
   short expiry, single-use exchange, organization isolation, no credentials in URLs.
   Disposable-stack integration passed locally and in CI, including actual
   PostgreSQL persistence, enrollment heartbeat, and replay rejection.
-- [ ] Desktop setup: bundled Java, prerequisite checks, secure native credential
+- [x] Desktop setup: bundled Java, prerequisite checks, secure native credential
   storage, provider/model selection and editable dated price estimates.
-- [ ] Lifecycle: explicit paid-work consent, start, graceful pause, status, redacted
+- [x] Lifecycle implementation and automated checks: explicit paid-work consent, start, graceful pause, status, redacted
   logs, single-instance protection, configuration and optional login startup.
-- [ ] Distribution: Windows/macOS/Linux native build matrix, checksums, installer
-  smoke tests, signed release/update trust policy and dashboard downloads.
-- [ ] Guide and verification: first-install walkthrough and recovery coverage;
+- [x] Development distribution: Windows/macOS/Linux native build matrix, checksums,
+  installed-runtime smoke tests and gated dashboard downloads.
+- [x] Guide and automated verification: first-install walkthrough and recovery coverage;
   distinguish tested operating systems from merely buildable packages.
+- [ ] Public release: signing/notarization, publication approval, signed install/update
+  validation and real login/reboot startup validation on supported operating systems.
 
 Implementation: three-step native Swing shell, OS credential adapters, explicit worker start,
 batch-draining pause, bounded redacted logs, per-user single-instance lock, and
