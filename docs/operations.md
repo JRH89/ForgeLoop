@@ -2,6 +2,17 @@
 
 ## Environments
 
+Compose mounts the named `forgeloop-postgres-data` volume at PostgreSQL 18's
+`/var/lib/postgresql` directory. `FORGELOOP_POSTGRES_VOLUME` can select a recovered
+volume. Container recreation retains this data; `docker compose down --volumes`
+deletes managed volumes and must not be used on a deployment with valuable data.
+Back up before changing volume selection. An older anonymous volume can be
+recovered by copying it while its database is stopped, validating that copy in
+an isolated PostgreSQL container, and selecting the recovered named volume.
+
+On 2026-09-26, the workstation database was recovered from its retained anonymous
+volume: 10 runs and two repository connections. The original volumes were retained.
+
 Docker Compose defaults to `FORGELOOP_SECURITY_MODE=github`, which protects the browser console with GitHub OAuth and persisted organization membership. Use `development` only for isolated local tests; it permits operator routes without a user identity and must never be exposed through the tunnel.
 
 The `production` security mode retains GitHub browser sessions and additionally accepts JWTs validated by Spring Security's OIDC resource server. Configure both `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` and `FORGELOOP_OIDC_AUDIENCE` through a secret manager before selecting it. The validated `org_id` claim must match a persisted organization membership; roles come only from that membership, never from caller-supplied GraphQL input. Health probes and signed GitHub webhooks bypass operator authentication because they have separate security boundaries.
