@@ -27,7 +27,10 @@ Connecting, saving settings, and checking prerequisites do not call a model.
 
 **Pause after current work** allows the active batch to complete before stopping
 new work. It is not an emergency cancellation and active calls can still cost
-money. The app refuses to close while work or setup is active. Start resumes the
+money. Optional **Start work at sign-in** is explicit consent to automatic paid
+work on future sign-ins; Docker must also start, and your keyring must be unlocked.
+Uncheck it and save to remove the app-managed login hook. Setup does not start work
+immediately. The app refuses to close while work or setup is active. Start resumes the
 same identity. The log pane is bounded and does not persist raw logs to disk.
 
 State lives in the private `~/.forgeloop/desktop-runner` directory, outside the
@@ -59,5 +62,5 @@ calls use [JNA](https://github.com/java-native-access/jna). Sonnet defaults refe
 
 Still required before public release: platform GUI/keychain validation, signed
 Windows packages, Apple Developer signing/notarization, trusted checksums and
-release hosting, dashboard-native downloads, startup integration, and a verified
+release hosting, dashboard-native downloads, OS login validation, and a verified
 update flow. Do not bypass OS security warnings to market this as production-ready.

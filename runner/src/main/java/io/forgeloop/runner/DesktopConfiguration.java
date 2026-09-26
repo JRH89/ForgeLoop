@@ -5,7 +5,8 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 /** Serializable settings deliberately exclude provider keys and pairing proofs. */
-public record DesktopConfiguration(String endpoint,String provider,String model,BigDecimal inputUsdPerMillion,BigDecimal outputUsdPerMillion) {
+public record DesktopConfiguration(String endpoint,String provider,String model,BigDecimal inputUsdPerMillion,BigDecimal outputUsdPerMillion,boolean startAtLogin) {
+    public DesktopConfiguration(String endpoint,String provider,String model,BigDecimal inputUsdPerMillion,BigDecimal outputUsdPerMillion){this(endpoint,provider,model,inputUsdPerMillion,outputUsdPerMillion,false);}
     public DesktopConfiguration {
         PairingRequest.validateEndpoint(URI.create(endpoint));
         if(!Map.of("anthropic","ANTHROPIC_API_KEY","openai","OPENAI_API_KEY","gemini","GEMINI_API_KEY").containsKey(provider))throw new IllegalArgumentException("Select a supported provider");

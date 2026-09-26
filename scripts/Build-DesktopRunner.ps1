@@ -1,6 +1,7 @@
 param(
     [ValidateSet('app-image','msi','dmg','deb')][string]$PackageType='app-image',
-    [string]$OutputDirectory='artifacts/desktop-runner'
+    [string]$OutputDirectory='artifacts/desktop-runner',
+    [string]$PackageVersion='1.0.0'
 )
 $ErrorActionPreference='Stop'
 # Native packages are built on their target OS. jlink retains java for the worker child JVM.
@@ -17,7 +18,9 @@ Copy-Item -LiteralPath $jar -Destination (Join-Path $inputDirectory 'runner.jar'
 $runtime=Join-Path $output 'runtime'
 & jlink --add-modules java.base,java.desktop,java.net.http,java.logging,java.management,java.naming,java.security.jgss,java.instrument,jdk.unsupported,jdk.crypto.ec --strip-debug --no-header-files --no-man-pages --output $runtime
 if ($LASTEXITCODE -ne 0) { throw 'Runtime build failed' }
-$arguments=@('--type',$PackageType,'--name','ForgeLoop Runner','--app-version','0.1.0','--vendor','Hooker Hill Studios','--description','Self-hosted ForgeLoop runner','--input',$inputDirectory,'--main-jar','runner.jar','--main-class','io.forgeloop.runner.DesktopRunner','--runtime-image',$runtime,'--dest',(Join-Path $output 'packages'))
+# Apple's CFBundleVersion requires a positive first component. Installer revision
+# is independent of the runner protocol version and is not a production-readiness claim.
+$arguments=@('--type',$PackageType,'--name','ForgeLoop Runner','--app-version',$PackageVersion,'--vendor','Hooker Hill Studios','--description','Self-hosted ForgeLoop runner (development preview)','--input',$inputDirectory,'--main-jar','runner.jar','--main-class','io.forgeloop.runner.DesktopRunner','--runtime-image',$runtime,'--dest',(Join-Path $output 'packages'))
 if ($PackageType -eq 'msi') { $arguments+=@('--win-per-user-install','--win-menu','--win-shortcut','--win-dir-chooser') }
 if ($PackageType -eq 'dmg') { $arguments+=@('--mac-package-identifier','io.forgeloop.runner') }
 if ($PackageType -eq 'deb') { $arguments+=@('--linux-shortcut','--linux-package-name','forgeloop-runner','--linux-deb-maintainer','support@hookerhillstudios.com') }
