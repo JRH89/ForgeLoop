@@ -107,6 +107,7 @@ public final class RunnerClient {
     public void recordEvent(RunnerIdentity identity,RunnerLease lease,long sequence,String level,String type,String message)throws Exception{
         String body=JSON.writeValueAsString(java.util.Map.of("sequence",sequence,"level",level,"eventType",type,"message",message,"occurredAt",Instant.now().toString()));
         HttpRequest request=HttpRequest.newBuilder(controlPlane.resolve("/api/runner/events"))
+                .timeout(java.time.Duration.ofSeconds(5))
                 .header("Content-Type","application/json").header("X-ForgeLoop-Runner-Id",identity.runnerId())
                 .header("X-ForgeLoop-Runner-Credential",identity.credential()).header("X-ForgeLoop-Lease-Id",lease.leaseId())
                 .header("X-ForgeLoop-Lease-Nonce",lease.nonce()).POST(HttpRequest.BodyPublishers.ofString(body)).build();
