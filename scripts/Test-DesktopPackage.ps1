@@ -33,7 +33,11 @@ if ($PackageType -eq 'msi') {
     & sudo apt-get install -y $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'DEB installation failed' }
     try {
-        & '/opt/forgeloop-runner/bin/ForgeLoop Runner' --self-test
+        # jpackage nests the application beneath the configured installation root.
+        # Resolve the executable from this package's inventory, not a guessed layout.
+        $launchers=@((& dpkg-query -L forgeloop-runner) | Where-Object { $_.EndsWith('/bin/ForgeLoop Runner') })
+        if ($launchers.Count -ne 1 -or -not $launchers[0].StartsWith('/opt/forgeloop-runner/')) { throw 'Unexpected installed package launcher layout' }
+        & $launchers[0] --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Installed Linux launcher failed' }
     } finally { & sudo apt-get remove -y forgeloop-runner }
 }
