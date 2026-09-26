@@ -4,11 +4,11 @@ ForgeLoop uses the named Cloudflare Tunnel `forgeloop`
 (`e0c976c6-b8ab-4f1a-8799-96e365adba3d`) for the stable hostname
 `forgeloop.hookerhillstudios.com`.
 
-Only the GitHub App webhook and installation callback are exposed. The edge
-proxy returns `404` for GraphQL, actuator endpoints, the operator UI, and all
-other paths. During local development, operators use `http://localhost:5173`.
-Keep operator and runner APIs behind their authenticated network boundary; add
-a separate protected application hostname only after production OIDC is live.
+The hostname now serves the public landing page and routes same-origin GitHub
+OAuth, signed webhooks, installation callbacks, and the authenticated operator
+console through the web gateway. The landing page loads no tenant data.
+GraphQL operator access is enforced by persisted organization membership;
+runner mutations retain their independent runner and lease credentials.
 
 ## Start on this workstation
 
@@ -17,6 +17,16 @@ uses the tunnel-specific JSON credentials file and neither file belongs in Git.
 
 ```powershell
 .\scripts\Start-ForgeLoopTunnel.ps1
+```
+
+Run exactly one connector per workstation. If the Windows `Cloudflared` service
+was installed earlier, stop and disable it from an elevated PowerShell before
+using the Compose connector; two connectors with different origin
+configurations cause intermittent `503` responses:
+
+```powershell
+Stop-Service Cloudflared
+Set-Service Cloudflared -StartupType Disabled
 ```
 
 Configure the GitHub App with:
@@ -75,6 +85,7 @@ curl.exe -i -X POST https://forgeloop.hookerhillstudios.com/api/github/webhooks 
 docker compose --profile tunnel logs cloudflared
 ```
 
-The first request must return `404`. The unsigned webhook request must reach
-ForgeLoop but be rejected (`400` or `401`), proving the route is live without
-bypassing signature validation.
+The root request must return `200`, `/oauth2/authorization/github` must redirect
+to GitHub, and the unsigned webhook request must be rejected (`400` or `401`).
+Together these prove the public shell and both independent authentication
+boundaries are live.

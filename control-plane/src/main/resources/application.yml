@@ -1,4 +1,6 @@
-server: { port: 8090 }
+server:
+  port: 8090
+  forward-headers-strategy: native
 spring:
   application: { name: forgeloop-control-plane }
   datasource:
@@ -11,6 +13,11 @@ spring:
   flyway:
     baseline-on-migrate: true
     baseline-version: "0"
+  session:
+    cookie:
+      http-only: true
+      secure: "${FORGELOOP_SESSION_COOKIE_SECURE:true}"
+      same-site: lax
 management:
   endpoint:
     health: { probes: { enabled: true } }
@@ -43,6 +50,8 @@ forgeloop:
     webhook-secret: "${FORGELOOP_GITHUB_WEBHOOK_SECRET:}"
     app-slug: "${FORGELOOP_GITHUB_APP_SLUG:}"
     app-id: "${FORGELOOP_GITHUB_APP_ID:}"
+    client-id: "${FORGELOOP_GITHUB_CLIENT_ID:}"
+    client-secret: "${FORGELOOP_GITHUB_CLIENT_SECRET:}"
     private-key: "${FORGELOOP_GITHUB_PRIVATE_KEY:}"
     installation-state-secret: "${FORGELOOP_GITHUB_INSTALLATION_STATE_SECRET:}"
     api-url: "${FORGELOOP_GITHUB_API_URL:https://api.github.com}"

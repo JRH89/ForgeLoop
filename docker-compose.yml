@@ -19,10 +19,12 @@ services:
       SPRING_DATASOURCE_PASSWORD: forgeloop
       # Flyway owns schema changes; Hibernate only verifies the migrated schema.
       SPRING_JPA_DDL_AUTO: validate
-      FORGELOOP_SECURITY_MODE: development
+      FORGELOOP_SECURITY_MODE: ${FORGELOOP_SECURITY_MODE:-github}
       FORGELOOP_DEVELOPMENT_ORGANIZATION_ID: ${FORGELOOP_DEVELOPMENT_ORGANIZATION_ID:-local-development}
       FORGELOOP_GITHUB_APP_SLUG: ${FORGELOOP_GITHUB_APP_SLUG:-}
       FORGELOOP_GITHUB_APP_ID: ${FORGELOOP_GITHUB_APP_ID:-}
+      FORGELOOP_GITHUB_CLIENT_ID: ${FORGELOOP_GITHUB_CLIENT_ID:-}
+      FORGELOOP_GITHUB_CLIENT_SECRET: ${FORGELOOP_GITHUB_CLIENT_SECRET:-}
       FORGELOOP_GITHUB_PRIVATE_KEY: ${FORGELOOP_GITHUB_PRIVATE_KEY:-}
       FORGELOOP_GITHUB_WEBHOOK_SECRET: ${FORGELOOP_GITHUB_WEBHOOK_SECRET:-}
       FORGELOOP_GITHUB_INSTALLATION_STATE_SECRET: ${FORGELOOP_GITHUB_INSTALLATION_STATE_SECRET:-}
@@ -53,7 +55,7 @@ services:
       - ./deploy/cloudflared/webhook-proxy.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       control-plane: { condition: service_healthy }
-    # Loopback-only: cloudflared reaches this port, while GraphQL remains unexposed.
+    # Loopback-only: the tunnel container reaches this service over the Docker network.
     ports: ["127.0.0.1:8091:8080"]
   cloudflared:
     image: cloudflare/cloudflared:2026.9.1

@@ -5,10 +5,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$windowsConnector = Get-Service -Name "Cloudflared" -ErrorAction SilentlyContinue
+if ($windowsConnector -and $windowsConnector.Status -eq "Running") {
+    throw "The Windows Cloudflared service is already running. Stop and disable it from an elevated PowerShell before starting the Compose connector."
+}
+
 $resolvedCredentials = (Resolve-Path -LiteralPath $CredentialsFile).Path
 $env:CLOUDFLARED_CREDENTIALS_FILE = $resolvedCredentials
 
 # The tunnel runs in Compose so the same checked-in configuration works on a
 # developer workstation and on the eventual production host.
-docker compose --profile tunnel up -d cloudflared
+# Recreate so ingress changes are loaded; cloudflared does not hot-reload this file.
+docker compose --profile tunnel up -d --force-recreate cloudflared
 docker compose --profile tunnel ps cloudflared

@@ -12,5 +12,6 @@ public interface GithubApi {
     long createPullRequest(long installationId, String repository, String head, String base, String title, String body, boolean draft);
     boolean checksPass(long installationId, String repository, String headSha);
     String getPullRequestHead(long installationId, String repository, long pullRequestNumber);
+    String getPullRequestState(long installationId, String repository, long pullRequestNumber);
     String mergePullRequest(long installationId, String repository, long pullRequestNumber, String expectedHeadSha);
 }

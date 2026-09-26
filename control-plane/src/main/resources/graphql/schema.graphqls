@@ -16,7 +16,7 @@ input LocalMcpConfigurationInput { name: String!, command: String!, arguments: [
 enum RunState { RECEIVED VALIDATING PLANNING QUEUED EXECUTING INTEGRATING VERIFYING REVIEWING READY_FOR_REVIEW PR_OPEN COMPLETE REJECTED BLOCKED CANCELLED FAILED }
 enum OperatorRole { ADMIN OPERATOR VIEWER }
 enum TaskState { PENDING LEASED PREPARING RUNNING CHANGE_READY INTEGRATED VERIFIED RETRYABLE_FAILURE REPAIR_QUEUED HELD FAILED }
-type FeatureRun { id: ID!, repository: String!, sourceRef: String!, title: String!, specification: String!, budgetUsd: Float!, spentCostMicros: Float!, harnessProfile: String!, baseBranch: String!, policyRevision: Int!, state: RunState!, createdAt: String!, approved: Boolean!, approvedAt: String, approvedBy: String, tasks: [Task!]!, gates: [VerificationGate!]!, criteria: [AcceptanceCriterion!]! }
+type FeatureRun { id: ID!, repository: String!, sourceRef: String!, title: String!, specification: String!, budgetUsd: Float!, spentCostMicros: Float!, harnessProfile: String!, baseBranch: String!, policyRevision: Int!, state: RunState!, createdAt: String!, approved: Boolean!, approvedAt: String, approvedBy: String, publication: GithubPublication, tasks: [Task!]!, gates: [VerificationGate!]!, criteria: [AcceptanceCriterion!]! }
 type RepositoryConnection { id: ID!, repository: String!, installationId: Float!, enabled: Boolean!, defaultBranch: String!, issueLabel: String!, harnessProfile: String!, requiredGates: [String!]!, verificationPolicies: [VerificationPolicy!]!, maxBudgetUsd: Float!, policyRevision: Int! }
 type VerificationPolicy { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int!, required: Boolean!, criterionCoverage: String! }
 type Runner { id: ID!, organizationId: String!, name: String!, version: String!, capabilities: [String!]!, registeredAt: String!, lastHeartbeatAt: String!, enabled: Boolean! }
@@ -24,7 +24,7 @@ type RunnerEnrollment { runner: Runner!, credential: String! }
 type OrganizationMembership { id: ID!, subject: String!, role: OperatorRole! }
 type OperatorSession { subject: String!, organizationId: String!, role: OperatorRole! }
 type AuditLedgerEntry { id: ID!, actor: String!, action: String!, resourceType: String!, resourceId: String!, payloadDigest: String!, occurredAt: String! }
-type GithubPublication { id: ID!, featureRunId: ID!, repository: String!, branch: String!, idempotencyKey: String!, headSha: String, checkRunId: Float, pullRequestNumber: Float, deliveredAt: String, autoMergeRequested: Boolean!, mergedAt: String, mergeSha: String }
+type GithubPublication { id: ID!, featureRunId: ID!, repository: String!, branch: String!, idempotencyKey: String!, headSha: String, checkRunId: Float, pullRequestNumber: Float, pullRequestState: String!, deliveredAt: String, autoMergeRequested: Boolean!, mergedAt: String, mergeSha: String }
 type TaskLease { id: ID!, taskId: ID!, runnerId: ID!, expiresAt: String!, acknowledged: Boolean!, completed: Boolean! }
 type LeaseGrant { lease: TaskLease!, nonce: String! }
 type GithubPushGrant { repository: String!, branch: String!, expectedHeadSha: String, token: String! }

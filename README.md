@@ -18,7 +18,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 With the Compose stack running, open `http://localhost:5173`. The dashboard is ForgeLoop's operator surface: **Runs** shows the live task graph, attempts, screenshot and log evidence, audit trail, approval controls, and PR links; **Analytics** compares persisted provider and harness telemetry; **Repositories** manages GitHub App authorization; **Harness & policy** manages organization limits, reusable harness definitions, and runner-local MCP context routes; and **User guide** provides the complete setup and operating handbook inside the application.
 
-The named development tunnel deliberately exposes only GitHub webhook and setup-callback routes. It does not publish the dashboard or GraphQL API. A public dashboard requires the production OIDC configuration and a separately protected application hostname; see [Cloudflare Tunnel](docs/cloudflare-tunnel.md).
+The named tunnel serves the public landing page and GitHub-authenticated dashboard at `https://forgeloop.hookerhillstudios.com`. Repository installation, human login, signed webhooks, and runner credentials remain separate security boundaries; see [GitHub user authentication](docs/github-user-authentication.md) and [Cloudflare Tunnel](docs/cloudflare-tunnel.md).
 
 ### Control plane
 
@@ -28,6 +28,7 @@ The named development tunnel deliberately exposes only GitHub webhook and setup-
 - [x] Generic repository connection policy: installation ID, branch, issue label, harness profile, required gates, and budget enforcement.
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
 - [x] Docker Compose deployment with PostgreSQL, control-plane health checks, and operator-console GraphQL proxy.
+- [x] Public landing page and GitHub OAuth browser sessions with immutable GitHub identity mapping, persisted membership authorization, first-administrator bootstrap locking, and authenticated console routing.
 - [x] Flyway forward migrations verified against the local PostgreSQL control-plane database.
 - [x] Persisted organization memberships and roles scope repository ownership, delivery-run visibility, runner enrollment, and privileged operator actions.
 - [x] JWT `org_id` context is checked against persisted membership server-side; cross-organization repository access and runner-token issuance are rejected.

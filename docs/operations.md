@@ -2,9 +2,9 @@
 
 ## Environments
 
-Docker Compose explicitly sets `FORGELOOP_SECURITY_MODE=development` for local evaluation only. It deliberately does not represent a production deployment.
+Docker Compose defaults to `FORGELOOP_SECURITY_MODE=github`, which protects the browser console with GitHub OAuth and persisted organization membership. Use `development` only for isolated local tests; it permits operator routes without a user identity and must never be exposed through the tunnel.
 
-The default security mode is `production`: all operator routes require a JWT validated by Spring Security's OIDC resource server. Set `SPRING_PROFILES_ACTIVE=production` to enable ECS JSON console logs, then configure both `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` and `FORGELOOP_OIDC_AUDIENCE` through a secrets manager before startup. The validated `org_id` claim must match a persisted organization membership; roles come only from that membership, never from a caller-supplied GraphQL value. Only health probes and signed GitHub webhooks bypass JWT authentication; webhook authenticity is independently checked with the configured HMAC secret.
+The `production` security mode retains GitHub browser sessions and additionally accepts JWTs validated by Spring Security's OIDC resource server. Configure both `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` and `FORGELOOP_OIDC_AUDIENCE` through a secret manager before selecting it. The validated `org_id` claim must match a persisted organization membership; roles come only from that membership, never from caller-supplied GraphQL input. Health probes and signed GitHub webhooks bypass operator authentication because they have separate security boundaries.
 
 ## Production configuration boundary
 

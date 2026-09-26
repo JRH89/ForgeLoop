@@ -34,6 +34,19 @@ public class GithubAutoMergeService {
         publications.findByRepositoryAndHeadSha(repository, headSha).ifPresent(publication -> reconcile(publication, installationId));
     }
 
+    /** Records a human merge from GitHub's signed pull_request webhook. */
+    @Transactional
+    public void recordMergedPullRequest(String repository, long pullRequestNumber, long installationId, String mergeSha) {
+        RepositoryConnection connection = connections.findByRepository(repository).orElse(null);
+        if (connection == null || !connection.isInstalledAs(installationId)) return;
+        GithubPublication publication = publications.findByRepositoryAndPullRequestNumber(repository, pullRequestNumber).orElse(null);
+        if (publication == null || publication.getMergedAt() != null) return;
+        publication.recordMerge(mergeSha);
+        FeatureRun run = runs.findById(publication.getFeatureRunId()).orElseThrow(() -> new IllegalStateException("Feature run was not found"));
+        if (run.getState() != io.forgeloop.control.domain.RunState.COMPLETE && run.isApproved()) run.completeDelivery();
+        audit.record("GITHUB_PR_MERGED", "FEATURE_RUN", run.getId(), mergeSha);
+    }
+
     /** Retries pending decisions so a transient webhook or GitHub outage cannot strand an eligible PR. */
     @Scheduled(fixedDelayString = "${forgeloop.github.auto-merge-reconcile-ms:30000}")
     @Transactional

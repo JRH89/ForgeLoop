@@ -55,6 +55,10 @@ jobs:
   end-to-end:
     runs-on: ubuntu-latest
     needs: [control-plane, frontend]
+    # CI has no interactive GitHub OAuth client. Development mode is scoped to
+    # this disposable runner while deployed Compose environments use `.env`.
+    env:
+      FORGELOOP_SECURITY_MODE: development
     steps:
       - uses: actions/checkout@v6
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'

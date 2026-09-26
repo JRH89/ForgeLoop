@@ -11,5 +11,7 @@ public interface GithubPublicationRepository extends JpaRepository<GithubPublica
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<GithubPublication> findByRepositoryAndHeadSha(String repository, String headSha);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<GithubPublication> findByRepositoryAndPullRequestNumber(String repository, Long pullRequestNumber);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<GithubPublication> findByAutoMergeRequestedTrueAndMergedAtIsNullAndPullRequestNumberIsNotNull();
 }

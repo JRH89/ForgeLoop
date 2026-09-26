@@ -72,6 +72,13 @@ public class GithubHttpApi implements GithubApi {
     @Override public String getPullRequestHead(long installationId, String repository, long pullRequestNumber) {
         return request(installationId, "GET", "/repos/" + repository + "/pulls/" + pullRequestNumber, Map.of()).path("head").path("sha").asText();
     }
+    @Override public String getPullRequestState(long installationId, String repository, long pullRequestNumber) {
+        JsonNode pullRequest = request(installationId, "GET", "/repos/" + repository + "/pulls/" + pullRequestNumber, Map.of());
+        if (pullRequest.path("merged").asBoolean()) return "MERGED";
+        String state = pullRequest.path("state").asText("").toUpperCase(java.util.Locale.ROOT);
+        if ("OPEN".equals(state) && pullRequest.path("draft").asBoolean()) return "DRAFT";
+        return List.of("OPEN", "CLOSED").contains(state) ? state : "UNKNOWN";
+    }
     @Override public String mergePullRequest(long installationId, String repository, long pullRequestNumber, String expectedHeadSha) {
         JsonNode response = request(installationId, "PUT", "/repos/" + repository + "/pulls/" + pullRequestNumber + "/merge", Map.of("sha", expectedHeadSha, "merge_method", "squash"));
         if (!response.path("merged").asBoolean()) throw new IllegalStateException("GitHub declined the pull request merge");

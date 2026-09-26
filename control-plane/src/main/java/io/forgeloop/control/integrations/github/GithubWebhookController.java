@@ -77,6 +77,14 @@ public class GithubWebhookController {
                     installations.synchronizeInstallation(installationId);
                 }
             }
+            if (autoMerge != null && "pull_request".equals(event) && "closed".equals(payload.path("action").asText())) {
+                JsonNode pullRequest = payload.path("pull_request");
+                if (pullRequest.path("merged").asBoolean()) {
+                    autoMerge.recordMergedPullRequest(payload.path("repository").path("full_name").asText(),
+                            pullRequest.path("number").asLong(), payload.path("installation").path("id").asLong(),
+                            pullRequest.path("merge_commit_sha").asText());
+                }
+            }
             if (autoMerge != null && "completed".equals(payload.path("action").asText()) && ("check_run".equals(event) || "check_suite".equals(event))) {
                 JsonNode check = payload.path("check_run".equals(event) ? "check_run" : "check_suite");
                 autoMerge.reconcile(payload.path("repository").path("full_name").asText(), check.path("head_sha").asText(), payload.path("installation").path("id").asLong());

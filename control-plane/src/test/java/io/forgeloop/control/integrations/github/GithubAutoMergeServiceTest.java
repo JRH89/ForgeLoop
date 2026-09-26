@@ -56,6 +56,28 @@ class GithubAutoMergeServiceTest {
         verify(github, never()).mergePullRequest(anyLong(), anyString(), anyLong(), anyString());
     }
 
+    @Test void recordsHumanMergedPullRequestAndCompletesApprovedRunIdempotently() {
+        GithubPublication publication = new GithubPublication("run-1", "acme/app", "forgeloop/run-1", "run-1");
+        publication.recordPullRequest(42, false);
+        RepositoryConnection connection = mock(RepositoryConnection.class);
+        FeatureRun run = mock(FeatureRun.class);
+        when(run.getId()).thenReturn("run-1");
+        when(run.getState()).thenReturn(io.forgeloop.control.domain.RunState.READY_FOR_REVIEW);
+        when(run.isApproved()).thenReturn(true);
+        when(connections.findByRepository("acme/app")).thenReturn(Optional.of(connection));
+        when(connection.isEnabled()).thenReturn(true);
+        when(connection.isInstalledAs(7)).thenReturn(true);
+        when(publications.findByRepositoryAndPullRequestNumber("acme/app", 42L)).thenReturn(Optional.of(publication));
+        when(runs.findById("run-1")).thenReturn(Optional.of(run));
+
+        service.recordMergedPullRequest("acme/app", 42, 7, "merge-sha");
+        service.recordMergedPullRequest("acme/app", 42, 7, "merge-sha");
+
+        assertEquals("merge-sha", publication.getMergeSha());
+        verify(run, times(1)).completeDelivery();
+        verify(audit).record("GITHUB_PR_MERGED", "FEATURE_RUN", "run-1", "merge-sha");
+    }
+
     private static GithubPublication pendingPublication() {
         GithubPublication publication = new GithubPublication("run-1", "acme/app", "forgeloop/run-1", "run-1");
         publication.recordHeadSha("a".repeat(40));
