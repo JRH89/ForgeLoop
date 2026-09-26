@@ -65,6 +65,9 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: docker compose up --build --wait
+      - name: Restore database into an isolated container
+        shell: pwsh
+        run: ./scripts/Test-PostgresRestore.ps1
       - run: npm ci
         working-directory: frontend
       # Browser binaries are intentionally not committed; provision the pinned Playwright Chromium in CI.

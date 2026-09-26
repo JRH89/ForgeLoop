@@ -4,6 +4,14 @@ This is the execution plan for the production product, not a demo plan. A slice 
 
 ## Current position
 
+2026-09-26 reliability review: earlier completed slices describe implemented
+features, not production deployment certification. Anonymous database storage
+was recovered and replaced with a stable named volume. Automatic database and
+local evidence backups, service restart policies, dynamic proxy DNS, and an
+isolated restore drill now cover the workstation recovery slice. See
+[tested evidence and remaining launch gates](reliability.md). Slice 8 still needs
+the second repository proof; Slice 9 remains incomplete.
+
 ForgeLoop has a working local control plane, PostgreSQL/Flyway migrations, signed GitHub webhook intake, installed-repository synchronization, live GitHub App JWT and installation-token validation, runner registration/leases, validated task-DAG execution and integration, repository-policy-selected container verification, criterion coverage, redacted checksummed evidence bundles, a role-aware operational console, a permissioned MCP gateway, persisted tenant roles, OIDC issuer/audience enforcement outside explicit development mode, production configuration validation, and tenant-scoped digest-only control-plane audit events.
 
 Ticketly is now a separate support SaaS repository. It has no ForgeLoop delivery dashboard, fabricated agent runs, fabricated cost data, or fabricated verification data. It remains the primary target application for the eventual real GitHub issue-to-PR validation.

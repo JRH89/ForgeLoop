@@ -28,6 +28,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [x] Generic repository connection policy: installation ID, branch, issue label, harness profile, required gates, and budget enforcement.
 - [x] Signed GitHub webhook endpoint with delivery idempotency and connected-repository label filtering.
 - [x] Docker Compose deployment with PostgreSQL, control-plane health checks, and operator-console GraphQL proxy.
+- [x] Named PostgreSQL storage, automatic database/evidence snapshots, isolated restore drill, and service restart policies; see [reliability evidence and limits](docs/reliability.md).
 - [x] Public landing page and GitHub OAuth browser sessions with immutable GitHub identity mapping, persisted membership authorization, first-administrator bootstrap locking, and authenticated console routing.
 - [x] Flyway forward migrations verified against the local PostgreSQL control-plane database.
 - [x] Persisted organization memberships and roles scope repository ownership, delivery-run visibility, runner enrollment, and privileged operator actions.
