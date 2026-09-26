@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 
 type Package = { platform: string; architecture: string; url: string; sha256: string };
 type Manifest = { version: string | null; published: boolean; packages: Package[] };
+function releaseUrl(value:string):boolean {try{const url=new URL(value);return url.protocol==='https:'&&url.host==='github.com'&&!url.username&&!url.password&&!url.search&&!url.hash&&url.pathname.startsWith('/JRH89/ForgeLoop/releases/download/');}catch{return false;}}
 /** Public release links are explicitly published; CI artifacts are never silently promoted. */
 export function verifiedManifest(value: unknown): Manifest | null {
   if(!value||typeof value!=='object')return null;
   const manifest=value as Manifest;
   if(manifest.published!==true||typeof manifest.version!=='string'||!Array.isArray(manifest.packages)||manifest.packages.length===0)return null;
-  if(manifest.packages.some(item=>!item||!['Windows','macOS','Linux'].includes(item.platform)||!['x64','arm64'].includes(item.architecture)||typeof item.sha256!=='string'||! /^[a-f0-9]{64}$/.test(item.sha256)||typeof item.url!=='string'||!item.url.startsWith('https://github.com/JRH89/ForgeLoop/releases/download/')))return null;
+  if(manifest.packages.some(item=>!item||!['Windows','macOS','Linux'].includes(item.platform)||!['x64','arm64'].includes(item.architecture)||typeof item.sha256!=='string'||! /^[a-f0-9]{64}$/.test(item.sha256)||typeof item.url!=='string'||!releaseUrl(item.url)))return null;
   return manifest;
 }
 export default function RunnerDownloads(){

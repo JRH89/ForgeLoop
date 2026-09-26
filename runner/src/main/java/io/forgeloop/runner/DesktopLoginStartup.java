@@ -21,7 +21,7 @@ public final class DesktopLoginStartup {
     }
     static String content(String os,String launcher){
         if(launcher.contains("\n")||launcher.contains("\r")||launcher.contains("\0"))throw new IllegalArgumentException("Invalid launcher path");
-        if(os.contains("win"))return "' "+MARKER+"\r\nCreateObject(\"WScript.Shell\").Run \"\"\""+launcher.replace("\"","\"\"")+"\"\" --autostart\", 0, False\r\n";
+        if(os.contains("win"))return "' "+MARKER+"\r\nCreateObject(\"WScript.Shell\").Run \"\"\""+launcher.replace("\"","\"\"")+"\"\" --autostart\", 1, False\r\n";
         if(os.contains("mac"))return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- "+MARKER+" -->\n<plist version=\"1.0\"><dict><key>Label</key><string>io.forgeloop.runner</string><key>ProgramArguments</key><array><string>"+xml(launcher)+"</string><string>--autostart</string></array><key>RunAtLoad</key><true/></dict></plist>\n";
         String escaped=launcher.replace("\\","\\\\").replace("\"","\\\"").replace("$","\\$").replace("`","\\`").replace("%","%%");
         return "[Desktop Entry]\n# "+MARKER+"\nType=Application\nName=ForgeLoop Runner\nExec=\""+escaped+"\" --autostart\nTerminal=false\n";

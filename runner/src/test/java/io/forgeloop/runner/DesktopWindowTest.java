@@ -21,9 +21,12 @@ class DesktopWindowTest {
                 assertEquals("ForgeLoop Runner",frame.getTitle());assertFalse(find(frame,"Start runner").isEnabled());assertTrue(find(frame,"Connect in browser").isEnabled());
                 BufferedImage screenshot=new BufferedImage(frame.getWidth(),frame.getHeight(),BufferedImage.TYPE_INT_RGB);Graphics2D graphics=screenshot.createGraphics();frame.paintAll(graphics);graphics.dispose();
                 Path output=Path.of("target","desktop-setup.png");Files.createDirectories(output.getParent());ImageIO.write(screenshot,"png",output.toFile());
+                JTabbedPane tabs=findTabs(frame);
+                for(int index=1;index<3;index++){tabs.setSelectedIndex(index);frame.validate();BufferedImage step=new BufferedImage(frame.getWidth(),frame.getHeight(),BufferedImage.TYPE_INT_RGB);Graphics2D painter=step.createGraphics();frame.paintAll(painter);painter.dispose();ImageIO.write(step,"png",Path.of("target","desktop-step-"+index+".png").toFile());}
                 assertFalse(Files.exists(directory.resolve("identity")));assertFalse(Files.exists(directory.resolve("provider-key.dpapi")));
             }catch(Exception error){throw new AssertionError(error);}finally{if(app!=null)app.disposeIdle();}
         });
     }
     private static JButton find(Container parent,String text){for(Component child:parent.getComponents()){if(child instanceof JButton button&&button.getText().equals(text))return button;if(child instanceof Container container){JButton found=find(container,text);if(found!=null)return found;}}return null;}
+    private static JTabbedPane findTabs(Container parent){for(Component child:parent.getComponents()){if(child instanceof JTabbedPane tabs)return tabs;if(child instanceof Container container){JTabbedPane found=findTabs(container);if(found!=null)return found;}}return null;}
 }
