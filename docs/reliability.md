@@ -1,5 +1,8 @@
 # Workstation reliability and recovery
 
+Deferred validation and funding dependencies are tracked in
+[Deferred launch checks](deferred-launch-checks.md).
+
 Compose gives PostgreSQL a stable named volume and restarts PostgreSQL, the
 control plane, both web proxies, backups, and the tunnel after Docker restarts.
 The installed runner also uses `unless-stopped` and retains its identity in its

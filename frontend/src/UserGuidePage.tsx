@@ -1,3 +1,6 @@
+import MarkdownContent from "./MarkdownContent";
+import runnerSetup from "./docs/runner-setup.md?raw";
+
 const lifecycle = [
   ["1", "Connect", "Install the GitHub App and authorize only the repositories ForgeLoop may operate on."],
   ["2", "Intake", "Add the repository's configured intake label to a detailed GitHub issue, or submit a run manually."],
@@ -19,11 +22,14 @@ export default function UserGuidePage() {
   return (
     <article className="guide">
       <section className="hero guide-hero"><p className="eyebrow">Operator handbook</p><h1>Using ForgeLoop</h1><p>From GitHub issue to verified pull request: setup, operating procedures, safety boundaries, and every configurable setting.</p></section>
-      <nav className="guide-toc" aria-label="User guide sections"><a href="#quick-start">Quick start</a><a href="#repositories">Repositories</a><a href="#runs">Runs</a><a href="#policy">Settings</a><a href="#delivery">Delivery</a><a href="#troubleshooting">Troubleshooting</a></nav>
+      <nav className="guide-toc" aria-label="User guide sections"><a href="#quick-start">Quick start</a><a href="#runner-setup">Runner setup &amp; API keys</a><a href="#repositories">Repositories</a><a href="#runs">Runs</a><a href="#policy">Settings</a><a href="#delivery">Delivery</a><a href="#troubleshooting">Troubleshooting</a></nav>
       <section className="panel guide-section" id="quick-start">
         <p className="eyebrow">Start here</p><h2>How delivery works</h2>
         <div className="guide-steps">{lifecycle.map(([number,title,body])=><div key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}</div>
         <div className="guide-callout"><b>ForgeLoop works with any authorized repository.</b><span>Ticketly is a validation repository, not a special product integration. Repository policy determines the workflow and verification commands.</span></div>
+      </section>
+      <section className="panel guide-section" id="runner-setup">
+        <MarkdownContent content={runnerSetup} />
       </section>
       <section className="panel guide-section" id="repositories">
         <p className="eyebrow">One-time setup</p><h2>Connect a repository</h2>
