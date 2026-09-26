@@ -36,8 +36,6 @@ Windows code signing, permission to publish a release, and testing the signed
 install/update path through normal OS trust prompts. Do not bypass those prompts
 or claim unsigned CI artifacts are trusted public installers.
 
-## Security and verification
-
 ## Onboarding reliability and polish follow-up (1.0.1)
 
 - [x] Modern HiDPI-aware dark desktop theme and existing favicon only.

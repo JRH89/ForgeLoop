@@ -70,7 +70,7 @@ public final class DesktopRunner {
         logs.setEditable(false);logs.setLineWrap(true);logs.setWrapStyleWord(true);
         logs.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));logs.setMargin(new Insets(16,16,16,16));
         JPanel runStep=new JPanel(new BorderLayout(12,12));runStep.add(controls,BorderLayout.NORTH);runStep.add(new JScrollPane(logs),BorderLayout.CENTER);
-        steps.addTab("1. Connect",step(connection));steps.addTab("2. Provider",step(providerStep));steps.addTab("3. Run",step(runStep));
+        steps.addTab("1. Connect",step(connection));steps.addTab("2. Provider",step(providerStep));steps.addTab("3. Run",stretchStep(runStep));
         if(Files.exists(directory.resolve("identity")))steps.setSelectedIndex(configuration==null?1:2);
         JPanel header=new JPanel(new BorderLayout(0,8));header.add(DesktopTheme.heading("ForgeLoop Runner"),BorderLayout.NORTH);header.add(new JLabel("Your machine. Your API keys. You control when work starts."),BorderLayout.SOUTH);
         JPanel root=new JPanel(new BorderLayout(20,24));root.setBorder(BorderFactory.createEmptyBorder(28,28,20,28));root.add(header,BorderLayout.NORTH);root.add(steps,BorderLayout.CENTER);root.add(status,BorderLayout.SOUTH);frame.setContentPane(root);
@@ -92,6 +92,7 @@ public final class DesktopRunner {
     }
     private static void field(JPanel panel,String label,JComponent component){JLabel text=new JLabel(label);text.setLabelFor(component);panel.add(text);panel.add(component);}
     /** Keep expanded pricing and controls reachable on small or scaled displays. */
+    private static JPanel stretchStep(JPanel content){JPanel panel=new JPanel(new BorderLayout());panel.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));panel.add(content,BorderLayout.CENTER);return panel;}
     private static JPanel step(JPanel content){
         JPanel body=new JPanel(new BorderLayout());body.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));body.add(content,BorderLayout.NORTH);
         JScrollPane scroll=new JScrollPane(body,JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
