@@ -18,6 +18,7 @@ public final class DesktopWorker {
         for(String path:List.of("identity","repositories","worktrees","provider-policy.json"))args.add(directory.resolve(path).toString());
         args.add(".");args.add(directory.resolve("leases").toString());args.add("1");
         var builder=new ProcessBuilder(args).redirectErrorStream(true);
+        builder.environment().put("PATH",DesktopToolPaths.searchPath());
         for(String variable:List.of("ANTHROPIC_API_KEY","OPENAI_API_KEY","GEMINI_API_KEY"))builder.environment().remove(variable);
         builder.environment().put(config.keyVariable(),key);
         builder.environment().put("FORGELOOP_RUNNER_PAUSE_FILE",directory.resolve("pause").toString());

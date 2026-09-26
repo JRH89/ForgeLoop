@@ -28,7 +28,8 @@ public final class DesktopRunner {
     private final JButton connect=new JButton("Connect in browser"),save=new JButton("Save provider settings"),start=new JButton("Start runner"),pause=new JButton("Pause after current work"),check=new JButton("Check Git and Docker");
     private final java.util.concurrent.atomic.AtomicBoolean busy=new java.util.concurrent.atomic.AtomicBoolean();
     private volatile DesktopConfiguration configuration;
-    private DesktopRunner(Path directory,boolean autoStart)throws Exception{
+    private final Timer statusTimer;
+    DesktopRunner(Path directory,boolean autoStart)throws Exception{
         this.directory=directory;worker=new DesktopWorker(directory);secrets=new DesktopSecretStore(directory);
         if(Files.exists(directory.resolve("config.json"))){configuration=JSON.readValue(directory.resolve("config.json").toFile(),DesktopConfiguration.class);endpoint.setText(configuration.endpoint());provider.setSelectedItem(configuration.provider());model.setText(configuration.model());input.setText(configuration.inputUsdPerMillion().toPlainString());output.setText(configuration.outputUsdPerMillion().toPlainString());}
         if(Files.exists(directory.resolve("endpoint")))endpoint.setText(Files.readString(directory.resolve("endpoint")));
@@ -48,12 +49,16 @@ public final class DesktopRunner {
         pause.addActionListener(e->background(()->{worker.pause();log("Pause requested. Current work will finish before the worker stops.");}));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter(){@Override public void windowClosing(WindowEvent e){if(worker.running()||busy.get()){JOptionPane.showMessageDialog(frame,"Pause the runner and wait for current work/setup to finish before closing.");return;}System.exit(0);}});
-        new Timer(1000,e->{boolean enabled=!busy.get()&&!worker.running();connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled);check.setEnabled(!busy.get());start.setEnabled(enabled&&configuration!=null&&Files.exists(directory.resolve("identity")));pause.setEnabled(!busy.get()&&worker.running());status.setText(worker.running()?"Running — eligible work can spend API credits":busy.get()?"Setup in progress — no paid work started":"Stopped — no work is being claimed");}).start();
+        start.setEnabled(false);pause.setEnabled(false);
+        statusTimer=new Timer(1000,e->{boolean enabled=!busy.get()&&!worker.running();connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled);check.setEnabled(!busy.get());start.setEnabled(enabled&&configuration!=null&&Files.exists(directory.resolve("identity")));pause.setEnabled(!busy.get()&&worker.running());status.setText(worker.running()?"Running — eligible work can spend API credits":busy.get()?"Setup in progress — no paid work started":"Stopped — no work is being claimed");});statusTimer.start();
         provider.addActionListener(e->{if(!"anthropic".equals(provider.getSelectedItem())){model.setText("");input.setText("");output.setText("");}});
         frame.pack();frame.setLocationByPlatform(true);frame.setVisible(true);
         if(autoStart&&configuration!=null&&configuration.startAtLogin())background(()->{prerequisites();worker.start(configuration,secrets.load(),this::log);log("Started using your saved sign-in consent.");});
     }
     private static void field(JPanel panel,String label,JComponent component){JLabel text=new JLabel(label);text.setLabelFor(component);panel.add(text);panel.add(component);}
+    /** UI verification may dispose an idle window without terminating its test JVM. */
+    void disposeIdle(){if(worker.running()||busy.get())throw new IllegalStateException("Cannot dispose active runner");statusTimer.stop();frame.dispose();}
+    JFrame window(){return frame;}
     private RunnerClient client(URI uri){return new RunnerClient(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(),uri);}
     private void pair(){
         String address=endpoint.getText().trim(),runnerName=name.getText().trim();
@@ -70,7 +75,7 @@ public final class DesktopRunner {
         background(()->{try{if(Files.exists(directory.resolve("endpoint"))&&!Files.readString(directory.resolve("endpoint")).equals(next.endpoint()))throw new IllegalStateException("Address must match this runner's enrollment");if(password.length>0)secrets.save(new String(password));else secrets.load();if(next.startAtLogin()||(configuration!=null&&configuration.startAtLogin()))DesktopLoginStartup.configure(next.startAtLogin());JSON.writeValue(directory.resolve("provider-policy.json").toFile(),next.policy());JSON.writeValue(directory.resolve("config.json").toFile(),next);configuration=next;log("Settings saved. No paid provider call was made.");}finally{java.util.Arrays.fill(password,'\0');}});
     }
     private static void prerequisites()throws Exception{
-        for(String[] command:new String[][]{{"git","--version"},{"docker","info","--format","{{.OSType}}"}}){Process process=new ProcessBuilder(command).redirectErrorStream(true).start();if(!process.waitFor(15,java.util.concurrent.TimeUnit.SECONDS)){process.destroyForcibly();throw new IllegalStateException("Git/Docker check timed out; start Docker and retry");}String result=new String(process.getInputStream().readNBytes(8192));if(process.exitValue()!=0||(command[0].equals("docker")&&!result.trim().equals("linux")))throw new IllegalStateException("Install Git and start Docker with Linux containers, then check again");}
+        for(String[] command:new String[][]{{"git","--version"},{"docker","info","--format","{{.OSType}}"}}){String tool=command[0];command[0]=DesktopToolPaths.executable(tool);Process process=new ProcessBuilder(command).redirectErrorStream(true).start();if(!process.waitFor(15,java.util.concurrent.TimeUnit.SECONDS)){process.destroyForcibly();throw new IllegalStateException("Git/Docker check timed out; start Docker and retry");}String result=new String(process.getInputStream().readNBytes(8192));if(process.exitValue()!=0||(tool.equals("docker")&&!result.trim().equals("linux")))throw new IllegalStateException("Install Git and start Docker with Linux containers, then check again");}
     }
     private void background(Work work){if(!busy.compareAndSet(false,true))return;Thread.ofVirtual().start(()->{try{work.run();}catch(Exception error){log("Action failed: "+(error instanceof IllegalArgumentException||error instanceof IllegalStateException?error.getMessage():error.getClass().getSimpleName()+"; check prerequisites and connectivity"));}finally{busy.set(false);}});}
     private void log(String message){SwingUtilities.invokeLater(()->{if(logs.getDocument().getLength()>24000)logs.setText("");logs.append(message+"\n");logs.setCaretPosition(logs.getDocument().getLength());});}

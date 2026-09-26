@@ -26,4 +26,8 @@ if ($PackageType -eq 'dmg') { $arguments+=@('--mac-package-identifier','io.forge
 if ($PackageType -eq 'deb') { $arguments+=@('--linux-shortcut','--linux-package-name','forgeloop-runner','--linux-deb-maintainer','support@hookerhillstudios.com') }
 & jpackage @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Desktop packaging failed' }
+Get-ChildItem -LiteralPath (Join-Path $output 'packages') -File | ForEach-Object {
+    $digest=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$digest  $($_.Name)" | Set-Content -LiteralPath ($_.FullName+'.sha256') -Encoding ascii
+}
 Write-Output 'Development package built. Not signed or notarized; do not publish as a production installer.'
