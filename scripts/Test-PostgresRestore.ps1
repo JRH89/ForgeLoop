@@ -9,20 +9,18 @@ $ErrorActionPreference = "Stop"
 $sourceContainer = "$ComposeProject-postgres-1"
 $drillContainer = "$ComposeProject-restore-drill-$([guid]::NewGuid().ToString('N'))"
 $backupPath = Join-Path ([System.IO.Path]::GetTempPath()) "forgeloop-restore-$([guid]::NewGuid().ToString('N')).dump"
-$containerBackup = "/tmp/forgeloop-restore.dump"
+$containerBackup = "/tmp/forgeloop-restore-$([guid]::NewGuid().ToString('N')).dump"
 
 try {
-    docker inspect $sourceContainer *> $null
-    if ($LASTEXITCODE -ne 0) { throw "Source PostgreSQL container '$sourceContainer' is not running." }
-
     if ($BackupFile) {
         Copy-Item -LiteralPath (Resolve-Path -LiteralPath $BackupFile).Path -Destination $backupPath
     } else {
-    docker exec $sourceContainer pg_dump --format=custom --no-owner --no-acl --file=$containerBackup --username=$Username $Database
-    if ($LASTEXITCODE -ne 0) { throw "pg_dump failed." }
-    docker cp "${sourceContainer}:${containerBackup}" $backupPath
-    if ($LASTEXITCODE -ne 0) { throw "Could not copy the backup from the source container." }
-    docker exec $sourceContainer rm -f $containerBackup
+        docker inspect $sourceContainer *> $null
+        if ($LASTEXITCODE -ne 0) { throw "Source PostgreSQL container '$sourceContainer' is unavailable." }
+        docker exec $sourceContainer pg_dump --format=custom --no-owner --no-acl --file=$containerBackup --username=$Username $Database
+        if ($LASTEXITCODE -ne 0) { throw "pg_dump failed." }
+        docker cp "${sourceContainer}:${containerBackup}" $backupPath
+        if ($LASTEXITCODE -ne 0) { throw "Could not copy the backup from the source container." }
     }
 
     # PostgreSQL 18 stores its versioned data directory beneath /var/lib/postgresql.
@@ -53,7 +51,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Restored operational record validation failed." }
 }
 finally {
-    docker exec $sourceContainer rm -f $containerBackup *> $null
+    # Saved backups must remain testable even when the original host is unavailable.
+    if (-not $BackupFile) { docker exec $sourceContainer rm -f $containerBackup *> $null }
     docker rm --force $drillContainer *> $null
     if (Test-Path -LiteralPath $backupPath) { Remove-Item -LiteralPath $backupPath -Force }
 }
