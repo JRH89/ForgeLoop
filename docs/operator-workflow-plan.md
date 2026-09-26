@@ -25,8 +25,17 @@ Windows-specific. Historical unpriced usage remains unpriced. Rates are supplied
 by the operator and are estimates, not billing receipts. Existing containers need
 the updated runner image to emit new progress events.
 
-The local runner image `forgeloop-runner:operator-workflow` is built. Replacement
-of `forgeloop-slice8-runner` was blocked by the execution tool, so the original
-container, credentials and state remain unchanged. Upgrade that installation
-before the next funded proving run. No provider calls were made; all 36 historical
-requests remain unpriced because the prior installation had no model rates.
+The local runner was upgraded to `forgeloop-runner:operator-workflow` on
+2026-09-26. Its identity, credentials, command and state mounts were preserved;
+the replacement heartbeat was accepted and no tasks were available. The original
+container is stopped with restart disabled under
+`forgeloop-slice8-runner-before-operator-workflow` for rollback. Never start both
+containers together because they share an identity and state.
+
+The replacement mounts the ignored local `provider-policy-priced.json`, retaining
+the original policy for rollback. All eight Sonnet 5 roles use standard estimates
+of $2 input / $10 output per million tokens, verified against
+[Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
+No funded proving run was started. The 36 historical requests remain unpriced
+because the prior installation had no model rates; configured prices apply to
+future requests, not retroactive billing receipts.
