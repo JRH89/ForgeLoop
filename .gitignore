@@ -9,4 +9,5 @@
 **/playwright-report/
 .env
 evidence/
+artifacts/
 forgeloop-dev.2026-09-20.private-key.pem

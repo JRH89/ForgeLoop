@@ -22,6 +22,9 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 
 - [Runner installation and API-key setup](docs/runner-setup.md) — also available in the dashboard User Guide.
 - [Deferred launch checks](docs/deferred-launch-checks.md) — off-host backup, reboot/server validation, and funded second-repository proof remain open.
+- [Desktop runner onboarding](docs/desktop-runner-plan.md) — browser pairing and native installer work; unsigned development packages are not production releases.
+
+- [ ] Signed, verified Windows/macOS/Linux desktop installer with browser pairing and local runner controls (in development).
 
 - [x] Self-service administrator runner enrollment, downloadable runner package, Windows encrypted-key setup and optional login startup.
 - [x] Reversible intake-queue archive/restore and repository-specific GitHub assignee gating.

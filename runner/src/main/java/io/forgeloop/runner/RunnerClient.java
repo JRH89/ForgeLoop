@@ -32,6 +32,13 @@ public final class RunnerClient {
         return new RunnerIdentity(match.group(1), match.group(2));
     }
 
+    /** Polls a browser-approved proof without sending provider credentials. Null means pending. */
+    public RunnerIdentity exchangePairing(String verifier) throws Exception {
+        JsonNode enrollment=JSON.readTree(post("mutation($verifier:String!){exchangeRunnerPairing(verifier:$verifier){runner{id} credential}}",JSON.writeValueAsString(java.util.Map.of("verifier",verifier)))).path("data").path("exchangeRunnerPairing");
+        if(enrollment.isNull())return null;
+        return new RunnerIdentity(enrollment.path("runner").path("id").asText(),enrollment.path("credential").asText());
+    }
+
     public String heartbeat(RunnerIdentity identity) throws Exception { return post("mutation($runnerId:ID!,$credential:String!){runnerHeartbeat(runnerId:$runnerId,credential:$credential){id lastHeartbeatAt}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
@@ -151,7 +158,14 @@ public final class RunnerClient {
         String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"integratedSha\":\"" + escape(integratedSha) + "\"}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$integratedSha:String!){completeGithubPush(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,integratedSha:$integratedSha){id completed}}",variables);
     }
-    private String post(String query, String variables) throws Exception { String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}"; HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString()); if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed"); return response.body(); }
+    private String post(String query, String variables) throws Exception {
+        String body = "{\"query\":\"" + escape(query) + "\",\"variables\":" + variables + "}";
+        HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint)
+                .timeout(java.time.Duration.ofSeconds(30)).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed");
+        return response.body();
+    }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }
     private static String jsonStrings(List<String> values) { return "[" + values.stream().map(value -> "\"" + escape(value) + "\"").reduce((a,b)->a+","+b).orElse("") + "]"; }
     private static String nullableText(JsonNode node, String field) { return node.path(field).isMissingNode() || node.path(field).isNull() ? null : node.path(field).asText(); }

@@ -366,6 +366,9 @@ public final class RunnerMain {
         int failedPolls = 0;
         try (var workers = Executors.newFixedThreadPool(parallelism)) {
             while (continuous || idlePolls < 3) {
+                // Desktop pause drains the current batch before exiting; it never kills active leases.
+                String pauseFile=System.getenv("FORGELOOP_RUNNER_PAUSE_FILE");
+                if(pauseFile!=null && Files.exists(Path.of(pauseFile))) return;
                 List<RunnerTask> available;
                 try {
                     client.heartbeat(identity);
@@ -384,6 +387,7 @@ public final class RunnerMain {
                     continue;
                 }
                 idlePolls = 0;
+                if(pauseFile!=null && Files.exists(Path.of(pauseFile))) return;
                 List<Future<?>> futures = new ArrayList<>();
                 for (RunnerTask task : available.stream().limit(parallelism).toList()) {
                     futures.add(workers.submit(() -> executeDispatchedTask(arguments, stateRoot, task)));
