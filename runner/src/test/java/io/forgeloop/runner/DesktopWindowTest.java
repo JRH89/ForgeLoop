@@ -47,6 +47,8 @@ class DesktopWindowTest {
                 assertFalse(find(frame,"Reopen approval page").isEnabled());
                 assertFalse(find(frame,"Cancel connection").isEnabled());
                 assertTrue(hasText(frame,"custom-model"));
+                findTabs(frame).setSelectedIndex(1);find(frame,"Pricing overrides").doClick();frame.validate();
+                assertTrue(find(frame,"Save provider settings").isShowing());
             }catch(Exception error){throw new AssertionError(error);}finally{if(app!=null)app.disposeIdle();}
         });
         // No key was provided: reopening must not call the OS vault or a provider.

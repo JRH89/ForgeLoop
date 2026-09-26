@@ -38,6 +38,21 @@ or claim unsigned CI artifacts are trusted public installers.
 
 ## Security and verification
 
+## Onboarding reliability and polish follow-up (1.0.1)
+
+- [x] Modern HiDPI-aware dark desktop theme and existing favicon only.
+- [x] Explicit restored connection, hidden saved-key explanation, remembered new
+  runner names, and safe fallback labels for older installations.
+- [x] Reopen/cancel pairing controls, bounded polling regression tests, and recovery
+  of old dashboard URLs carrying valid pairing challenges.
+- [x] Free heartbeat and local key-store checks; allowlisted diagnostics export.
+- [x] No-provider-call start/pause/restart and restored-window regression tests.
+- [x] Windows installer upgrade and uninstall/reinstall state-preservation checks
+  on disposable CI hosts; real OS reboot/login acceptance remains deferred.
+- [ ] Paid real-provider delivery and signed public release remain separate gates.
+
+## Security boundaries
+
 Provider keys never reach the control plane. Browser approval never starts paid
 work. Pairing proofs are high-entropy and only their SHA-256 challenges are stored.
 An administrator explicitly checks the desktop/browser fingerprint before approval.
