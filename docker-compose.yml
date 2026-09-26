@@ -1,6 +1,9 @@
 services:
   postgres:
     image: postgres:18-alpine
+    # PostgreSQL 18 stores versioned data beneath /var/lib/postgresql.
+    volumes:
+      - postgres-data:/var/lib/postgresql
     environment:
       POSTGRES_DB: forgeloop
       POSTGRES_USER: forgeloop
@@ -72,4 +75,6 @@ services:
       control-plane: { condition: service_healthy }
       webhook-edge: { condition: service_started }
 volumes:
+  postgres-data:
+    name: ${FORGELOOP_POSTGRES_VOLUME:-forgeloop-postgres-data}
   forgeloop-artifacts:
