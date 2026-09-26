@@ -26,13 +26,17 @@ The runner executes inside customer-controlled infrastructure. It registers with
 
 ## Container build
 
+For the complete source installation, enrollment, provider-key, and startup
+walkthrough, see [Runner setup](../docs/runner-setup.md). The same document is
+rendered inside the dashboard User Guide. Enrollment is currently administrator-assisted.
+
 ```sh
 docker build -t forgeloop-runner:local runner
 ```
 
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
-The runner does not yet clone repositories or upload evidence to an object store. It can claim server-authorized work, create guarded detached worktrees from locally available checkouts, execute policy-selected planner/coding/review providers, integrate declared task commits, push the integrated branch with a scoped installation token, persist redacted evidence, and execute repository-policy-selected verification tasks. After human approval, the control plane creates the check run and draft pull request for that already-pushed branch.
+The runner automatically clones authorized repositories using lease-bound GitHub App grants and uploads evidence through the control plane's authenticated artifact endpoint. It creates guarded detached worktrees, executes policy-selected planner/coding/review providers, integrates declared task commits, pushes the integrated branch with a scoped installation token, and executes repository-policy-selected verification tasks. Delivery remains subject to the configured approval and auto-merge policy.
 
 Planner and writing prompts include a bounded runner-local repository manifest and text-only source context. Authorized paths are prioritized, Git metadata and binary contents are excluded, individual files and total context are capped, and the server independently enforces the fixed capability for every role. The model cannot invent a new runner capability or expand its write scope.
 
@@ -50,7 +54,7 @@ execute-policy-task <control-plane-url> <identity-file> <task-id> <repositories-
 
 For graph-planned writing tasks, the control-plane-owned `ownedPaths` list overrides the legacy `allowed-prefixes` CLI value. Planner and integration tasks use the same command but are routed to their dedicated execution paths.
 
-For a long-running worker, use `serve`; for bounded CI or proving-ground work, use `work-until-idle`. Both accept the control-plane URL, persisted identity, pre-cloned repository root, worktree root, reviewed provider-policy file, fallback allowed path, lease-state root, and parallelism:
+For a long-running worker, use `serve`; for bounded CI or proving-ground work, use `work-until-idle`. Both accept the control-plane URL, persisted identity, repository cache root, worktree root, reviewed provider-policy file, fallback allowed path, lease-state root, and parallelism:
 
 ```text
 serve <control-plane-url> <identity-file> <repositories-root> <workspace-root> <provider-policy-file> <allowed-prefixes> <state-root> <parallelism>

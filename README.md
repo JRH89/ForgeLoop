@@ -20,6 +20,9 @@ With the Compose stack running, open `http://localhost:5173`. The dashboard is F
 
 The named tunnel serves the public landing page and GitHub-authenticated dashboard at `https://forgeloop.hookerhillstudios.com`. Repository installation, human login, signed webhooks, and runner credentials remain separate security boundaries; see [GitHub user authentication](docs/github-user-authentication.md) and [Cloudflare Tunnel](docs/cloudflare-tunnel.md).
 
+- [Runner installation and API-key setup](docs/runner-setup.md) — also available in the dashboard User Guide.
+- [Deferred launch checks](docs/deferred-launch-checks.md) — off-host backup, reboot/server validation, and funded second-repository proof remain open.
+
 ### Control plane
 
 - [x] Spring Boot GraphQL control plane with persisted delivery-run, task, gate, criterion, and GitHub-delivery records.
