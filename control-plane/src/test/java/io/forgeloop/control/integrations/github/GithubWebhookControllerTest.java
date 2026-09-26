@@ -86,4 +86,19 @@ class GithubWebhookControllerTest {
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         return "sha256=" + HexFormat.of().formatHex(mac.doFinal(body.getBytes(StandardCharsets.UTF_8)));
     }
+
+    @Test void waitsForAssignmentAndStillRequiresLabel() throws Exception {
+        var connection = new RepositoryConnection("local-development", "owner/repo", 7, "main", "forgeloop", "GENERIC", List.of("unit"), 20);
+        connection.configureRequiredAssignee("worker");
+        when(connections.findByRepository("owner/repo")).thenReturn(java.util.Optional.of(connection));
+        String template = "{\"action\":\"%s\",\"installation\":{\"id\":7},\"repository\":{\"full_name\":\"owner/repo\"},\"issue\":{\"number\":1,\"state\":\"open\",\"title\":\"Fix\",\"body\":\"Spec\",\"labels\":%s,\"assignees\":%s}}";
+        String waiting = template.formatted("labeled", "[{\"name\":\"forgeloop\"}]", "[]");
+        controller.receive("waiting", "issues", signature(waiting), waiting);
+        String noLabel = template.formatted("assigned", "[]", "[{\"login\":\"worker\"}]");
+        controller.receive("no-label", "issues", signature(noLabel), noLabel);
+        verify(runs, never()).submitIssue(any());
+        String ready = template.formatted("assigned", "[{\"name\":\"forgeloop\"}]", "[{\"login\":\"Worker\"}]");
+        controller.receive("ready", "issues", signature(ready), ready);
+        verify(runs).submitIssue(any());
+    }
 }

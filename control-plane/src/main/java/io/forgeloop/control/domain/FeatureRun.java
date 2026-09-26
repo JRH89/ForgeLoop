@@ -14,6 +14,14 @@ public class FeatureRun {
   private double budgetUsd; private String harnessProfile; private String baseBranch; private int policyRevision;
   @Enumerated(EnumType.STRING) private RunState state; private Instant createdAt;
   private Instant approvedAt; private String approvedBy;
+  private boolean archived;
+  public boolean isArchived() { return archived; }
+  /** Archive is reversible and never cancels work or erases its evidence. */
+  public void setArchived(boolean archived) {
+    if (archived && !Set.of(RunState.COMPLETE, RunState.CANCELLED, RunState.FAILED, RunState.REJECTED).contains(state))
+      throw new IllegalStateException("Cancel active work before archiving it");
+    this.archived = archived;
+  }
   @OneToMany(mappedBy="run",cascade=CascadeType.ALL,orphanRemoval=true) private List<DeliveryTask> tasks=new ArrayList<>();
   @OneToMany(mappedBy="run",cascade=CascadeType.ALL,orphanRemoval=true) private List<VerificationGate> gates=new ArrayList<>();
   @OneToMany(mappedBy="run",cascade=CascadeType.ALL,orphanRemoval=true) private List<AcceptanceCriterion> criteria=new ArrayList<>();
@@ -48,6 +56,6 @@ public class FeatureRun {
   public void completeDelivery(){if(state!=RunState.READY_FOR_REVIEW&&state!=RunState.PR_OPEN)throw new IllegalStateException("Run is not awaiting delivery");if(!isApproved())throw new IllegalStateException("Run is not approved");state=RunState.COMPLETE;}
   public void resumeAfterRetry(DeliveryTask task){if(state!=RunState.BLOCKED&&state!=RunState.FAILED)throw new IllegalStateException("Run is not blocked");if(task.getRun()!=this)throw new IllegalArgumentException("Retry task does not belong to run");state="PLANNER".equals(task.getRole())?RunState.PLANNING:RunState.EXECUTING;approvedAt=null;approvedBy=null;}
   public long getSpentCostMicros(){return tasks.stream().mapToLong(DeliveryTask::getSpentCostMicros).sum();}
-  public boolean hasBudgetRemaining(){return getSpentCostMicros()<Math.round(budgetUsd*1_000_000d);}
+  public boolean hasBudgetRemaining(){return !archived && getSpentCostMicros()<Math.round(budgetUsd*1_000_000d);}
   public String getId(){return id;} public String getOrganizationId(){return organizationId;} public String getRepository(){return repository;} public String getSourceRef(){return sourceRef;} public String getTitle(){return title;} public String getSpecification(){return specification;} public double getBudgetUsd(){return budgetUsd;} public String getHarnessProfile(){return harnessProfile;} public String getBaseBranch(){return baseBranch;} public int getPolicyRevision(){return policyRevision;} public RunState getState(){return state;} public String getCreatedAt(){return createdAt.toString();} public List<DeliveryTask> getTasks(){return List.copyOf(tasks);} public List<VerificationGate> getGates(){return List.copyOf(gates);} public List<AcceptanceCriterion> getCriteria(){return List.copyOf(criteria);} public boolean isApproved(){return approvedAt!=null;} public String getApprovedAt(){return approvedAt==null?null:approvedAt.toString();} public String getApprovedBy(){return approvedBy;}
 }

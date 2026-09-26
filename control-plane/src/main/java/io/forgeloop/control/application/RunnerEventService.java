@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RunnerEventService {
     private static final Set<String> LEVELS=Set.of("DEBUG","INFO","WARN","ERROR");
-    private static final Set<String> TYPES=Set.of("LEASE_ACKNOWLEDGED","WORKSPACE_PREPARING","EXECUTION_STARTED","ARTIFACT_UPLOADED","TASK_COMPLETED","TASK_FAILED");
+    private static final Set<String> TYPES=Set.of("LEASE_ACKNOWLEDGED","WORKSPACE_PREPARING","EXECUTION_STARTED","EXECUTION_PROGRESS","PROVIDER_STARTED","PROVIDER_COMPLETED","PROVIDER_FAILED","ARTIFACT_UPLOADED","SCREENSHOTS_UPLOADED","TASK_COMPLETED","TASK_FAILED");
     private final TaskLeaseService leases; private final TaskLeaseRepository leaseRepository; private final DeliveryTaskRepository tasks; private final RunnerEventRepository events;
     public RunnerEventService(TaskLeaseService leases,TaskLeaseRepository leaseRepository,DeliveryTaskRepository tasks,RunnerEventRepository events){this.leases=leases;this.leaseRepository=leaseRepository;this.tasks=tasks;this.events=events;}
     @Transactional public RunnerEvent append(String leaseId,String runnerId,String nonce,long sequence,String level,String type,String message,Instant occurredAt){
