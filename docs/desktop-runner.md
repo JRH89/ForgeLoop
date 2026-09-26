@@ -24,6 +24,11 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
 No enrollment token needs copying. The local pairing secret never enters a URL.
 Connecting, saving settings, and checking prerequisites do not call a model.
 
+The pairing page itself loads without login so the fingerprint remains in the
+original tab while GitHub sign-in opens separately. Approval still requires an
+authenticated administrator. Verify this production proxy boundary with
+`scripts/Test-AnonymousPairing.ps1 -BaseUrl https://your-forgeloop-host`.
+
 ## Controls and local data
 
 **Pause after current work** allows the active batch to complete before stopping
