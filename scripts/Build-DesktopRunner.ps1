@@ -23,7 +23,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Runtime build failed' }
 $arguments=@('--type',$PackageType,'--name','ForgeLoop Runner','--app-version',$PackageVersion,'--vendor','Hooker Hill Studios','--description','Self-hosted ForgeLoop runner (development preview)','--input',$inputDirectory,'--main-jar','runner.jar','--main-class','io.forgeloop.runner.DesktopRunner','--runtime-image',$runtime,'--dest',(Join-Path $output 'packages'))
 if ($PackageType -eq 'msi') { $arguments+=@('--win-per-user-install','--win-menu','--win-shortcut','--win-dir-chooser') }
 if ($PackageType -eq 'dmg') { $arguments+=@('--mac-package-identifier','io.forgeloop.runner') }
-if ($PackageType -eq 'deb') { $arguments+=@('--linux-shortcut','--linux-package-name','forgeloop-runner','--linux-deb-maintainer','support@hookerhillstudios.com') }
+if ($PackageType -eq 'deb') { $arguments+=@('--linux-shortcut','--linux-package-name','forgeloop-runner','--install-dir','/opt/forgeloop-runner','--linux-deb-maintainer','support@hookerhillstudios.com') }
 & jpackage @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Desktop packaging failed' }
 Get-ChildItem -LiteralPath (Join-Path $output 'packages') -File | ForEach-Object {

@@ -16,8 +16,9 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
    administrator. The sign-in link opens a separate tab so the pairing request
    remains available. Return to the original tab to approve. Approval expires
    after five minutes; the desktop waits up to ten minutes for approval.
-5. Select the provider, model ID, and API key. Sonnet 5 price defaults are dated
-   estimates; other model/account prices must be supplied explicitly. Save.
+5. On the Provider step select the provider, model, and API key. Sonnet 5 price
+   defaults are dated estimates. Pricing overrides are collapsed by default;
+   custom models require explicit prices. Save to advance to the Run step.
 6. Check Git and Docker. Click **Start runner** and confirm potential API charges.
 
 No enrollment token needs copying. The local pairing secret never enters a URL.
@@ -40,7 +41,9 @@ is no plaintext fallback. Do not share the identity file or copy this state into
 a second active installation. Administrators/root can still inspect processes.
 
 Pause before editing settings or upgrading. Reopen after replacing the app;
-the existing identity and settings remain. Do not reconnect an existing identity
+the existing identity and settings remain. **Downloads / updates** opens the
+deployment's release page; it does not silently replace or execute a binary.
+Do not reconnect an existing identity
 to a different ForgeLoop address. The current preview does not migrate CLI or
 Docker identities. Uninstallation must retain state unless the user explicitly
 chooses to remove it; native keychain entries need separate removal when retiring
@@ -60,7 +63,9 @@ and an explicit jlink runtime retaining the child-JVM launcher. Native credentia
 calls use [JNA](https://github.com/java-native-access/jna). Sonnet defaults reference
 [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
 
-Still required before public release: platform GUI/keychain validation, signed
+Still required before public release: signed
 Windows packages, Apple Developer signing/notarization, trusted checksums and
-release hosting, dashboard-native downloads, OS login validation, and a verified
-update flow. Do not bypass OS security warnings to market this as production-ready.
+release hosting and publication of `frontend/public/downloads/desktop-manifest.json`,
+OS login validation, and signed-install/update acceptance. The manifest remains
+unpublished until installers have trusted signatures and recorded SHA-256 hashes.
+Do not bypass OS security warnings to market this as production-ready.

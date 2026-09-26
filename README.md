@@ -25,6 +25,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [Desktop runner onboarding](docs/desktop-runner-plan.md) — browser pairing and native installer work; unsigned development packages are not production releases.
 
 - [ ] Signed, verified Windows/macOS/Linux desktop installer with browser pairing and local runner controls (in development).
+- [x] Desktop preview: browser approval, native OS key storage, bundled-runtime package builds, setup-window tests, and real worker start/pause tests on Windows, macOS and Linux CI.
 
 - [x] Self-service administrator runner enrollment, downloadable runner package, Windows encrypted-key setup and optional login startup.
 - [x] Reversible intake-queue archive/restore and repository-specific GitHub assignee gating.

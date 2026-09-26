@@ -8,7 +8,8 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
 
 - [x] Browser pairing implementation and unit tests: administrator approval bound to a desktop-generated secret,
   short expiry, single-use exchange, organization isolation, no credentials in URLs.
-  Disposable-stack integration runs in CI; release acceptance remains gated on it.
+  Disposable-stack integration passed locally and in CI, including actual
+  PostgreSQL persistence, enrollment heartbeat, and replay rejection.
 - [ ] Desktop setup: bundled Java, prerequisite checks, secure native credential
   storage, provider/model selection and editable dated price estimates.
 - [ ] Lifecycle: explicit paid-work consent, start, graceful pause, status, redacted
@@ -18,12 +19,20 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
 - [ ] Guide and verification: first-install walkthrough and recovery coverage;
   distinguish tested operating systems from merely buildable packages.
 
-Implementation: native Swing shell, OS credential adapters, explicit worker start,
+Implementation: three-step native Swing shell, OS credential adapters, explicit worker start,
 batch-draining pause, bounded redacted logs, per-user single-instance lock, and
-opt-in user login startup are implemented. Windows MSI and Linux DEB builds passed
-the first matrix run; macOS packaging required a positive installer version, now
-fixed. Native secret-store round trips and the final matrix remain release gates.
-Do not change the public download links until release artifacts are trusted.
+opt-in user login startup are implemented. Windows MSI, macOS ARM64 DMG and Linux
+x64 DEB builds and native key-store round trips passed. Native setup screenshots
+were inspected. The real child-worker test proves heartbeat, polling and graceful
+idle pause without provider calls. The final matrix also exercises native package
+installation/launch on disposable hosts. The public download/update page remains
+explicitly unpublished until signed release artifacts exist. Prices for custom
+models remain explicit overrides, not invented defaults.
+
+Remaining owner-dependent release gate: Apple Developer signing/notarization and
+Windows code signing, permission to publish a release, and testing the signed
+install/update path through normal OS trust prompts. Do not bypass those prompts
+or claim unsigned CI artifacts are trusted public installers.
 
 ## Security and verification
 

@@ -1,7 +1,7 @@
 name: Desktop runner packages
 on:
   pull_request:
-    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', '.github/workflows/desktop-runner.yml']
+    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', '.github/workflows/desktop-runner.yml']
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
@@ -48,6 +48,9 @@ jobs:
       - name: Build unsigned native development installer
         shell: pwsh
         run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer
+      - name: Verify native installer launch on disposable host
+        shell: pwsh
+        run: ./scripts/Test-DesktopPackage.ps1 -PackageType '${{ matrix.type }}'
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-runner-${{ matrix.os }}-unsigned
