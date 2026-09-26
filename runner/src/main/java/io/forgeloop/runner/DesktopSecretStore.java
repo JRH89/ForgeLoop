@@ -44,7 +44,9 @@ public final class DesktopSecretStore {
         } else linux(List.of("secret-tool","clear","application","forgeloop-runner","installation",accountName()),new byte[0]);
     }
     private static byte[] linux(List<String> command,byte[] input)throws Exception{
-        Process process=new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+        Process process;
+        try{process=new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();}
+        catch(java.io.IOException missing){throw new IllegalStateException("Install libsecret-tools and unlock your desktop keyring; plaintext fallback is disabled",missing);}
         try(var stdin=process.getOutputStream()){stdin.write(input);}
         if(!process.waitFor(30,TimeUnit.SECONDS)){process.destroyForcibly();throw new IllegalStateException("Unlock your desktop keyring and retry");}
         if(process.exitValue()!=0)throw new IllegalStateException("Install libsecret tools and unlock your desktop keyring; plaintext fallback is disabled");
