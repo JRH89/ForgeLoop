@@ -21,10 +21,30 @@ it('renders the real intake queue and role-aware creation flow', async () => {
   render(<App />);
   expect(await screen.findByText('Intake queue')).toBeInTheDocument();
   expect(screen.getByText(/GitHub issues carrying/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '+ New run' }));
+  fireEvent.click(screen.getByRole('button', { name: '+ New Run' }));
   expect(screen.getByText('Start a delivery run')).toBeInTheDocument();
   expect(screen.getByLabelText('Authorized repository')).toBeInTheDocument();
   expect(screen.queryByText('Support Desk')).not.toBeInTheDocument();
+});
+
+it('filters the dashboard table and shows task verification progress', async () => {
+  const createdAt = new Date().toISOString();
+  vi.stubGlobal('fetch', controlPlane({
+    repositoryConnections: [],
+    featureRuns: [
+      { id: 'running', repository: 'acme/api', sourceRef: '#41', title: 'Export monthly report', state: 'EXECUTING', createdAt, tasks: [{ state: 'VERIFIED' }, { state: 'RUNNING' }] },
+      { id: 'ready', repository: 'acme/web', sourceRef: '#42', title: 'Improve onboarding', state: 'READY_FOR_REVIEW', publication: { pullRequestState: 'MERGED' }, createdAt, tasks: [{ state: 'VERIFIED' }] },
+      { id: 'failed', repository: 'acme/worker', sourceRef: '#43', title: 'Upgrade dependencies', state: 'FAILED', createdAt, tasks: [{ state: 'FAILED' }] },
+    ],
+  }));
+  render(<App />);
+
+  expect(await screen.findByRole('table')).toBeInTheDocument();
+  expect(screen.getByText('50%')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Succeeded/ }));
+  expect(screen.getByText('Improve onboarding')).toBeInTheDocument();
+  expect(screen.getByText('COMPLETE')).toBeInTheDocument();
+  expect(screen.queryByText('Upgrade dependencies')).not.toBeInTheDocument();
 });
 
 it('shows persisted harness and runner-local MCP configuration', async () => {
@@ -54,7 +74,7 @@ it('provides an in-app operator guide as the fifth navigation item', async () =>
   vi.stubGlobal('fetch', controlPlane({ repositoryConnections: [] }));
   render(<App />);
   await screen.findByText('Intake queue');
-  const guide = screen.getByRole('button', { name: /05 User guide/ });
+  const guide = screen.getByRole('button', { name: /User guide/ });
   expect(guide).toBeInTheDocument();
   fireEvent.click(guide);
   expect(screen.getByRole('heading', { name: 'Using ForgeLoop' })).toBeInTheDocument();

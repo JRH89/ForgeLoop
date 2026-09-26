@@ -7,6 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 import { createRoot } from "react-dom/client";
+import { BarChart3, BookOpen, GitBranch, ListChecks, SlidersHorizontal } from "lucide-react";
 import {
   approveFeatureRun,
   acknowledgeEscalation,
@@ -32,7 +33,9 @@ import {
   type PlatformConfiguration,
 } from "./api";
 import favicon from "./assets/favicon.png";
+import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
+import LandingPage from "./LandingPage";
 import "./styles.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
@@ -95,7 +98,7 @@ function RepositoryPage({ items }: { items: RepositoryConnection[] }) {
 function AnalyticsPage({analytics}:{analytics?:RunAnalytics}){
   if(!analytics)return <p className="loading">Loading analytics…</p>;
   const table=(title:string,items:RunAnalytics["modelComparisons"])=><section className="panel"><h2>{title}</h2>{items.length?items.map(item=><div className="item" key={item.name}><div><b>{item.name}</b><small>{item.runCount} runs · {item.requestCount} requests · {item.successfulRequests} succeeded · {(item.inputTokens+item.outputTokens).toLocaleString()} tokens</small></div><span>{money(item.knownCostMicros)}</span></div>):<p className="empty">No comparison data recorded yet.</p>}</section>;
-  return <><section className="hero"><p className="eyebrow">Measured delivery</p><h1>Run analytics</h1><p>Tenant-scoped facts from persisted provider telemetry—never fabricated estimates.</p></section><section className="metrics"><article><b>{analytics.totalRuns}</b><span>Total runs</span></article><article><b>{analytics.activeRuns}</b><span>Active runs</span></article><article><b>{analytics.deliveredRuns}</b><span>Delivered runs</span></article><article><b>{analytics.providerRequests}</b><span>Provider requests</span></article><article><b>{money(analytics.knownCostMicros)}</b><span>Known cost · {Math.round(analytics.costCoverage*100)}% coverage</span></article></section><div className="two-column">{table("Model comparison",analytics.modelComparisons)}{table("Harness comparison",analytics.harnessComparisons)}</div></>;
+  return <><section className="hero"><p className="eyebrow">Measured delivery</p><h1>Run analytics</h1><p>Tenant-scoped facts from persisted provider telemetry—never fabricated estimates.</p></section><section className="metrics analytics-metrics"><article><b>{analytics.totalRuns}</b><span>Total runs</span></article><article><b>{analytics.activeRuns}</b><span>Active runs</span></article><article><b>{analytics.deliveredRuns}</b><span>Delivered runs</span></article><article><b>{analytics.providerRequests}</b><span>Provider requests</span></article><article><b>{money(analytics.knownCostMicros)}</b><span>Known cost · {Math.round(analytics.costCoverage*100)}% coverage</span></article></section><div className="two-column">{table("Model comparison",analytics.modelComparisons)}{table("Harness comparison",analytics.harnessComparisons)}</div></>;
 }
 
 function NewRun({
@@ -225,6 +228,8 @@ function RunDetail({
     budget ? (run.spentCostMicros / budget) * 100 : 0,
   );
   const canOperate = operator.role !== "VIEWER";
+  const visibleRunState = operations.publication?.pullRequestState === "MERGED" || run.publication?.pullRequestState === "MERGED" ? "COMPLETE" : run.state;
+  const retryableTask = run.tasks.find((task) => retryable.has(task.state));
   async function action(label: string, callback: () => Promise<unknown>) {
     setBusy(label);
     setError("");
@@ -247,10 +252,10 @@ function RunDetail({
             {run.repository} · {run.sourceRef}
           </p>
           <h1>{run.title}</h1>
-          <p>{run.specification}</p>
+          <MarkdownContent content={run.specification} />
         </div>
-        <span className={`status ${run.state.toLowerCase()}`}>
-          {run.state.replaceAll("_", " ")}
+        <span className={`status ${visibleRunState.toLowerCase()}`}>
+          {visibleRunState.replaceAll("_", " ")}
         </span>
       </section>
       <section className="metrics">
@@ -304,6 +309,18 @@ function RunDetail({
             </p>
           </div>
           <div className="actions">
+            {["FAILED", "BLOCKED"].includes(run.state) && retryableTask && canOperate && (
+              <button
+                className="secondary"
+                disabled={!!busy}
+                onClick={() => {
+                  const reason = window.prompt("Reason for retrying this failed run");
+                  if (reason) void action("retry-run", () => retryFeatureTask(retryableTask.id, reason));
+                }}
+              >
+                {busy === "retry-run" ? "Retrying…" : "Retry run"}
+              </button>
+            )}
             {run.state === "READY_FOR_REVIEW" &&
               !run.approved &&
               operator.role === "ADMIN" && (
@@ -319,7 +336,7 @@ function RunDetail({
                   Approve release
                 </button>
               )}
-            {!terminal.has(run.state) && canOperate && (
+            {!terminal.has(run.state) && !run.approved && canOperate && (
               <button
                 className="danger"
                 disabled={!!busy}
@@ -552,16 +569,26 @@ function RunDetail({
             <p className="empty">No audit events recorded.</p>
           )}
         </section>
-        <section className="panel">
-          <h2>GitHub delivery</h2>
+        <section className="panel github-delivery">
+          <div className="section-heading github-delivery-heading">
+            <div><p className="eyebrow">Publication</p><h2>GitHub delivery</h2></div>
+            {operations.publication && (() => {
+              const state = operations.publication.mergedAt ? "MERGED" : operations.publication.pullRequestState;
+              const stateLabels: Record<string, string> = { OPEN: "PULL REQUEST OPEN", DRAFT: "DRAFT PR", CLOSED: "CLOSED", MERGED: "MERGED", UNKNOWN: "STATUS UNKNOWN", NOT_CREATED: "BRANCH READY" };
+              const stateClasses: Record<string, string> = { OPEN: "ready_for_review", DRAFT: "running", CLOSED: "closed", MERGED: "complete", UNKNOWN: "held", NOT_CREATED: "running" };
+              return <span className={`status ${stateClasses[state] ?? "held"}`}>{stateLabels[state] ?? state}</span>;
+            })()}
+          </div>
           {operations.publication ? (
             <>
-              <p>
-                <b>{operations.publication.branch}</b>
-              </p>
-              <small>
-                {operations.publication.headSha ?? "Branch pending"}
-              </small>
+              <dl className="github-delivery-meta">
+                <div><dt>Repository</dt><dd>{operations.publication.repository}</dd></div>
+                <div><dt>Branch</dt><dd><code title={operations.publication.branch}>{operations.publication.branch}</code></dd></div>
+                <div><dt>Commit</dt><dd><code title={operations.publication.headSha}>{operations.publication.headSha?.slice(0, 12) ?? "Pending"}</code></dd></div>
+                <div><dt>Delivery</dt><dd>{operations.publication.mergedAt ? `Merged ${stamp(operations.publication.mergedAt)}` : operations.publication.pullRequestState === "MERGED" ? "Merged on GitHub" : operations.publication.pullRequestState === "CLOSED" ? "Closed on GitHub" : operations.publication.deliveredAt ? `Published ${stamp(operations.publication.deliveredAt)}` : "Awaiting publication"}</dd></div>
+                <div><dt>Auto-merge</dt><dd>{operations.publication.mergedAt || operations.publication.pullRequestState === "MERGED" ? "Merged" : operations.publication.autoMergeRequested ? "Requested" : "Not requested"}</dd></div>
+                {operations.publication.mergeSha && <div><dt>Merge commit</dt><dd><code title={operations.publication.mergeSha}>{operations.publication.mergeSha.slice(0, 12)}</code></dd></div>}
+              </dl>
               {operations.publication.pullRequestNumber && (
                 <a
                   className="primary inline"
@@ -569,7 +596,7 @@ function RunDetail({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Open pull request #{operations.publication.pullRequestNumber}
+                  View pull request #{operations.publication.pullRequestNumber}
                 </a>
               )}
             </>
@@ -583,6 +610,35 @@ function RunDetail({
       </div>
     </div>
   );
+}
+
+type RunFilter = "All" | "Running" | "Succeeded" | "Failed";
+
+function runCategory(state: string): Exclude<RunFilter, "All"> {
+  if (["READY_FOR_REVIEW", "COMPLETE"].includes(state)) return "Succeeded";
+  if (["BLOCKED", "FAILED", "REJECTED", "CANCELLED"].includes(state)) return "Failed";
+  return "Running";
+}
+
+function displayedRunState(run: FeatureRun): string {
+  return run.publication?.pullRequestState === "MERGED" ? "COMPLETE" : run.state;
+}
+
+function runProgress(run: FeatureRun): number {
+  if (["READY_FOR_REVIEW", "COMPLETE"].includes(displayedRunState(run))) return 100;
+  if (!run.tasks.length) return 0;
+  return Math.round((run.tasks.filter((task) => task.state === "VERIFIED").length / run.tasks.length) * 100);
+}
+
+function relativeTime(value: string): string {
+  const elapsed = Math.max(0, Date.now() - new Date(value).getTime());
+  if (!Number.isFinite(elapsed)) return "—";
+  const minutes = Math.floor(elapsed / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function RunsPage({
@@ -606,7 +662,10 @@ function RunsPage({
     audit: [],
   });
   const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState<RunFilter>("All");
   const run = runs.find((item) => item.id === selected);
+  const filters: RunFilter[] = ["All", "Running", "Succeeded", "Failed"];
+  const visibleRuns = runs.filter((item) => filter === "All" || runCategory(displayedRunState(item)) === filter);
   async function refresh() {
     if (!selected) return;
     const [updated, detail] = await Promise.all([
@@ -618,9 +677,6 @@ function RunsPage({
     );
     setOperations(detail);
   }
-  useEffect(() => {
-    if (!selected && runs[0]) setSelected(runs[0].id);
-  }, [runs, selected]);
   useEffect(() => {
     if (!selected) return;
     void loadRunOperations(selected).then(setOperations);
@@ -645,65 +701,53 @@ function RunsPage({
     );
   return (
     <>
-      <section className="page-title">
+      <section className="page-title runs-title">
         <div>
-          <p className="eyebrow">Delivery operations</p>
           <h1>Runs</h1>
-          <p>From issue intake to verified, approved pull request.</p>
+          <p>Turn specifications into working software.</p>
         </div>
         {operator.role !== "VIEWER" && (
           <button className="primary" onClick={() => setCreating(true)}>
-            + New run
+            + New Run
           </button>
         )}
       </section>
-      <div className="workspace">
-        <section className="panel run-list">
-          <div className="filters">
-            <b>Intake queue</b>
-            <span>{runs.length} total</span>
-          </div>
-          {runs.length ? (
-            runs.map((item) => (
-              <button
-                className={`run ${selected === item.id ? "selected" : ""}`}
-                key={item.id}
-                onClick={() => setSelected(item.id)}
-              >
-                <div>
-                  <b>{item.title}</b>
-                  <small>
-                    {item.repository} · {item.sourceRef}
-                  </small>
-                </div>
-                <span className={`status ${item.state.toLowerCase()}`}>
-                  {item.state.replaceAll("_", " ")}
-                </span>
-              </button>
-            ))
-          ) : (
-            <p className="empty">
-              GitHub issues carrying the configured intake label will appear
-              here automatically.
-            </p>
-          )}
-        </section>
-        <div>
-          {run ? (
-            <RunDetail
-              run={run}
-              operations={operations}
-              operator={operator}
-              onRefresh={refresh}
-            />
-          ) : (
-            <section className="panel empty-state">
-              <h2>No run selected</h2>
-              <p>Connect a repository or submit a run to begin.</p>
-            </section>
-          )}
+      <section className="panel runs-dashboard">
+        <h2 className="visually-hidden">Intake queue</h2>
+        <div className="run-filters" role="group" aria-label="Filter runs">
+          {filters.map((item) => (
+            <button key={item} className={filter === item ? "active" : ""} aria-pressed={filter === item} onClick={() => setFilter(item)}>
+              {item}{" "}<span>{item === "All" ? runs.length : runs.filter((runItem) => runCategory(displayedRunState(runItem)) === item).length}</span>
+            </button>
+          ))}
         </div>
-      </div>
+        {visibleRuns.length ? (
+          <div className="runs-table-wrap">
+            <table className="runs-table">
+              <thead><tr><th scope="col">Run</th><th scope="col">Repository</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Started</th></tr></thead>
+              <tbody>
+                {visibleRuns.map((item) => {
+                  const progressPercent = runProgress(item);
+                  return (
+                    <tr key={item.id} className={selected === item.id ? "selected" : ""} tabIndex={0} aria-label={`Open run ${item.title}`} onClick={() => setSelected(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(item.id); } }}>
+                      <td><b>{item.sourceRef}</b><small>{item.title}</small></td>
+                      <td>{item.repository}</td>
+                      <td><span className={`status ${displayedRunState(item).toLowerCase()}`}>{displayedRunState(item).replaceAll("_", " ")}</span></td>
+                      <td><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
+                      <td><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : runs.length ? (
+          <p className="empty">No {filter.toLowerCase()} runs.</p>
+        ) : (
+          <p className="empty">GitHub issues carrying the configured intake label will appear here automatically.</p>
+        )}
+      </section>
+      {run && <RunDetail run={run} operations={operations} operator={operator} onRefresh={refresh} />}
     </>
   );
 }
@@ -771,6 +815,7 @@ function App() {
               {operator.role.toLowerCase()} · {operator.organizationId}
             </span>
           )}
+          <a className="logout" href="/logout">Sign out</a>
         </div>
       </header>
       <div className="shell">
@@ -780,17 +825,17 @@ function App() {
               className={page === "Runs" ? "active" : ""}
               onClick={() => setPage("Runs")}
             >
-              <span className="nav-icon">01</span> Runs
+              <span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Runs
             </button>
-            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}><span className="nav-icon">02</span> Analytics</button>
+            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}><span className="nav-icon" aria-hidden="true"><BarChart3 size={17} strokeWidth={1.9} /></span> Analytics</button>
             <button
               className={page === "Repositories" ? "active" : ""}
               onClick={() => setPage("Repositories")}
             >
-              <span className="nav-icon">03</span> Repositories
+              <span className="nav-icon" aria-hidden="true"><GitBranch size={17} strokeWidth={1.9} /></span> Repositories
             </button>
-            <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon">04</span> Harness &amp; policy</button>
-            <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon">05</span> User guide</button>
+            <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
+            <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon" aria-hidden="true"><BookOpen size={17} strokeWidth={1.9} /></span> User guide</button>
           </nav>
           <p className="sidebar-note">
             Repository code and commands execute only on an enrolled customer
@@ -827,6 +872,6 @@ function App() {
 if (import.meta.env.MODE !== "test") {
   const root = document.getElementById("root");
   if (!root) throw new Error("ForgeLoop root element is missing");
-  createRoot(root).render(<App />);
+  createRoot(root).render(window.location.pathname.startsWith("/app") ? <App /> : <LandingPage />);
 }
 export default App;
