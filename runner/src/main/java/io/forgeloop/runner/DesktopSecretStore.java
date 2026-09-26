@@ -11,33 +11,37 @@ import java.util.concurrent.TimeUnit;
 /** Uses OS-protected storage and never falls back to plaintext or secret command arguments. */
 public final class DesktopSecretStore {
     private final Path directory;
-    public DesktopSecretStore(Path directory){this.directory=directory;}
+    private final String slot;
+    public DesktopSecretStore(Path directory){this(directory,"provider");}
+    public DesktopSecretStore(Path directory,String slot){if(!slot.matches("[a-z]{1,20}"))throw new IllegalArgumentException("Invalid credential slot");this.directory=directory;this.slot=slot;}
+    private Path encryptedFile(){return directory.resolve(slot+"-key.dpapi");}
+    private String accountName(){return directory+":"+slot;}
     public void save(String secret) throws Exception {
         if(secret==null||secret.isBlank()||secret.length()>8192||secret.contains("\n")||secret.contains("\r"))throw new IllegalArgumentException("Enter a valid provider API key");
         byte[] bytes=secret.getBytes(StandardCharsets.UTF_8);
         try {
-            if(Platform.isWindows())Files.write(directory.resolve("provider-key.dpapi"),Crypt32Util.cryptProtectData(bytes));
+            if(Platform.isWindows())DesktopFiles.writeAtomic(encryptedFile(),Crypt32Util.cryptProtectData(bytes));
             else if(Platform.isMac())macSave(bytes);
-            else linux(List.of("secret-tool","store","--label=ForgeLoop Runner provider key","application","forgeloop-runner","installation",directory.toString()),bytes);
+            else linux(List.of("secret-tool","store","--label=ForgeLoop Runner provider key","application","forgeloop-runner","installation",accountName()),bytes);
         } finally {Arrays.fill(bytes,(byte)0);}
     }
     public String load() throws Exception {
         byte[] bytes;
-        if(Platform.isWindows())bytes=Crypt32Util.cryptUnprotectData(Files.readAllBytes(directory.resolve("provider-key.dpapi")));
+        if(Platform.isWindows())bytes=Crypt32Util.cryptUnprotectData(Files.readAllBytes(encryptedFile()));
         else if(Platform.isMac())bytes=macLoad();
-        else bytes=linux(List.of("secret-tool","lookup","application","forgeloop-runner","installation",directory.toString()),new byte[0]);
+        else bytes=linux(List.of("secret-tool","lookup","application","forgeloop-runner","installation",accountName()),new byte[0]);
         try {String result=new String(bytes,StandardCharsets.UTF_8).stripTrailing();if(result.isBlank())throw new IllegalStateException("Provider key not found; save it again");return result;}
         finally{Arrays.fill(bytes,(byte)0);}
     }
     public void remove() throws Exception {
-        if(Platform.isWindows())Files.deleteIfExists(directory.resolve("provider-key.dpapi"));
+        if(Platform.isWindows())Files.deleteIfExists(encryptedFile());
         else if(Platform.isMac()){
             Keychain api=Native.load("Security",Keychain.class);var item=new PointerByReference();byte[] service=service(),account=account();
             int status=api.SecKeychainFindGenericPassword(null,service.length,service,account.length,account,null,null,item);
             if(status==-25300)return;
             if(status!=0)throw new IllegalStateException("Keychain denied removal");
             try{if(api.SecKeychainItemDelete(item.getValue())!=0)throw new IllegalStateException("Keychain removal failed");}finally{Native.load("CoreFoundation",CoreFoundation.class).CFRelease(item.getValue());}
-        } else linux(List.of("secret-tool","clear","application","forgeloop-runner","installation",directory.toString()),new byte[0]);
+        } else linux(List.of("secret-tool","clear","application","forgeloop-runner","installation",accountName()),new byte[0]);
     }
     private static byte[] linux(List<String> command,byte[] input)throws Exception{
         Process process=new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
@@ -55,7 +59,7 @@ public final class DesktopSecretStore {
         int SecKeychainItemDelete(Pointer item);
     }
     interface CoreFoundation extends Library {void CFRelease(Pointer reference);}
-    private byte[] account(){return directory.toString().getBytes(StandardCharsets.UTF_8);}
+    private byte[] account(){return accountName().getBytes(StandardCharsets.UTF_8);}
     private static byte[] service(){return "io.forgeloop.runner".getBytes(StandardCharsets.UTF_8);}
     private void macSave(byte[] bytes){
         Keychain api=Native.load("Security",Keychain.class);var item=new PointerByReference();byte[] service=service(),account=account();

@@ -18,4 +18,7 @@ class DesktopFilesTest {
         store.save("replacement-fake-key");assertEquals("replacement-fake-key",store.load());
     }
     @Test void rejectsMalformedKeysWithoutCallingNativeStorage(){var store=new DesktopSecretStore(directory);assertThrows(IllegalArgumentException.class,()->store.save(""));assertThrows(IllegalArgumentException.class,()->store.save("key\nother"));}
+    @Test void replacesCompleteConfigurationAndCleansTemporaryFile()throws Exception{
+        Path file=directory.resolve("config.json");DesktopFiles.writeAtomic(file,"old".getBytes());DesktopFiles.writeAtomic(file,"new".getBytes());assertEquals("new",Files.readString(file));try(var files=Files.list(directory)){assertEquals(1,files.count());}
+    }
 }

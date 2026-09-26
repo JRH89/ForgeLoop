@@ -21,4 +21,10 @@ public final class DesktopFiles {
         if(Files.isDirectory(path))builder.setFlags(AclEntryFlag.DIRECTORY_INHERIT,AclEntryFlag.FILE_INHERIT);
         acl.setAcl(List.of(builder.build()));
     }
+    /** Replace complete files only, so interruption cannot truncate an existing configuration. */
+    public static void writeAtomic(Path path,byte[] content)throws Exception{
+        Path temporary=Files.createTempFile(path.getParent(),".config-",".tmp");
+        try{protect(temporary);Files.write(temporary,content);Files.move(temporary,path,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
+        finally{Files.deleteIfExists(temporary);}
+    }
 }
