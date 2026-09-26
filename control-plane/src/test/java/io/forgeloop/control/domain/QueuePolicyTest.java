@@ -25,4 +25,14 @@ class QueuePolicyTest {
         repository.configureRequiredAssignee("");
         assertTrue(repository.acceptsAssignees(List.of()));
     }
+    @Test void confirmedMergeCanArchiveLegacyDeliveryWithoutChangingItsState() {
+        var run = new FeatureRun("org", "owner/repo", "issue-1", "title", "spec", 10, "GENERIC", 1);
+        // A fixture without required gates models a previously verified delivery.
+        run.evaluateReviewReadiness();
+        assertEquals(RunState.READY_FOR_REVIEW,run.getState());
+        assertThrows(IllegalStateException.class,()->run.setArchived(true));
+        run.setArchived(true,true);
+        assertTrue(run.isArchived());assertFalse(run.hasBudgetRemaining());
+        assertEquals(RunState.READY_FOR_REVIEW,run.getState());
+    }
 }

@@ -18,7 +18,11 @@ public class FeatureRun {
   public boolean isArchived() { return archived; }
   /** Archive is reversible and never cancels work or erases its evidence. */
   public void setArchived(boolean archived) {
-    if (archived && !Set.of(RunState.COMPLETE, RunState.CANCELLED, RunState.FAILED, RunState.REJECTED).contains(state))
+    setArchived(archived, false);
+  }
+  public void setArchived(boolean archived, boolean confirmedMerged) {
+    boolean delivered = confirmedMerged && Set.of(RunState.READY_FOR_REVIEW, RunState.PR_OPEN).contains(state);
+    if (archived && !delivered && !Set.of(RunState.COMPLETE, RunState.CANCELLED, RunState.FAILED, RunState.REJECTED).contains(state))
       throw new IllegalStateException("Cancel active work before archiving it");
     this.archived = archived;
   }

@@ -695,6 +695,7 @@ function RunsPage({
     let stopped=false;
     let timer:number;
     let failures=0;
+    setOperations({evidence:[],reviews:[],artifacts:[],events:[],escalations:[],audit:[]});
     // Serialized polling prevents overlapping requests and stale responses after selection changes.
     async function poll() {
       try {
@@ -771,7 +772,7 @@ function RunsPage({
                       <td><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
                       <td>{costSummary(item)}</td>
                       <td><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
-                      <td>{operator.role!=='VIEWER'&&(item.archived||terminal.has(item.state))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
+                      <td>{operator.role!=='VIEWER'&&(item.archived||terminal.has(displayedRunState(item)))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
                     </tr>
                   );
                 })}

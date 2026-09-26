@@ -28,7 +28,9 @@ The runner executes inside customer-controlled infrastructure. It registers with
 
 For the complete source installation, enrollment, provider-key, and startup
 walkthrough, see [Runner setup](../docs/runner-setup.md). The same document is
-rendered inside the dashboard User Guide. Enrollment is currently administrator-assisted.
+rendered inside the dashboard User Guide. Administrators issue enrollment tokens
+directly in Harness & policy. The downloadable package includes a Windows setup
+wizard, encrypted local key storage, and optional start-at-login task.
 
 ```sh
 docker build -t forgeloop-runner:local runner
