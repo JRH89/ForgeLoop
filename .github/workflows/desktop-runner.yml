@@ -1,7 +1,7 @@
 name: Desktop runner packages
 on:
   pull_request:
-    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', '.github/workflows/desktop-runner.yml']
+    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', 'scripts/Test-DesktopUpgrade.ps1', '.github/workflows/desktop-runner.yml']
   workflow_dispatch:
 permissions: {contents: read}
 jobs:
@@ -61,6 +61,14 @@ jobs:
         with:
           name: desktop-runner-${{ matrix.os }}-unsigned
           path: artifacts/native-installer/packages/*
+      - name: Build previous installer revision for upgrade regression
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Build-DesktopRunner.ps1 -PackageType msi -PackageVersion 1.0.0 -OutputDirectory artifacts/desktop-baseline
+      - name: Verify Windows upgrade and uninstall preserve private state
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Test-DesktopUpgrade.ps1
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-setup-screenshot-${{ matrix.os }}

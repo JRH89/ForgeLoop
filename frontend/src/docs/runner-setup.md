@@ -13,6 +13,17 @@ save your API key in your operating system's secure storage, check Git/Docker,
 and explicitly start work. Sonnet 5 pricing defaults can be overridden; custom
 models require explicit prices. No provider call is made during setup.
 
+On reopening, **Run** is selected when your setup is saved. An empty key field
+does not mean your key was lost: leave it blank to retain the stored key.
+**Check saved key locally** verifies protected storage without calling the model;
+**Check saved connection** sends only a heartbeat. Neither spends model credits.
+**Reopen approval page** and **Cancel connection** recover an interrupted pairing
+attempt without editing URLs. Old installations without a saved display name
+show **Previously connected runner**; do not re-enroll just to change that label.
+**Export safe diagnostics** saves runtime/status information, not credentials or
+raw task logs. Log history is session-only. Keep **Start work at sign-in** off
+when you do not want automatic API spending.
+
 Use **Pause after current work** before closing or updating. Optional sign-in
 startup can spend API credits and requires Docker and an unlocked keyring.
 Windows uses DPAPI, macOS uses Keychain, and Linux requires libsecret tools and

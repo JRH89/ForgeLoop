@@ -74,3 +74,33 @@ release hosting and publication of `frontend/public/downloads/desktop-manifest.j
 OS login validation, and signed-install/update acceptance. The manifest remains
 unpublished until installers have trusted signatures and recorded SHA-256 hashes.
 Do not bypass OS security warnings to market this as production-ready.
+
+## Desktop 1.0.1 usability and free checks
+
+The desktop preview uses a consistent dark theme, the existing ForgeLoop favicon,
+and a three-step layout. Reopening a configured installation selects Run and logs
+that the existing connection/settings were restored. The API-key field stays blank
+on purpose: **Saved key configured - leave blank to keep** is not a claim that the
+provider accepted the key. Keys are decrypted only for an explicit local check,
+settings save, or work start, not simply to render the window.
+
+- **Check saved connection** sends a heartbeat only; it does not claim tasks.
+- **Check saved key locally** checks OS-protected storage, not provider credit or
+  API validity. Neither check calls a model.
+- **Reopen approval page** opens the current fingerprint page while pairing is
+  pending. **Cancel connection** stops polling after an in-flight request returns
+  (up to the HTTP timeout), then Connect starts a fresh attempt. If approval wins
+  the race, the issued identity is retained rather than discarded.
+- New connections remember their display name. Older 1.0.0 installations that
+  never saved a name show **Previously connected runner** without re-enrollment.
+- **Export safe diagnostics** writes an allowlisted runtime/status summary. It
+  excludes keys, runner credentials, account/repository identifiers and raw task
+  logs. The in-app log remains session-only; it is intentionally not reloaded.
+
+Offline regression coverage includes pairing pending/success/timeout/cancellation,
+connection errors, saved-window restoration without decrypting keys, diagnostics
+redaction, and child-worker start/pause/restart against a loopback fake control
+plane. Native package CI covers all three supported build targets; Windows also
+tests 1.0.0-to-1.0.1 installer replacement and private-state survival across
+uninstall/reinstall. These checks do not replace real-provider delivery evidence
+or actual OS sign-in/reboot acceptance. The public manifest remains unpublished.

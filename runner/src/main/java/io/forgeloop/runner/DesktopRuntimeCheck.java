@@ -5,6 +5,7 @@ import java.nio.file.*;
 public final class DesktopRuntimeCheck {
     private DesktopRuntimeCheck(){}
     public static void verify()throws Exception{
+        DesktopTheme.install();
         Path directory=Files.createTempDirectory("forgeloop-runtime-check-");DesktopFiles.protect(directory);
         DesktopSecretStore store=new DesktopSecretStore(directory,"check");
         try{
