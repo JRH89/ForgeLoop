@@ -5,6 +5,13 @@ concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test Windows runner setup without external services
+        shell: powershell
+        run: ./scripts/Test-RunnerInstaller.ps1
   control-plane:
     runs-on: ubuntu-latest
     steps:
@@ -68,6 +75,11 @@ jobs:
       - name: Restore database into an isolated container
         shell: pwsh
         run: ./scripts/Test-PostgresRestore.ps1
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: '21' }
+      - name: Verify downloadable runner and enrollment
+        shell: pwsh
+        run: ./scripts/Test-RunnerPackage.ps1
       - run: npm ci
         working-directory: frontend
       # Browser binaries are intentionally not committed; provision the pinned Playwright Chromium in CI.

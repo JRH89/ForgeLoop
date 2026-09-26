@@ -27,6 +27,19 @@ public class RepositoryConnection {
   @Column(nullable = false, length = 2000) private String requiredGates;
   @Column(nullable = false) private double maxBudgetUsd;
   @Column(nullable = false) private int policyRevision;
+  private String requiredAssignee;
+  public String getRequiredAssignee() { return requiredAssignee; }
+  /** Null disables assignment gating; usernames are compared case-insensitively. */
+  public void configureRequiredAssignee(String login) {
+    String normalized = login == null ? "" : login.trim();
+    if (!normalized.isEmpty() && !normalized.matches("[A-Za-z0-9][A-Za-z0-9\\-]{0,38}(\\[bot\\])?"))
+      throw new IllegalArgumentException("Enter a GitHub assignee login, without @");
+    requiredAssignee = normalized.isEmpty() ? null : normalized;
+    policyRevision++;
+  }
+  public boolean acceptsAssignees(List<String> logins) {
+    return requiredAssignee == null || logins.stream().anyMatch(requiredAssignee::equalsIgnoreCase);
+  }
   @OneToMany(mappedBy = "connection", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<RepositoryVerificationPolicy> verificationPolicies = new ArrayList<>();
 

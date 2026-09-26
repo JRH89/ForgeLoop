@@ -7,6 +7,12 @@ import java.util.Locale;
 /** Calculates costs from operator-managed model rates; ForgeLoop does not hard-code changeable vendor prices. */
 public final class ProviderCostCalculator {
     public ProviderCostEstimate fromEnvironment(ProviderExecutionPolicy policy, ProviderResult result) {
+        // Human-readable per-model policy rates take precedence over legacy environment rates.
+        if (policy.inputUsdPerMillion() != null) {
+            BigDecimal micros = BigDecimal.valueOf(result.inputTokens()).multiply(policy.inputUsdPerMillion())
+                    .add(BigDecimal.valueOf(result.outputTokens()).multiply(policy.outputUsdPerMillion()));
+            return new ProviderCostEstimate(micros.setScale(0, RoundingMode.CEILING).longValueExact(), true);
+        }
         String prefix = "FORGELOOP_" + normalize(policy.provider()) + "_" + normalize(policy.model());
         String input = System.getenv(prefix + "_INPUT_MICROS_PER_MILLION");
         String output = System.getenv(prefix + "_OUTPUT_MICROS_PER_MILLION");

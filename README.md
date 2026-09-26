@@ -23,6 +23,14 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [Runner installation and API-key setup](docs/runner-setup.md) — also available in the dashboard User Guide.
 - [Deferred launch checks](docs/deferred-launch-checks.md) — off-host backup, reboot/server validation, and funded second-repository proof remain open.
 
+- [x] Self-service administrator runner enrollment, downloadable runner package, Windows encrypted-key setup and optional login startup.
+- [x] Reversible intake-queue archive/restore and repository-specific GitHub assignee gating.
+- [x] Runner-local per-model pricing, explicit unpriced requests, and automatic two-second run updates with metadata progress events.
+
+Build the complete downloadable-runner web image through `docker compose build web`
+(root-context `deploy/web.Dockerfile`). The standalone `frontend/Dockerfile` builds
+only the frontend and does not package the runner.
+
 ### Control plane
 
 - [x] Spring Boot GraphQL control plane with persisted delivery-run, task, gate, criterion, and GitHub-delivery records.

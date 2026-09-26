@@ -4,12 +4,37 @@ The runner runs on your own machine or dedicated server, not in your browser.
 GitHub sign-in, repository installation, runner enrollment, and model-provider
 credentials are separate. Connecting a repository does not install a runner.
 
-### Current installation boundary
+### Guided installation (recommended)
 
-Installation is currently source-based and administrator-assisted. There is no
-one-click installer or runner-enrollment screen yet. Ask your organization
-administrator for a single-use enrollment token (valid for 15 minutes).
-Administrators issue it through the authenticated GraphQL API:
+Open **Harness & policy → Install and connect a runner**. Administrators can
+generate a single-use enrollment token there; other roles ask their administrator.
+The panel lists runner heartbeats so you can confirm the connection.
+
+1. Download the runner ZIP and its SHA-256 checksum from that panel. Verify the
+   checksum, review the included scripts, and extract into a private permanent folder.
+2. Install prerequisites: Java 21+, Git, and Docker with Linux containers. The
+   package includes the tested runner JAR; no source checkout or Maven is needed.
+3. On Windows run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Runner.ps1`.
+   Setup prompts for the control-plane URL, enrollment token, provider/model,
+   API key, and input/output USD prices per million tokens.
+4. Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-Runner.ps1` when
+   ready to process eligible issues. Setup itself makes no paid model request.
+
+Add `-StartAtLogin` to installation for an optional hidden, current-user scheduled
+task. Docker must also start at login. It is not an always-on server service and
+does not run before login. Without this option, keep the foreground terminal open.
+Windows keys are encrypted with DPAPI for the installing user and machine;
+they cannot be moved to another host. Local administrators can still inspect
+running processes. The package README includes direct Java commands for Linux/macOS.
+
+Stop the worker before rotating keys or changing models/prices, rerun setup
+without `-StartAtLogin`, and restart. Existing identity is retained. Upgrades must
+preserve identity, configuration, policy and encrypted secrets; replace binaries
+and scripts only. Never enroll multiple workers with the same identity.
+
+Enrollment tokens expire after 15 minutes. The installer supplies them on stdin,
+not as visible process arguments. The browser never asks for your provider key.
+Advanced administrators can also issue tokens through the authenticated GraphQL API:
 
 ```graphql
 mutation EnrollRunner($organizationId: String!) {
@@ -21,7 +46,7 @@ Use your actual organization ID and administrator authentication. Never disable
 authentication to enroll a runner. Treat the response as a secret; do not paste
 it in issues or logs. Enrollment tokens are not GitHub installation IDs or API keys.
 
-### Windows source installation
+### Advanced: Windows source installation
 
 Prerequisites: Git, Java 21, Maven, and a running Docker daemon using Linux
 containers. Use a dedicated account with access only to the repositories and
@@ -145,5 +170,47 @@ binary and retain its state when upgrading.
   another runner's identity or invent credentials.
 
 Runner commands and container workspace/socket configuration are also documented
-in the repository's `runner/README.md`. Self-service enrollment UI, packaged
-installation, and service setup remain onboarding improvements, not completed features.
+in the repository's `runner/README.md`.
+
+### Prices, costs, and budgets
+
+The installer writes `inputUsdPerMillion` and `outputUsdPerMillion` alongside
+provider/model/maxAttempts in the runner-local policy. For source installations,
+add both nonnegative numeric fields to each role (or a `default` entry). Example
+shape using illustrative rates, not current vendor prices:
+
+```json
+{"default":{"provider":"anthropic","model":"YOUR_MODEL_ID","maxAttempts":2,"inputUsdPerMillion":3,"outputUsdPerMillion":15}}
+```
+
+Use rates from your actual provider account. Policy rates override legacy pricing
+environment variables. Costs are estimates for recorded input/output tokens,
+not provider invoices; caching, tools, tiers and other charges can differ.
+Unknown older requests remain explicitly unpriced, not $0.00, and are not
+retroactively altered. Budget remaining is based on priced usage only, so missing
+rates reduce budget accuracy. Future work needs a configured price to report cost.
+
+### Assignment-gated intake
+
+In **Repositories**, set **Required GitHub assignee** to a login without `@`.
+Both the intake label and that assignee must be present before a new issue starts.
+Leave it blank to use label-only intake. Choose a login GitHub lets you assign in
+that repository; the setting does not make an arbitrary App bot assignable.
+Assigning a labeled issue or labeling an assigned issue both trigger evaluation.
+It applies to future intake, not cancellation of existing work. Manual submissions
+remain explicit operator requests and do not use this GitHub-only gate.
+
+### Clear the intake queue and follow progress
+
+Use **Archive** on terminal runs, or cancel active work first. **Show archived runs**
+lets you inspect them and **Restore** puts them back. Archiving keeps evidence,
+audit records, costs, and GitHub issue deduplication; it never deletes GitHub work.
+Permanent destruction is deliberately not the queue-cleanup action.
+
+The queue and selected run refresh every two seconds while visible, with slower
+background polling and error backoff. The status line shows the last successful
+refresh and connection failures. Runner events include provider start/completion,
+token counts and ten-second elapsed-time progress during provider/verification
+work. These are safe metadata events, not raw model reasoning or streamed secrets.
+Verification output remains in the completed evidence. Older runners must be
+upgraded to emit the additional event types.

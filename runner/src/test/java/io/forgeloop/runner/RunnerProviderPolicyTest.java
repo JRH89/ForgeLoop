@@ -9,6 +9,16 @@ import org.junit.jupiter.api.io.TempDir;
 
 class RunnerProviderPolicyTest {
     @TempDir Path directory;
+    @Test void parsesPricesAndRejectsPartialNegativeOrSecretFields() throws Exception {
+        Path policy=directory.resolve("priced.json");
+        String base="{\"default\":{\"provider\":\"anthropic\",\"model\":\"model\",\"maxAttempts\":2%s}}";
+        Files.writeString(policy,base.formatted(",\"inputUsdPerMillion\":3,\"outputUsdPerMillion\":15"));
+        assertEquals(new java.math.BigDecimal("3"),RunnerProviderPolicy.load(policy).select("PLANNER").inputUsdPerMillion());
+        for(String fields:java.util.List.of(",\"inputUsdPerMillion\":3",",\"inputUsdPerMillion\":-1,\"outputUsdPerMillion\":15",",\"key\":\"secret\",\"extra\":1")) {
+            Files.writeString(policy,base.formatted(fields));
+            assertThrows(IllegalArgumentException.class,()->RunnerProviderPolicy.load(policy));
+        }
+    }
     @Test void selectsProvidersDeterministicallyByRole() throws Exception {
         Path policy = directory.resolve("providers.json");
         Files.writeString(policy, "{\"IMPLEMENTATION\":{\"provider\":\"anthropic\",\"model\":\"claude\",\"maxAttempts\":2},\"default\":{\"provider\":\"local\",\"model\":\"qwen\",\"maxAttempts\":1}}");

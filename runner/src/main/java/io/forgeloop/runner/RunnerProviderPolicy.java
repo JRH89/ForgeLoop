@@ -21,11 +21,18 @@ public final class RunnerProviderPolicy {
         Iterator<Map.Entry<String, JsonNode>> fields = root.properties().iterator();
         while (fields.hasNext()) {
             Map.Entry<String, JsonNode> field = fields.next(); JsonNode value = field.getValue();
-            if (!field.getKey().matches("[A-Z_]+|default") || !value.isObject() || value.size() != 3
+            if (!field.getKey().matches("[A-Z_]+|default") || !value.isObject() || (value.size() != 3 && value.size() != 5)
                     || !value.hasNonNull("provider") || !value.hasNonNull("model") || !value.hasNonNull("maxAttempts")) {
                 throw new IllegalArgumentException("Provider policy entry is invalid");
             }
-            roles.put(field.getKey(), new ProviderExecutionPolicy(value.path("provider").asText(), value.path("model").asText(), value.path("maxAttempts").asInt()));
+            java.math.BigDecimal input = null, output = null;
+            if (value.size() == 5) {
+                if (!value.path("inputUsdPerMillion").isNumber() || !value.path("outputUsdPerMillion").isNumber())
+                    throw new IllegalArgumentException("Pricing must specify numeric USD per million tokens for input and output");
+                input = value.path("inputUsdPerMillion").decimalValue();
+                output = value.path("outputUsdPerMillion").decimalValue();
+            }
+            roles.put(field.getKey(), new ProviderExecutionPolicy(value.path("provider").asText(), value.path("model").asText(), value.path("maxAttempts").asInt(), input, output));
         }
         return new RunnerProviderPolicy(roles);
     }
