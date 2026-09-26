@@ -21,6 +21,9 @@ New-Item -ItemType Directory -Path $stateDirectory | Out-Null
 Set-Content -LiteralPath (Join-Path $stateDirectory 'identity') -Value "fake-runner`nfake-enrollment" -NoNewline
 Set-Content -LiteralPath (Join-Path $stateDirectory 'config.json') -Value '{"endpoint":"https://example.invalid","provider":"anthropic","model":"fake","inputUsdPerMillion":1,"outputUsdPerMillion":1,"startAtLogin":false}' -NoNewline
 Set-Content -LiteralPath (Join-Path $stateDirectory 'runner-name') -Value 'Upgrade regression runner' -NoNewline
+$fakeKey=[Text.Encoding]::UTF8.GetBytes('fake-upgrade-test-key')
+$encryptedKey=[Security.Cryptography.ProtectedData]::Protect($fakeKey,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)
+[IO.File]::WriteAllBytes((Join-Path $stateDirectory 'anthropic-key.dpapi'),$encryptedKey)
 $script:expected=@{}
 Get-ChildItem -LiteralPath $stateDirectory -File | ForEach-Object { $script:expected[$_.FullName]=(Get-FileHash -LiteralPath $_.FullName).Hash }
 try {
