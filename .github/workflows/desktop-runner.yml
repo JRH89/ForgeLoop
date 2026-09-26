@@ -6,6 +6,7 @@ on:
 permissions: {contents: read}
 jobs:
   package:
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -19,8 +20,19 @@ jobs:
       - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: '21', cache: maven}
       - name: Test runner and desktop logic
+        if: runner.os != 'Linux'
         run: mvn -B verify
         working-directory: runner
+      - name: Install Linux desktop keyring test dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring
+      - name: Test Linux native key storage in an isolated session
+        if: runner.os == 'Linux'
+        env: {FORGELOOP_TEST_KEYRING: 'true'}
+        shell: bash
+        working-directory: runner
+        run: |
+          dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; mvn -B verify'
       - name: Build bundled-runtime image
         shell: pwsh
         run: ./scripts/Build-DesktopRunner.ps1 -PackageType app-image

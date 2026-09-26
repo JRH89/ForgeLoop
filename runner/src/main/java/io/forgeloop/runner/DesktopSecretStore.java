@@ -29,6 +29,16 @@ public final class DesktopSecretStore {
         try {String result=new String(bytes,StandardCharsets.UTF_8).stripTrailing();if(result.isBlank())throw new IllegalStateException("Provider key not found; save it again");return result;}
         finally{Arrays.fill(bytes,(byte)0);}
     }
+    public void remove() throws Exception {
+        if(Platform.isWindows())Files.deleteIfExists(directory.resolve("provider-key.dpapi"));
+        else if(Platform.isMac()){
+            Keychain api=Native.load("Security",Keychain.class);var item=new PointerByReference();byte[] service=service(),account=account();
+            int status=api.SecKeychainFindGenericPassword(null,service.length,service,account.length,account,null,null,item);
+            if(status==-25300)return;
+            if(status!=0)throw new IllegalStateException("Keychain denied removal");
+            try{if(api.SecKeychainItemDelete(item.getValue())!=0)throw new IllegalStateException("Keychain removal failed");}finally{Native.load("CoreFoundation",CoreFoundation.class).CFRelease(item.getValue());}
+        } else linux(List.of("secret-tool","clear","application","forgeloop-runner","installation",directory.toString()),new byte[0]);
+    }
     private static byte[] linux(List<String> command,byte[] input)throws Exception{
         Process process=new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
         try(var stdin=process.getOutputStream()){stdin.write(input);}
@@ -42,6 +52,7 @@ public final class DesktopSecretStore {
         int SecKeychainAddGenericPassword(Pointer keychain,int serviceLength,byte[] service,int accountLength,byte[] account,int length,byte[] data,PointerByReference item);
         int SecKeychainItemModifyAttributesAndData(Pointer item,Pointer attributes,int length,byte[] data);
         int SecKeychainItemFreeContent(Pointer attributes,Pointer data);
+        int SecKeychainItemDelete(Pointer item);
     }
     interface CoreFoundation extends Library {void CFRelease(Pointer reference);}
     private byte[] account(){return directory.toString().getBytes(StandardCharsets.UTF_8);}

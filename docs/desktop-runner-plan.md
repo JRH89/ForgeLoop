@@ -6,8 +6,9 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
 
 ## Acceptance slices
 
-- [ ] Browser pairing: administrator approval bound to a desktop-generated secret,
+- [x] Browser pairing implementation and unit tests: administrator approval bound to a desktop-generated secret,
   short expiry, single-use exchange, organization isolation, no credentials in URLs.
+  Disposable-stack integration runs in CI; release acceptance remains gated on it.
 - [ ] Desktop setup: bundled Java, prerequisite checks, secure native credential
   storage, provider/model selection and editable dated price estimates.
 - [ ] Lifecycle: explicit paid-work consent, start, graceful pause, status, redacted
@@ -16,6 +17,13 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
   smoke tests, signed release/update trust policy and dashboard downloads.
 - [ ] Guide and verification: first-install walkthrough and recovery coverage;
   distinguish tested operating systems from merely buildable packages.
+
+Implementation: native Swing shell, OS credential adapters, explicit worker start,
+batch-draining pause, bounded redacted logs, per-user single-instance lock, and
+opt-in user login startup are implemented. Windows MSI and Linux DEB builds passed
+the first matrix run; macOS packaging required a positive installer version, now
+fixed. Native secret-store round trips and the final matrix remain release gates.
+Do not change the public download links until release artifacts are trusted.
 
 ## Security and verification
 
