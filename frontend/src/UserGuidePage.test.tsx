@@ -8,6 +8,6 @@ it('renders the shared runner installation guide and honest enrollment boundary'
   expect(screen.getByRole('link', { name: 'Runner setup & API keys' })).toHaveAttribute('href', '#runner-setup');
   expect(screen.getByRole('heading', { name: 'Install a runner and configure provider keys' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Choose models and set API keys' })).toBeInTheDocument();
-  expect(screen.getByText(/There is no one-click installer/, { exact: false })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Guided installation (recommended)' })).toBeInTheDocument();
   expect(screen.getAllByText(/ANTHROPIC_API_KEY/).length).toBeGreaterThan(0);
 });

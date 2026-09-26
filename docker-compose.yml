@@ -50,7 +50,9 @@ services:
       retries: 10
     ports: ["8090:8090"]
   web:
-    build: ./frontend
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
     depends_on:
       control-plane: { condition: service_healthy }

@@ -10,6 +10,7 @@ import { createRoot } from "react-dom/client";
 import { BarChart3, BookOpen, GitBranch, ListChecks, SlidersHorizontal } from "lucide-react";
 import {
   approveFeatureRun,
+  archiveRun,
   acknowledgeEscalation,
   cancelFeatureRun,
   configureOrganizationPolicy,
@@ -36,18 +37,25 @@ import favicon from "./assets/favicon.png";
 import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
 import LandingPage from "./LandingPage";
+import RunnerSetup from "./RunnerSetup";
+import IntakeSettings from "./IntakeSettings";
 import "./styles.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
 const retryable = new Set(["FAILED", "HELD", "RETRYABLE_FAILURE"]);
-const money = (micros: number) => `$${(micros / 1_000_000).toFixed(2)}`;
+const money = (micros: number) => `$${(micros / 1_000_000).toFixed(micros > 0 && micros < 10000 ? 6 : 2)}`;
+const costSummary = (run:FeatureRun) => {
+  const attempts = run.tasks.flatMap(task=>task.providerAttempts??[]);
+  const unknown = attempts.filter(attempt=>!attempt.costKnown).length;
+  return attempts.length===0?'No usage recorded':unknown===attempts.length?'Cost unavailable — configure model pricing':`${money(run.spentCostMicros)} estimated${unknown?` + ${unknown} unpriced requests`:''}`;
+};
 const stamp = (value: string) =>
   new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 
-function RepositoryPage({ items }: { items: RepositoryConnection[] }) {
+function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnection[]; operator:OperatorSession; onSaved:(item:RepositoryConnection)=>void }) {
   return (
     <>
       <section className="hero">
@@ -81,6 +89,7 @@ function RepositoryPage({ items }: { items: RepositoryConnection[] }) {
                   {item.defaultBranch} · {item.issueLabel} ·{" "}
                   {item.requiredGates.join(", ")}
                 </small>
+                <IntakeSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
               </div>
               <span className="status complete">
                 Policy v{item.policyRevision}
@@ -227,7 +236,7 @@ function RunDetail({
     100,
     budget ? (run.spentCostMicros / budget) * 100 : 0,
   );
-  const canOperate = operator.role !== "VIEWER";
+  const canOperate = operator.role !== "VIEWER" && !run.archived;
   const visibleRunState = operations.publication?.pullRequestState === "MERGED" || run.publication?.pullRequestState === "MERGED" ? "COMPLETE" : run.state;
   const retryableTask = run.tasks.find((task) => retryable.has(task.state));
   async function action(label: string, callback: () => Promise<unknown>) {
@@ -295,7 +304,7 @@ function RunDetail({
           <span>Tokens used</span>
         </article>
         <article>
-          <b>{money(run.spentCostMicros)}</b>
+          <b>{costSummary(run)}</b>
           <span>of ${run.budgetUsd.toFixed(2)}</span>
         </article>
       </section>
@@ -358,8 +367,8 @@ function RunDetail({
           <span style={{ width: `${progress}%` }} />
         </div>
         <small>
-          {money(run.spentCostMicros)} used ·{" "}
-          {money(Math.max(0, budget - run.spentCostMicros))} remaining · policy
+          {costSummary(run)} ·{" "}
+          {money(Math.max(0, budget - run.spentCostMicros))} remaining against priced usage only · policy
           revision {run.policyRevision}
         </small>
         {error && <p role="alert">{error}</p>}
@@ -392,7 +401,7 @@ function RunDetail({
                 {task.providerAttempts.map((attempt) => (
                   <span key={attempt.id}>
                     {attempt.provider}/{attempt.model} · {attempt.outcome} ·{" "}
-                    {money(attempt.estimatedCostMicros)}
+                    {attempt.costKnown?money(attempt.estimatedCostMicros):'Unpriced'}
                   </span>
                 ))}
                 {task.repairPackages.map((repair) => (
@@ -662,10 +671,15 @@ function RunsPage({
     audit: [],
   });
   const [creating, setCreating] = useState(false);
+  const [archived,setArchived]=useState(false);
+  const [refreshError,setRefreshError]=useState('');
+  const [lastUpdated,setLastUpdated]=useState('');
+  const [archiveBusy,setArchiveBusy]=useState('');
   const [filter, setFilter] = useState<RunFilter>("All");
   const run = runs.find((item) => item.id === selected);
   const filters: RunFilter[] = ["All", "Running", "Succeeded", "Failed"];
-  const visibleRuns = runs.filter((item) => filter === "All" || runCategory(displayedRunState(item)) === filter);
+  const queueRuns = runs.filter(item=>Boolean(item.archived)===archived);
+  const visibleRuns = queueRuns.filter((item) => filter === "All" || runCategory(displayedRunState(item)) === filter);
   async function refresh() {
     if (!selected) return;
     const [updated, detail] = await Promise.all([
@@ -678,11 +692,30 @@ function RunsPage({
     setOperations(detail);
   }
   useEffect(() => {
-    if (!selected) return;
-    void loadRunOperations(selected).then(setOperations);
-    const timer = window.setInterval(() => void refresh(), 5000);
-    return () => window.clearInterval(timer);
+    let stopped=false;
+    let timer:number;
+    let failures=0;
+    // Serialized polling prevents overlapping requests and stale responses after selection changes.
+    async function poll() {
+      try {
+        const [updated,detail]=await Promise.all([loadRuns(), selected?loadRunOperations(selected):Promise.resolve(undefined)]);
+        if(stopped)return;
+        setRuns(updated);
+        if(detail)setOperations(detail);
+        setRefreshError('');setLastUpdated(new Date().toLocaleTimeString());failures=0;
+      } catch(reason) { if(!stopped){failures++;setRefreshError(reason instanceof Error?reason.message:'Live updates unavailable');} }
+      finally { if(!stopped)timer=window.setTimeout(()=>void poll(), document.hidden?10000:Math.min(15000,2000*2**failures)); }
+    }
+    void poll();
+    return()=>{stopped=true;window.clearTimeout(timer);};
   }, [selected]);
+  async function archive(item:FeatureRun) {
+    if(!window.confirm(item.archived?'Restore this run to the intake queue?':'Archive this run? Evidence and GitHub history will be retained.'))return;
+    setArchiveBusy(item.id);
+    try { const updated=await archiveRun(item.id,!item.archived);setRuns(current=>current.map(run=>run.id===updated.id?updated:run));if(selected===item.id)setSelected(undefined); }
+    catch(reason){setRefreshError(reason instanceof Error?reason.message:'Archive failed');}
+    finally{setArchiveBusy('');}
+  }
   if (creating)
     return (
       <>
@@ -713,18 +746,20 @@ function RunsPage({
         )}
       </section>
       <section className="panel runs-dashboard">
+        <p role="status">{refreshError?`Updates interrupted: ${refreshError}. Retrying automatically.`:`Live updates every 2 seconds${lastUpdated?` · Updated ${lastUpdated}`:''}`}</p>
+        <label className="check"><input type="checkbox" checked={archived} onChange={event=>{setArchived(event.target.checked);setSelected(undefined);}}/> Show archived runs</label>
         <h2 className="visually-hidden">Intake queue</h2>
         <div className="run-filters" role="group" aria-label="Filter runs">
           {filters.map((item) => (
             <button key={item} className={filter === item ? "active" : ""} aria-pressed={filter === item} onClick={() => setFilter(item)}>
-              {item}{" "}<span>{item === "All" ? runs.length : runs.filter((runItem) => runCategory(displayedRunState(runItem)) === item).length}</span>
+              {item}{" "}<span>{item === "All" ? queueRuns.length : queueRuns.filter((runItem) => runCategory(displayedRunState(runItem)) === item).length}</span>
             </button>
           ))}
         </div>
         {visibleRuns.length ? (
           <div className="runs-table-wrap">
             <table className="runs-table">
-              <thead><tr><th scope="col">Run</th><th scope="col">Repository</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Started</th></tr></thead>
+              <thead><tr><th scope="col">Run</th><th scope="col">Repository</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Cost</th><th scope="col">Started</th><th scope="col">Queue</th></tr></thead>
               <tbody>
                 {visibleRuns.map((item) => {
                   const progressPercent = runProgress(item);
@@ -734,7 +769,9 @@ function RunsPage({
                       <td>{item.repository}</td>
                       <td><span className={`status ${displayedRunState(item).toLowerCase()}`}>{displayedRunState(item).replaceAll("_", " ")}</span></td>
                       <td><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
+                      <td>{costSummary(item)}</td>
                       <td><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
+                      <td>{operator.role!=='VIEWER'&&(item.archived||terminal.has(item.state))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
                     </tr>
                   );
                 })}
@@ -855,9 +892,9 @@ function App() {
               setRuns={setRuns}
             />
           ) : page === "Repositories" ? (
-            <RepositoryPage items={repositories} />
+            <RepositoryPage items={repositories} operator={operator} onSaved={updated=>setRepositories(current=>current.map(item=>item.id===updated.id?updated:item))}/>
           ) : page === "Configuration" ? (
-            <ConfigurationPage operator={operator}/>
+            <><RunnerSetup operator={operator}/><ConfigurationPage operator={operator}/></>
           ) : page === "Guide" ? (
             <UserGuidePage />
           ) : (

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import App from './main';
 
@@ -15,6 +15,29 @@ function controlPlane(data: Record<string, unknown>) {
     return { ok: true, json: async () => ({ data: { featureRuns: data.featureRuns ?? [] } }) };
   });
 }
+
+it('separates archived runs and shows missing prices rather than zero cost',async()=>{
+  const createdAt=new Date().toISOString();
+  vi.stubGlobal('fetch',controlPlane({featureRuns:[
+    {id:'active',title:'Unpriced completed run',sourceRef:'issue-1',repository:'org/repo',state:'COMPLETE',createdAt,archived:false,spentCostMicros:0,tasks:[{state:'VERIFIED',providerAttempts:[{costKnown:false}]}]},
+    {id:'archive',title:'Retained archive',sourceRef:'issue-2',repository:'org/repo',state:'CANCELLED',createdAt,archived:true,tasks:[]}
+  ]}));
+  render(<App/>);
+  expect(await screen.findByText('Unpriced completed run')).toBeInTheDocument();
+  expect(screen.getByText('Cost unavailable — configure model pricing')).toBeInTheDocument();
+  expect(screen.queryByText('Retained archive')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText('Show archived runs'));
+  expect(screen.getByText('Retained archive')).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Restore'})).toBeInTheDocument();
+});
+
+it('refreshes the queue without selecting a run',async()=>{
+  const data:Record<string,unknown>={featureRuns:[]};
+  vi.stubGlobal('fetch',controlPlane(data));render(<App/>);
+  await screen.findByText('Intake queue');
+  data.featureRuns=[{id:'new',title:'Fresh webhook run',sourceRef:'issue-3',repository:'org/repo',state:'PLANNING',createdAt:new Date().toISOString(),tasks:[]}];
+  await waitFor(()=>expect(screen.getByText('Fresh webhook run')).toBeInTheDocument(),{timeout:4000});
+});
 
 it('renders the real intake queue and role-aware creation flow', async () => {
   vi.stubGlobal('fetch', controlPlane({ repositoryConnections: [] }));
