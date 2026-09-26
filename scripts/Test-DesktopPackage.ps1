@@ -26,6 +26,10 @@ if ($PackageType -eq 'msi') {
         if ($LASTEXITCODE -ne 0) { throw 'Packaged macOS app failed' }
     } finally { & hdiutil detach $mount }
 } else {
+    # Hosted Ubuntu is a minimal server image. Supply the standard desktop menu
+    # directory that a desktop distribution provides before testing its shortcut.
+    & sudo install -d /usr/share/desktop-directories
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop menu fixture setup failed' }
     & sudo apt-get install -y $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'DEB installation failed' }
     try {
