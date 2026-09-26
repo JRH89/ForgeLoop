@@ -3,6 +3,10 @@ package io.forgeloop.runner;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.FileVisitResult;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
@@ -21,16 +25,22 @@ public final class RepositoryContextBuilder {
         if (!Files.exists(root.resolve(".git"))) throw new IllegalArgumentException("Repository context requires a Git worktree");
         List<String> prefixes = preferredPrefixes == null ? List.of() : preferredPrefixes.stream()
                 .map(value -> value.replace('\\', '/').replaceAll("/$", "")).toList();
-        List<Path> files;
-        try (var paths = Files.walk(root)) {
-            files = paths.filter(Files::isRegularFile)
-                    .filter(path -> !Files.isSymbolicLink(path))
-                    .filter(path -> !path.startsWith(root.resolve(".git")))
-                    .sorted(Comparator.comparingInt((Path path) -> preferred(root, path, prefixes) ? 0 : 1)
-                            .thenComparing(path -> relative(root, path)))
-                    .limit(MAX_FILES)
-                    .toList();
-        }
+        List<Path> candidates = new ArrayList<>();
+        // Prune Git metadata before traversing it. Filtering a Files.walk stream
+        // is too late: background Git maintenance can remove lock files mid-walk.
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                return !directory.equals(root) && directory.getFileName().toString().equals(".git")
+                        ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                if (attributes.isRegularFile() && !file.getFileName().toString().equals(".git")) candidates.add(file);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        List<Path> files = candidates.stream()
+                .sorted(Comparator.comparingInt((Path path) -> preferred(root, path, prefixes) ? 0 : 1)
+                        .thenComparing(path -> relative(root, path))).limit(MAX_FILES).toList();
         StringBuilder context = new StringBuilder("Repository manifest:\n");
         files.forEach(path -> context.append("- ").append(relative(root, path)).append('\n'));
         for (Path file : files) {

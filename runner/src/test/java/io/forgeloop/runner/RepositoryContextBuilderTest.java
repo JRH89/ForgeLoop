@@ -27,4 +27,17 @@ class RepositoryContextBuilderTest {
         assertTrue(context.contains("frontend/src/logo.png"));
         assertFalse(context.contains("secret-token"));
     }
+
+    @Test void prunesNestedMetadataAndWorktreePointerFiles() throws Exception {
+        Files.writeString(temporaryDirectory.resolve(".git"),"gitdir: /private/worktree-metadata");
+        Files.createDirectories(temporaryDirectory.resolve("nested/.git/objects"));
+        Files.writeString(temporaryDirectory.resolve("nested/.git/objects/maintenance.lock"),"transient Git state");
+        Files.writeString(temporaryDirectory.resolve("nested/.git/config.json"),"private metadata");
+        Files.writeString(temporaryDirectory.resolve("README.md"),"project documentation");
+        String context=new RepositoryContextBuilder().build(temporaryDirectory,List.of());
+        assertTrue(context.contains("project documentation"));
+        assertFalse(context.contains("maintenance.lock"));
+        assertFalse(context.contains("private metadata"));
+        assertFalse(context.contains("worktree-metadata"));
+    }
 }

@@ -1,0 +1,67 @@
+name: Desktop runner packages
+on:
+  pull_request:
+    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', '.github/workflows/desktop-runner.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  package:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, type: msi}
+          - {os: macos-latest, type: dmg}
+          - {os: ubuntu-latest, type: deb}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: '21', cache: maven}
+      - name: Test runner and desktop logic
+        if: runner.os != 'Linux'
+        run: mvn -B verify
+        working-directory: runner
+      - name: Install Linux desktop keyring test dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring xvfb
+      - name: Test Linux native key storage in an isolated session
+        if: runner.os == 'Linux'
+        env: {FORGELOOP_TEST_KEYRING: 'true'}
+        shell: bash
+        working-directory: runner
+        run: |
+          xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; mvn -B verify'
+      - name: Build bundled-runtime image
+        shell: pwsh
+        run: ./scripts/Build-DesktopRunner.ps1 -PackageType app-image
+      - name: Smoke test packaged runtime without enrolling or spending credits
+        shell: pwsh
+        run: |
+          $root = 'artifacts/desktop-runner/packages/ForgeLoop Runner'
+          if ($IsWindows) { $java = "$root/runtime/bin/java.exe"; $jar = "$root/app/runner.jar" }
+          elseif ($IsMacOS) { $java = "$root.app/Contents/runtime/Contents/Home/bin/java"; $jar = "$root.app/Contents/app/runner.jar" }
+          else { $java = "$root/lib/runtime/bin/java"; $jar = "$root/lib/app/runner.jar" }
+          & $java -cp $jar io.forgeloop.runner.DesktopRunner --version
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged runtime failed' }
+      - name: Build unsigned native development installer
+        shell: pwsh
+        run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer
+      - name: Verify native installer launch on disposable host
+        if: runner.os != 'Linux'
+        shell: pwsh
+        run: ./scripts/Test-DesktopPackage.ps1 -PackageType '${{ matrix.type }}'
+      - name: Verify installed Linux runtime and keyring integration
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; pwsh -File scripts/Test-DesktopPackage.ps1 -PackageType deb'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-runner-${{ matrix.os }}-unsigned
+          path: artifacts/native-installer/packages/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-setup-screenshot-${{ matrix.os }}
+          path: runner/target/desktop-*.png

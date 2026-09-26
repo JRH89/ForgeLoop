@@ -38,6 +38,8 @@ import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
 import LandingPage from "./LandingPage";
 import RunnerSetup from "./RunnerSetup";
+import RunnerPairingPage from "./RunnerPairingPage";
+import RunnerDownloads from "./RunnerDownloads";
 import IntakeSettings from "./IntakeSettings";
 import "./styles.css";
 
@@ -924,6 +926,6 @@ function App() {
 if (import.meta.env.MODE !== "test") {
   const root = document.getElementById("root");
   if (!root) throw new Error("ForgeLoop root element is missing");
-  createRoot(root).render(window.location.pathname.startsWith("/app") ? <App /> : <LandingPage />);
+  createRoot(root).render(window.location.pathname==='/app/runner-downloads'?<RunnerDownloads/>:window.location.pathname==='/app/runner-connect'?<RunnerPairingPage/>:window.location.pathname.startsWith("/app") ? <App /> : <LandingPage />);
 }
 export default App;

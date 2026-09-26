@@ -4,6 +4,25 @@ The runner runs on your own machine or dedicated server, not in your browser.
 GitHub sign-in, repository installation, runner enrollment, and model-provider
 credentials are separate. Connecting a repository does not install a runner.
 
+### Desktop setup (development preview)
+
+The new desktop app includes Java and guides you through **Connect → Provider →
+Run**. Connect opens GitHub sign-in and an administrator approval page; compare
+the fingerprint in both windows. No enrollment token is copied. Choose a model,
+save your API key in your operating system's secure storage, check Git/Docker,
+and explicitly start work. Sonnet 5 pricing defaults can be overridden; custom
+models require explicit prices. No provider call is made during setup.
+
+Use **Pause after current work** before closing or updating. Optional sign-in
+startup can spend API credits and requires Docker and an unlocked keyring.
+Windows uses DPAPI, macOS uses Keychain, and Linux requires libsecret tools and
+an unlocked desktop keyring. Headless Linux servers should use the CLI below.
+
+The **Desktop installers and updates** link in Harness & policy reports release
+availability. Public installers remain unavailable until signing/notarization
+and release verification are complete. Do not bypass OS signature warnings.
+The existing guided CLI installation below remains the available fallback.
+
 ### Guided installation (recommended)
 
 Open **Harness & policy → Install and connect a runner**. Administrators can

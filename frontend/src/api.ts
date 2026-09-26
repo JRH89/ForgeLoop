@@ -35,6 +35,7 @@ export type PlatformConfiguration = { policy:OrganizationPolicy; harnesses:Harne
 const taskFields = `id planKey role executionRole title state attemptBudget attempts budgetMicros spentCostMicros changeSha ownedPaths dependencyKeys providerAttempts { id provider model inputTokens outputTokens attemptCount estimatedCostMicros costKnown outcome retryable category recordedAt } repairPackages { id attempt failureCategory changeSha evidenceDigest createdAt }`;
 const runFields = `archived id repository sourceRef title specification budgetUsd spentCostMicros harnessProfile baseBranch policyRevision state createdAt approved approvedAt approvedBy publication { pullRequestState } tasks { ${taskFields} } gates { id name required state kind imageDigest command networkPolicy timeoutSeconds criterionCoverage } criteria { id statement coverageState }`;
 
+export function approveRunnerPairing(challenge:string,name:string):Promise<boolean>{return request<{approveRunnerPairing:boolean}>('mutation($challenge:String!,$name:String!){approveRunnerPairing(challenge:$challenge,name:$name)}',{challenge,name}).then(data=>data.approveRunnerPairing);}
 async function request<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
   const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
   const body = await response.json() as { data?: T; errors?: Array<{ message?: string }> };
