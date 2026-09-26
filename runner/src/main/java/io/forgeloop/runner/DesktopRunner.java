@@ -93,6 +93,7 @@ public final class DesktopRunner {
     private void log(String message){SwingUtilities.invokeLater(()->{if(logs.getDocument().getLength()>24000)logs.setText("");logs.append(message+"\n");logs.setCaretPosition(logs.getDocument().getLength());});}
     @FunctionalInterface private interface Work{void run()throws Exception;}
     public static void main(String[] args)throws Exception{
+        if(args.length==1&&args[0].equals("--self-test")){DesktopRuntimeCheck.verify();return;}
         if(args.length==1&&args[0].equals("--version")){System.out.println("ForgeLoop Runner Desktop 0.1.0");return;}
         Path directory=DesktopFiles.directory();FileChannel channel=FileChannel.open(directory.resolve("desktop.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE);FileLock lock=channel.tryLock();
         if(lock==null){channel.close();JOptionPane.showMessageDialog(null,"ForgeLoop Runner is already open.");return;}

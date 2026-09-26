@@ -11,7 +11,7 @@ if ($PackageType -eq 'msi') {
     try {
         $launcher=Join-Path $installDirectory 'ForgeLoop Runner.exe'
         if (-not (Test-Path -LiteralPath $launcher)) { throw 'Installed launcher missing' }
-        $check=Start-Process -FilePath $launcher -ArgumentList '--version' -Wait -PassThru -WindowStyle Hidden
+        $check=Start-Process -FilePath $launcher -ArgumentList '--self-test' -Wait -PassThru -WindowStyle Hidden
         if ($check.ExitCode -ne 0) { throw 'Installed Windows launcher failed' }
     } finally {
         $remove=Start-Process msiexec.exe -ArgumentList @('/x',('"'+$package.FullName+'"'),'/qn') -Wait -PassThru -WindowStyle Hidden
@@ -22,7 +22,7 @@ if ($PackageType -eq 'msi') {
     & hdiutil attach -nobrowse -mountpoint $mount $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'DMG mount failed' }
     try {
-        & (Join-Path $mount 'ForgeLoop Runner.app/Contents/MacOS/ForgeLoop Runner') --version
+        & (Join-Path $mount 'ForgeLoop Runner.app/Contents/MacOS/ForgeLoop Runner') --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Packaged macOS app failed' }
     } finally { & hdiutil detach $mount }
 } else {
@@ -33,7 +33,7 @@ if ($PackageType -eq 'msi') {
     & sudo apt-get install -y $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'DEB installation failed' }
     try {
-        & '/opt/forgeloop-runner/bin/ForgeLoop Runner' --version
+        & '/opt/forgeloop-runner/bin/ForgeLoop Runner' --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Installed Linux launcher failed' }
     } finally { & sudo apt-get remove -y forgeloop-runner }
 }
