@@ -3,6 +3,7 @@ type Mutation { submitFeature(input: SubmitFeatureInput!): FeatureRun!, configur
 input VerificationPolicyInput { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int!, required: Boolean!, criterionCoverage: String! }
 extend type Mutation { archiveFeatureRun(runId: ID!, archived: Boolean!): FeatureRun!, configureRepositoryIntake(repository: String!, requiredAssignee: String): RepositoryConnection! }
 extend type FeatureRun { archived: Boolean! }
+extend type Mutation { approveRunnerPairing(challenge: String!, name: String!): Boolean!, exchangeRunnerPairing(verifier: String!): RunnerEnrollment }
 extend type RepositoryConnection { requiredAssignee: String }
 input VerificationEvidenceInput { kind: String!, gate: String!, image: String!, command: [String!]!, exitCode: Int!, timedOut: Boolean!, output: String!, startedAt: String!, finishedAt: String!, artifactReference: String, outputDigest: String!, bundleDigest: String! }
 input ReviewCriterionInput { statement: String!, status: String!, evidence: String! }
