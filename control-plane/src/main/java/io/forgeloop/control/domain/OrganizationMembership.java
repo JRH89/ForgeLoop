@@ -15,4 +15,5 @@ public class OrganizationMembership {
     public boolean belongsTo(String organizationId, String candidateSubject) { return organization.getId().equals(organizationId) && subject.equals(candidateSubject); }
     public boolean isAdministrator() { return role == OperatorRole.ADMIN; }
     public String getId() { return id; } public String getSubject() { return subject; } public OperatorRole getRole() { return role; }
+    public String getOrganizationId() { return organization.getId(); }
 }
