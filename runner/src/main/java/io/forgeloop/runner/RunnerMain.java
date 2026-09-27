@@ -364,6 +364,9 @@ public final class RunnerMain {
         RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1]));
         int idlePolls = 0;
         int failedPolls = 0;
+        String statusFile=System.getenv("FORGELOOP_RUNNER_STATUS_FILE");
+        WorkerStatus status=new WorkerStatus(statusFile==null?null:Path.of(statusFile));
+        status.publish(WorkerStatus.Phase.STARTING,0);
         try (var workers = Executors.newFixedThreadPool(parallelism)) {
             while (continuous || idlePolls < 3) {
                 // Desktop pause drains the current batch before exiting; it never kills active leases.
@@ -373,12 +376,22 @@ public final class RunnerMain {
                 try {
                     client.heartbeat(identity);
                     available = client.availableTasks(identity);
+                    if(failedPolls>0)System.out.println("Control-plane connection restored.");
                     failedPolls = 0;
+                    status.publish(available.isEmpty()?WorkerStatus.Phase.IDLE:WorkerStatus.Phase.WORKING,0);
                 } catch (Exception unavailable) {
+                    if(unavailable instanceof InterruptedException){Thread.currentThread().interrupt();throw unavailable;}
+                    if(unavailable instanceof ControlPlaneFailure rejected&&!rejected.retryable()){
+                        status.publish(WorkerStatus.Phase.ATTENTION,0);
+                        System.err.println(rejected.getMessage());
+                        throw rejected; // Re-enrollment or configuration changes require an explicit operator action.
+                    }
                     failedPolls++;
-                    System.err.println("Control-plane poll failed; retrying: " + safeDiagnostic(unavailable.getMessage()));
+                    int retrySeconds=WorkerStatus.retrySeconds(failedPolls);
+                    status.publish(WorkerStatus.Phase.RECONNECTING,retrySeconds);
+                    System.err.println("Control-plane unavailable; retrying in "+retrySeconds+" seconds ("+unavailable.getClass().getSimpleName()+").");
                     if (!continuous && failedPolls >= 5) throw unavailable;
-                    Thread.sleep(2000);
+                    waitForPoll(retrySeconds,pauseFile);
                     continue;
                 }
                 if (available.isEmpty()) {
@@ -394,6 +407,15 @@ public final class RunnerMain {
                 }
                 for (Future<?> future : futures) future.get();
             }
+        }
+    }
+
+    /** Backoff stays responsive to an explicit desktop pause, without interrupting active tasks. */
+    private static void waitForPoll(int seconds,String pauseFile)throws InterruptedException{
+        long deadline=System.nanoTime()+Duration.ofSeconds(seconds).toNanos();
+        while(System.nanoTime()<deadline){
+            if(pauseFile!=null&&Files.exists(Path.of(pauseFile)))return;
+            Thread.sleep(200);
         }
     }
 

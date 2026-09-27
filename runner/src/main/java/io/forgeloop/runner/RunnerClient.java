@@ -39,13 +39,20 @@ public final class RunnerClient {
         return new RunnerIdentity(enrollment.path("runner").path("id").asText(),enrollment.path("credential").asText());
     }
 
-    public String heartbeat(RunnerIdentity identity) throws Exception { return post("mutation($runnerId:ID!,$credential:String!){runnerHeartbeat(runnerId:$runnerId,credential:$credential){id lastHeartbeatAt}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
+    public String heartbeat(RunnerIdentity identity) throws Exception {
+        String response=post("mutation($runnerId:ID!,$credential:String!){runnerHeartbeat(runnerId:$runnerId,credential:$credential){id lastHeartbeatAt}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        if(!identity.runnerId().equals(JSON.readTree(response).path("data").path("runnerHeartbeat").path("id").asText()))
+            throw new ControlPlaneFailure("Invalid heartbeat acknowledgement",true);
+        return response;
+    }
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
         String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
-        for (JsonNode task : JSON.readTree(response).path("data").path("availableRunnerTasks")) {
+        JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
+        if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
+        for (JsonNode task : taskNodes) {
             tasks.add(new RunnerTask(task.path("id").asText(), task.path("role").asText(), task.path("title").asText(),
                     task.path("repository").asText(), task.path("baseBranch").asText(), task.path("sourceRef").asText(), task.path("specification").asText(), task.path("requiredCapability").asText(), task.path("budgetUsd").asDouble(),
                     JSON.convertValue(task.path("ownedPaths"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
@@ -163,7 +170,22 @@ public final class RunnerClient {
         HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint)
                 .timeout(java.time.Duration.ofSeconds(30)).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200 || response.body().contains("\"errors\"")) throw new IllegalStateException("Control-plane request failed");
+        int status = response.statusCode();
+        if (status != 200) throw new ControlPlaneFailure("Control-plane HTTP " + status,
+                status == 408 || status == 429 || status >= 500);
+        JsonNode parsed;
+        try { parsed = JSON.readTree(response.body()); }
+        catch (Exception invalid) { throw new ControlPlaneFailure("Invalid control-plane response", true); }
+        if (parsed == null || !parsed.isObject()) throw new ControlPlaneFailure("Invalid control-plane response", true);
+        if (parsed.path("errors").isArray() && !parsed.path("errors").isEmpty()) {
+            boolean retryable = true;
+            for (JsonNode error : parsed.path("errors")) {
+                String classification = error.path("extensions").path("classification").asText();
+                if (List.of("UNAUTHORIZED", "FORBIDDEN", "BAD_REQUEST", "NOT_FOUND").contains(classification)) retryable = false;
+            }
+            throw new ControlPlaneFailure(retryable ? "Control-plane service error" : "Control-plane rejected the request; verify enrollment and client compatibility", retryable);
+        }
+        if (!parsed.path("data").isObject()) throw new ControlPlaneFailure("Missing control-plane response data", true);
         return response.body();
     }
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }

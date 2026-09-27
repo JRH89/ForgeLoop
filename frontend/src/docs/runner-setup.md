@@ -29,6 +29,36 @@ startup can spend API credits and requires Docker and an unlocked keyring.
 Windows uses DPAPI, macOS uses Keychain, and Linux requires libsecret tools and
 an unlocked desktop keyring. Headless Linux servers should use the CLI below.
 
+#### Connection recovery (desktop preview 1.0.2)
+
+The Run footer distinguishes **Connecting**, **Connected / waiting**, **Working**,
+**Offline / reconnecting**, and **Stopped / attention required**. Hover over it
+for the last successful control-plane poll time. A running process alone is not
+reported as a healthy connection. **Pausing** means the current work or request
+must finish before exit.
+
+When idle polling loses the server or receives a temporary service error, the
+runner retries after 2, 4, 8, then at most 16 seconds. It claims no new tasks until
+both heartbeat and task discovery succeed. Recovery reuses the saved identity;
+do not reconnect/re-enroll simply because the server restarted. HTTP requests
+have a 30-second timeout; Pause interrupts retry waiting but not an in-flight
+request or active work. Recovery can resume eligible paid work if you previously
+started the runner, so use Pause if you do not want work to resume.
+
+A rejected credential, authorization failure, or incompatible request stops the
+worker instead of retrying forever. Ask your administrator to check runner access
+and client compatibility, use **Check saved connection**, and explicitly select
+**Start runner** after correction. Do not delete saved identity or key files to
+troubleshoot a temporary outage. Server response bodies are excluded from these
+diagnostics.
+
+Connection status reflects polling between batches, not continuous connectivity
+during a long task. This does not checkpoint or replay interrupted model calls;
+existing server lease-expiry/retry rules still govern interrupted tasks. Reopening
+the desktop restores setup but does not start work unless you explicitly opted
+into sign-in startup. Real OS reboot and funded in-flight delivery verification
+remain separate release checks.
+
 The **Desktop installers and updates** link in Harness & policy reports release
 availability. Public installers remain unavailable until signing/notarization
 and release verification are complete. Do not bypass OS signature warnings.
