@@ -20,3 +20,32 @@
 @media(max-width:1000px){.public-nav>nav{gap:13px}.public-site .landing-hero h1{max-width:640px!important}.public-site .landing-hero,.public-site .public-hero{background-image:linear-gradient(90deg,#071019bb,#07101922),url('/images/delivery-hero.webp')}.public-cards{grid-template-columns:1fr}.public-site .public-footer{grid-template-columns:repeat(3,1fr)}.footer-intro{grid-column:1/-1}}
 @media(max-width:760px){.public-site .public-nav{height:auto;min-height:76px;flex-wrap:wrap;gap:14px;padding:16px 20px}.public-nav>nav{display:none}.public-nav>.primary{font-size:.7rem;padding:9px}.public-site .mobile-navigation{display:block;width:100%;font-size:.9rem}.mobile-navigation summary{cursor:pointer;padding:5px 0}.mobile-navigation nav{display:flex;flex-wrap:wrap;gap:18px;padding:20px 0 6px}.mobile-navigation a{color:#d5e3f2;text-decoration:none}.public-site .landing-hero,.public-site .public-hero{padding:55px 24px 45px!important;background-image:linear-gradient(90deg,#071019ee,#07101988),url('/images/delivery-hero-small.webp');background-position:65% center;min-height:0}.public-site .landing-hero h1{font-size:2.75rem!important;line-height:1.08}.public-site .landing-hero>p:not(.eyebrow){font-size:.95rem}.public-hero h1{font-size:2.65rem}.public-site .landing-terminal{margin-top:35px}.public-site .landing-section,.public-section{padding:55px 24px}.article-grid{grid-template-columns:1fr}.page-sections>section{grid-template-columns:28px 1fr;gap:12px}.page-sections h2{font-size:1.45rem}.public-site .public-footer{grid-template-columns:1fr 1fr;gap:30px;padding:40px 24px}.public-footer nav:last-of-type{grid-column:1/-1}.article-body{padding:35px 24px 60px}.public-cta{padding:25px}.public-site .landing-actions a{font-size:.88rem}.public-site .landing-grid{grid-template-columns:1fr}.public-site .landing-proof{gap:20px}}
 @media(prefers-reduced-motion:reduce){.public-site *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Full-width chrome; equal outside columns keep desktop links truly centered. */
+.public-site .public-nav{max-width:none!important;width:100%;display:grid;grid-template-columns:1fr auto 1fr;padding-inline:28px}
+.public-nav>nav{justify-content:center}.public-nav>.primary{justify-self:end;margin-left:0}
+.public-site .public-footer{padding-inline:28px}
+.public-site .menu-toggle{display:none}
+.public-site .mobile-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(380px,88vw);max-width:none;height:100dvh;max-height:none;box-sizing:border-box;padding:24px;border:0;border-left:1px solid #29435e;background:#0b1928;color:#edf4ff;transform:translateX(100%);transition:transform 250ms cubic-bezier(.22,1,.36,1);box-shadow:-16px 0 60px #0005}
+.public-site .mobile-drawer.is-open{transform:translateX(0)}
+.mobile-drawer::backdrop{background:#02081000;transition:background 250ms ease}
+.mobile-drawer.is-open::backdrop{background:#020810b8}
+.drawer-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:32px}
+.public-site .menu-close,.public-site .menu-toggle{border:1px solid #35516d;border-radius:10px;background:#11263b;color:#edf4ff;cursor:pointer;width:44px;height:44px;flex-shrink:0}
+.public-site .menu-close{font-size:28px;line-height:1}
+.mobile-drawer nav{display:flex;flex-direction:column;gap:5px;margin-bottom:32px}
+.mobile-drawer nav a{display:block;padding:14px 12px;color:#d5e3f2;text-decoration:none;border-radius:8px;font-size:1rem}
+.mobile-drawer nav a:hover{background:#18314c;color:white}
+.mobile-drawer>.primary{display:block;text-align:center;text-decoration:none}
+.public-nav :focus-visible{outline:2px solid #91c5ff;outline-offset:4px}
+.public-nav noscript{display:none}
+@media(max-width:1000px){
+  .public-site .public-nav{grid-template-columns:1fr auto;min-height:76px;height:76px;padding:0 24px;gap:16px}
+  .public-nav>nav,.public-nav>.primary{display:none}
+  .public-site .menu-toggle:not([hidden]){display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;justify-self:end}
+  .menu-toggle span{display:block;width:20px;height:2px;background:currentColor;border-radius:2px}
+  .public-nav noscript{display:block;grid-column:1/-1}.public-nav:has(noscript nav){height:auto;padding-block:16px}
+  .public-nav noscript nav{display:flex;flex-wrap:wrap;gap:16px}
+}
+@media(max-width:760px){.public-site .public-nav{padding-inline:20px}.public-site .public-footer{padding-inline:24px}}
+@media(prefers-reduced-motion:reduce){.mobile-drawer::backdrop{transition:none}}
