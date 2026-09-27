@@ -1,0 +1,20 @@
+.onboarding { max-width: 1100px; }
+.onboarding p { line-height: 1.65; }
+.onboarding a { color: var(--accent, #5baaff); }
+.onboarding button, .onboarding a { margin-block: .4rem; margin-right: .75rem; }
+.onboarding button, .setup-entry button { padding: .7rem 1rem; border: 1px solid #38566d; border-radius: .5rem; background: #172d3d; color: #e9f2f8; font: inherit; cursor: pointer; }
+.onboarding button:hover, .setup-entry button:hover { background: #24465b; }
+.onboarding button:focus-visible, .setup-entry button:focus-visible, .onboarding a:focus-visible { outline: 2px solid #44d6ab; outline-offset: 3px; }
+.onboarding button:disabled { opacity: .6; cursor: wait; }
+.setup-notice { padding: 1rem 1.25rem; border-left: 3px solid #44d6ab; background: #112b2a; border-radius: .4rem; }
+.setup-steps { padding: 0; list-style: none; counter-reset: step; display: grid; gap: 1rem; }
+.setup-steps > li { counter-increment: step; padding: 1.5rem; background: #0f1c29; border: 1px solid #253b4f; border-radius: 1rem; min-width: 0; overflow-wrap: anywhere; }
+.setup-steps h2 { font-size: 1.25rem; margin-top: 0; }
+.setup-steps h2::before { content: counter(step) '. '; color: #44d6ab; }
+.onboarding label { display: block; margin-bottom: .5rem; }
+.onboarding select, .onboarding input { max-width: 100%; padding: .65rem; }
+.setup-issue { border-top: 1px solid #253b4f; margin-top: 1rem; padding-top: 1rem; }
+.setup-runs { padding-left: 1.25rem; }
+.setup-runs li { margin-bottom: 1rem; overflow-wrap: anywhere; }
+.setup-entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem; border: 1px solid #253b4f; border-radius: .75rem; margin-bottom: 1.5rem; }
+@media (max-width: 600px) { .setup-steps > li { padding: 1rem; } .onboarding button, .onboarding select { width: 100%; } }

@@ -1,3 +1,41 @@
+## Start with the setup checklist
+
+Open **Getting started** in the dashboard sidebar, or **Open setup checklist**
+on Runs. User guide remains the fifth sidebar item. The checklist refreshes
+organization-scoped repository, runner, policy, and run metadata every 10 seconds:
+
+1. **Connect GitHub.** An administrator installs the ForgeLoop GitHub App and
+   selects repositories. GitHub login and repository installation are separate.
+2. **Select your repository.** Confirm its base branch and harness. ForgeLoop
+   works with any supported connected repository; no special demo repository is required.
+3. **Connect and check your runner.** Download the desktop preview, approve the
+   matching browser fingerprint, and save provider settings locally. Use **Check
+   saved key locally** and **Check saved connection**. Neither calls a model.
+4. **Review intake and safety settings.** Check the exact issue label, optional
+   required assignee, budgets, harness, verification gates, human approval, and
+   auto-merge policy. Administrators change intake in Repositories and execution
+   settings in Harness & policy.
+5. **Create and follow your first issue.** Draft a small change with observable
+   acceptance criteria. The draft link does not apply intake labels or assignees.
+   Adding the configured label/assignee can start paid work if a runner is running.
+
+**Check issue intake** reads one existing issue from GitHub only when clicked.
+Enter its issue number to see whether its label, assignee, open state, and body
+meet intake rules. It does not edit the issue, replay webhooks, or submit work.
+Passing this check does not prove webhook delivery or that a run has started.
+Intake handles opened, labeled, assigned, and reopened events; a description edit
+alone is not an intake trigger. If rules pass but no run appears, inspect the
+GitHub App's webhook deliveries before retrying anything.
+
+**What is waiting?** explains persisted approval, failure, budget, and heartbeat
+signals for unarchived runs in the selected repository. Open Runs for detailed
+events and evidence. A heartbeat within 60 seconds means recent contact, not
+proof of provider funding, valid credentials, matching capabilities, or an idle
+worker. Active work may delay heartbeats. The website cannot inspect your locally
+stored key, Git, or Docker. Stale/read failures are shown explicitly; use Refresh
+readiness to retry. No setup check calls a model. Starting a runner with queued
+work can incur provider charges, so keep it paused when avoiding API spending.
+
 ## Install a runner and configure provider keys
 
 The runner runs on your own machine or dedicated server, not in your browser.

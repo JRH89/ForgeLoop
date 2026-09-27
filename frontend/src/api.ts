@@ -1,5 +1,10 @@
 const endpoint = import.meta.env.VITE_GRAPHQL_URL ?? '/graphql';
 
+export type IssueIntakeCheck = { eligible: boolean; reasons: string[]; checkedAt: string };
+export function checkIssueIntake(repository: string, issueNumber: number): Promise<IssueIntakeCheck> {
+  return request<{ issueIntakeCheck: IssueIntakeCheck }>('query($repository:String!,$issueNumber:Int!){issueIntakeCheck(repository:$repository,issueNumber:$issueNumber){eligible reasons checkedAt}}', { repository, issueNumber }).then(data => data.issueIntakeCheck);
+}
+
 export type Runner = { id:string; name:string; version:string; enabled:boolean; lastHeartbeatAt:string; capabilities:string[] };
 export function loadRunners(organizationId:string):Promise<Runner[]> { return request<{runners:Runner[]}>('query($organizationId:String!){runners(organizationId:$organizationId){id name version enabled lastHeartbeatAt capabilities}}',{organizationId}).then(data=>data.runners); }
 export function issueRunnerToken(organizationId:string):Promise<string> { return request<{issueRunnerRegistrationToken:string}>('mutation($organizationId:String!){issueRunnerRegistrationToken(organizationId:$organizationId)}',{organizationId}).then(data=>data.issueRunnerRegistrationToken); }
@@ -8,7 +13,7 @@ export function configureIntake(repository:string,requiredAssignee:string):Promi
 
 export type ProviderAttempt = { id: string; provider: string; model: string; inputTokens: number; outputTokens: number; attemptCount: number; estimatedCostMicros: number; costKnown: boolean; outcome: string; retryable: boolean; category: string; recordedAt: string };
 export type RepairPackage = { id: string; attempt: number; failureCategory: string; changeSha?: string; evidenceDigest?: string; createdAt: string };
-export type Task = { id: string; planKey: string; role: string; executionRole: string; title: string; state: string; attemptBudget: number; attempts: number; budgetMicros: number; spentCostMicros: number; changeSha?: string; ownedPaths: string[]; dependencyKeys: string[]; providerAttempts: ProviderAttempt[]; repairPackages: RepairPackage[] };
+export type Task = { id: string; planKey: string; role: string; executionRole: string; title: string; state: string; requiredCapability?: string; attemptBudget: number; attempts: number; budgetMicros: number; spentCostMicros: number; changeSha?: string; ownedPaths: string[]; dependencyKeys: string[]; providerAttempts: ProviderAttempt[]; repairPackages: RepairPackage[] };
 export type Gate = { id: string; name: string; required: boolean; state: string; kind?: string; imageDigest?: string; command: string[]; networkPolicy?: string; timeoutSeconds?: number; criterionCoverage?: string };
 export type Criterion = { id: string; statement: string; coverageState: string };
 export type FeatureRun = { archived: boolean; id: string; repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number; spentCostMicros: number; harnessProfile: string; baseBranch: string; policyRevision: number; state: string; createdAt: string; approved: boolean; approvedAt?: string; approvedBy?: string; publication?: Pick<GithubPublication, 'pullRequestState'> | null; tasks: Task[]; gates: Gate[]; criteria: Criterion[] };
@@ -32,7 +37,7 @@ export type HarnessDefinition = { id:string; organizationId:string; name:string;
 export type LocalMcpConfiguration = { id:string; name:string; command:string; arguments:string[]; allowedRoles:string[]; contextTool:string; toolArguments:string; enabled:boolean; revision:number };
 export type PlatformConfiguration = { policy:OrganizationPolicy; harnesses:HarnessDefinition[]; mcp:LocalMcpConfiguration[] };
 
-const taskFields = `id planKey role executionRole title state attemptBudget attempts budgetMicros spentCostMicros changeSha ownedPaths dependencyKeys providerAttempts { id provider model inputTokens outputTokens attemptCount estimatedCostMicros costKnown outcome retryable category recordedAt } repairPackages { id attempt failureCategory changeSha evidenceDigest createdAt }`;
+const taskFields = `id planKey role executionRole title state requiredCapability attemptBudget attempts budgetMicros spentCostMicros changeSha ownedPaths dependencyKeys providerAttempts { id provider model inputTokens outputTokens attemptCount estimatedCostMicros costKnown outcome retryable category recordedAt } repairPackages { id attempt failureCategory changeSha evidenceDigest createdAt }`;
 const runFields = `archived id repository sourceRef title specification budgetUsd spentCostMicros harnessProfile baseBranch policyRevision state createdAt approved approvedAt approvedBy publication { pullRequestState } tasks { ${taskFields} } gates { id name required state kind imageDigest command networkPolicy timeoutSeconds criterionCoverage } criteria { id statement coverageState }`;
 
 export function approveRunnerPairing(challenge:string,name:string):Promise<boolean>{return request<{approveRunnerPairing:boolean}>('mutation($challenge:String!,$name:String!){approveRunnerPairing(challenge:$challenge,name:$name)}',{challenge,name}).then(data=>data.approveRunnerPairing);}
