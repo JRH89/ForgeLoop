@@ -1,6 +1,10 @@
 ForgeLoop Runner desktop preview for Windows x64, macOS Apple Silicon and Intel,
 and Debian/Ubuntu Linux x64. Java is bundled; Git and Docker must be installed.
 
+The Provider step now looks up public base text-token prices for supported
+models. Account-specific rates can still be entered manually. Unknown or
+unavailable rates show N/A rather than a misleading zero-cost estimate.
+
 Install the package for your operating system, open ForgeLoop Runner, approve
 the browser pairing request, and configure your provider key locally. Starting
 the runner can process eligible work and incur provider charges.
