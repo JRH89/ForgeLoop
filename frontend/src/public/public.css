@@ -59,3 +59,7 @@
 .public-site a.article-card>span{color:#91bbf4;text-decoration:underline;text-underline-offset:4px}
 @media(max-width:1439px){.public-site .landing-hero,.public-site .public-hero{--hero-overlay-start:.94;--hero-overlay-end:.8}}
 @media(max-width:760px){.public-site .landing-hero,.public-site .public-hero{--hero-source:var(--hero-small);--hero-overlay-start:.96;--hero-overlay-end:.88}}
+
+/* A little more breathing room for the landing composition, without forcing a full screen. */
+.public-site .landing-hero{padding-top:110px!important;padding-bottom:85px!important;min-height:630px}
+@media(max-width:760px){.public-site .landing-hero{padding-top:75px!important;padding-bottom:65px!important;min-height:0}}
