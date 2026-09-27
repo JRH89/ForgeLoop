@@ -83,7 +83,7 @@ audit passes. Do not invent a verification token or add analytics without consen
 
 - Frontend lint, type checking, 21 unit tests, production build and 18-page SEO
   contract checks pass.
-- Seven public-site browser tests pass against the production Nginx image, including
+- Eight public-site browser tests pass against the production Nginx image, including
   JavaScript-disabled content, mobile navigation, real 404/redirect behavior and
   automated WCAG A/AA checks on representative templates.
 - Lighthouse 13.5.0 mobile simulation against the local production image scored
@@ -92,6 +92,10 @@ audit passes. Do not invent a verification token or add analytics without consen
   Report: `evidence/public-site/lighthouse-home.json` (local evidence, not committed).
 
 ## Hero artwork provenance
+
+The homepage now uses the [reference-inspired refined hero](landing-hero-refinement.md),
+with versioned URLs and higher-quality encoding. The original source below is
+retained for history; all other page illustrations remain unchanged.
 
 Built-in image generation was used, not the paid provider key configured on the
 ForgeLoop runner. Original: `frontend/src/assets/delivery-hero-generated.png`.
