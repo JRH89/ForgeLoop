@@ -17,6 +17,10 @@ requests are made by public pages.
   404 page has a decorative image-backed hero. Informational text remains HTML.
 - Each page and article now has unique artwork, responsive derivatives, and a
   matching social preview. See [hero prompts and asset map](public-hero-prompts.md).
+- All hero templates (including 404) apply a dark navy overlay below 1440px,
+  strongest behind copy and strengthened again on phones. At 1440px and above
+  the overlay is transparent. Browser tests cover both breakpoint edges and
+  mobile/tablet widths without changing copy or artwork.
 - Article cards are whole-card links, including the visible read action; browser
   tests open every article through that action. The decorative pipeline status
   strip has been removed. Customer-facing pages and the guide never name internal
@@ -79,7 +83,7 @@ audit passes. Do not invent a verification token or add analytics without consen
 
 - Frontend lint, type checking, 21 unit tests, production build and 18-page SEO
   contract checks pass.
-- Six public-site browser tests pass against the production Nginx image, including
+- Seven public-site browser tests pass against the production Nginx image, including
   JavaScript-disabled content, mobile navigation, real 404/redirect behavior and
   automated WCAG A/AA checks on representative templates.
 - Lighthouse 13.5.0 mobile simulation against the local production image scored

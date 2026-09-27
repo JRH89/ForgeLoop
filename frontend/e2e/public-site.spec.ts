@@ -115,3 +115,24 @@ test('public templates pass automated accessibility checks',async({page})=>{
     expect(result.violations,path).toEqual([]);
   }
 });
+
+test('hero overlays protect text below large desktop widths',async({page})=>{
+  for(const path of ['/','/features','/blog/self-hosted-ai-runners','/this-page-does-not-exist']){
+    await page.goto(path);
+    for(const width of [390,768,1024,1280,1439,1440,1920]){
+      await page.setViewportSize({width,height:900});
+      const hero=page.locator('.landing-hero,.public-hero');
+      const style=await hero.evaluate(el=>{
+        const css=getComputedStyle(el);
+        return {start:Number(css.getPropertyValue('--hero-overlay-start')),end:Number(css.getPropertyValue('--hero-overlay-end')),background:css.backgroundImage};
+      });
+      expect(style.start,`${path} at ${width}`).toBe(width>=1440?0:width<=760?.96:.94);
+      expect(style.end,`${path} at ${width}`).toBe(width>=1440?0:width<=760?.88:.8);
+      expect(style.background).toContain('linear-gradient');
+      expect(style.background).toContain(width<=760?'-hero-small.webp':'-hero.webp');
+      await expect(page.getByRole('heading',{level:1})).toBeVisible();
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      if(path==='/'&&[390,1280,1440].includes(width))await page.screenshot({path:`../evidence/public-site/hero-overlay-${width}.png`});
+    }
+  }
+});

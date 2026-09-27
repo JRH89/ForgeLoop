@@ -50,12 +50,12 @@
 @media(max-width:760px){.public-site .public-nav{padding-inline:20px}.public-site .public-footer{padding-inline:24px}}
 @media(prefers-reduced-motion:reduce){.mobile-drawer::backdrop{transition:none}}
 
-/* Route-specific artwork keeps the existing text contrast and responsive crop. */
-.public-site .landing-hero,.public-site .public-hero{background-image:linear-gradient(90deg,#07101922,#07101900),var(--hero-image)}
+/* All hero templates share a scrim below large desktop width, where copy overlaps artwork. */
+.public-site .landing-hero,.public-site .public-hero{--hero-overlay-start:0;--hero-overlay-end:0;--hero-source:var(--hero-image);background-image:linear-gradient(90deg,rgba(7,16,25,var(--hero-overlay-start)) 0%,rgba(7,16,25,var(--hero-overlay-start)) 55%,rgba(7,16,25,var(--hero-overlay-end)) 100%),var(--hero-source)}
 .public-site a.article-card{display:block;color:inherit;text-decoration:none;transition:border-color 180ms ease,transform 180ms ease}
 .public-site a.article-card h3{color:#edf4ff}
 .public-site a.article-card:hover{transform:translateY(-3px);border-color:#73a9e3}
 .public-site a.article-card:focus-visible{outline:2px solid #91c5ff;outline-offset:5px}
 .public-site a.article-card>span{color:#91bbf4;text-decoration:underline;text-underline-offset:4px}
-@media(max-width:1000px){.public-site .landing-hero,.public-site .public-hero{background-image:linear-gradient(90deg,#071019bb,#07101922),var(--hero-image)}}
-@media(max-width:760px){.public-site .landing-hero,.public-site .public-hero{background-image:linear-gradient(90deg,#071019ee,#07101988),var(--hero-small)}}
+@media(max-width:1439px){.public-site .landing-hero,.public-site .public-hero{--hero-overlay-start:.94;--hero-overlay-end:.8}}
+@media(max-width:760px){.public-site .landing-hero,.public-site .public-hero{--hero-source:var(--hero-small);--hero-overlay-start:.96;--hero-overlay-end:.88}}
