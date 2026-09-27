@@ -25,7 +25,7 @@ for(const path of publicPaths){
   assert(doc.querySelector('main').textContent.length>400,`${path}: real prerendered content`);
   for(const link of doc.querySelectorAll('a[href]')){
     const href=link.getAttribute('href');
-    if(href.startsWith('/')&&!href.startsWith('/app')&&!href.startsWith('/oauth2'))assert(publicPaths.includes(href.split('#')[0]),`${path}: broken local link ${href}`);
+    if(href.startsWith('/')&&!href.startsWith('/app')&&!href.startsWith('/oauth2')&&!href.startsWith('/support'))assert(publicPaths.includes(href.split('#')[0]),`${path}: broken local link ${href}`);
   }
   assert(doc.querySelector('.public-hero,.landing-hero'),`${path}: missing hero`);
 }

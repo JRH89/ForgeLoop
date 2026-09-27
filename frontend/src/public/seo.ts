@@ -7,8 +7,8 @@ export const publicPaths=[...pages.map(page=>page.path),...articles.map(article=
 export function metadata(path:string) {
   const article=articles.find(item=>path===`/blog/${item.slug}`);
   const page=pages.find(item=>item.path===path);
-  const title=article?`${article.title} | ForgeLoop`:page?.title??'Page not found | ForgeLoop';
-  const description=article?.description??page?.description??'This page could not be found. Explore ForgeLoop features, documentation, and practical software delivery guides.';
+  const title=path==='/support'?'Support center | ForgeLoop':article?`${article.title} | ForgeLoop`:page?.title??'Page not found | ForgeLoop';
+  const description=path==='/support'?'Track your ForgeLoop support requests, read replies, and follow ticket status securely.':article?.description??page?.description??'This page could not be found. Explore ForgeLoop features, documentation, and practical software delivery guides.';
   const url=SITE+(path==='/'?'/':path);
   const organization={'@type':'Organization','@id':`${SITE}/#organization`,name:'Hooker Hill Studios',url:`${SITE}/about`,logo:{'@type':'ImageObject',url:`${SITE}/icons/icon-192.png`,width:192,height:192}};
   const graph:Record<string,unknown>[]=[organization,{'@type':'WebSite','@id':`${SITE}/#website`,name:'ForgeLoop',url:`${SITE}/`,publisher:{'@id':`${SITE}/#organization`}},

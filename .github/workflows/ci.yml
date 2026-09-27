@@ -66,6 +66,7 @@ jobs:
     # this disposable runner while deployed Compose environments use `.env`.
     env:
       FORGELOOP_SECURITY_MODE: development
+      FORGELOOP_SUPPORT_E2E: '1'
     steps:
       - uses: actions/checkout@v6
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'

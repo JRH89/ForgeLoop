@@ -1,0 +1,14 @@
+/* An external support destination follows the five established console tabs. */
+.support-console-link {
+  display: block;
+  margin-top: 12px;
+  padding: 11px 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 8px;
+}
+.support-console-link:hover,
+.support-console-link:focus-visible {
+  color: var(--text);
+  background: var(--raised);
+}

@@ -15,3 +15,4 @@ if (/^\/app(?:\/|$)/.test(window.location.pathname)) {
 }
 
 initializeNavigation();
+if(['/contact','/support'].includes(window.location.pathname))void import('./support/mount');
