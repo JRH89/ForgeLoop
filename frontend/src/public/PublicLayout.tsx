@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 const favicon='/icons/icon-192.png';
 import { REPOSITORY } from './content';
 import { heroStyle } from './heroes';
-import { BookOpen, CircleHelp, FileText, Info, Layers, LifeBuoy, Menu, Shield, X } from 'lucide-react';
+import { BookOpen, CircleHelp, Download, FileText, Info, Layers, LifeBuoy, Menu, Shield, X } from 'lucide-react';
 
-const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs']];
-const mobileIcons = [Layers, CircleHelp, Info, FileText, BookOpen, Shield, LifeBuoy];
+const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs'],['Downloads','/app/runner-downloads']];
+const mobileIcons = [Layers, CircleHelp, Info, FileText, BookOpen, Download, Shield, LifeBuoy];
 export function PublicHeader() {
   return <header className="landing-nav public-nav">
     <a className="brand" href="/" aria-label="ForgeLoop home"><img src={favicon} width="30" height="30" alt=""/><strong>ForgeLoop</strong></a>
