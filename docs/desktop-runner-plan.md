@@ -49,6 +49,16 @@ or claim unsigned CI artifacts are trusted public installers.
   on disposable CI hosts; real OS reboot/login acceptance remains deferred.
 - [ ] Paid real-provider delivery and signed public release remain separate gates.
 
+## Native launcher branding (1.0.3)
+
+The native installer now derives Windows ICO, macOS ICNS, and Linux PNG icons
+from the bundled ForgeLoop favicon and passes the platform icon to jpackage.
+The window icon alone does not brand the executable or Start-menu shortcut.
+Windows package CI compares the installed executable icon pixel-for-pixel with
+the generated favicon, and unit tests validate all native icon containers/sizes.
+Install the newer preview to update an existing shortcut; private runner state
+is preserved. Packages remain unsigned development previews.
+
 ## Connection-recovery follow-up (1.0.2)
 
 - [x] Secret-free atomic worker status snapshots instead of inferring health from a live process.
