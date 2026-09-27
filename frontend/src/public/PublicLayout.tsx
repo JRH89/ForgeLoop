@@ -4,7 +4,18 @@ import { REPOSITORY } from './content';
 
 const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs']];
 export function PublicHeader() {
-  return <header className="landing-nav public-nav"><a className="brand" href="/" aria-label="ForgeLoop home"><img src={favicon} width="30" height="30" alt=""/><strong>ForgeLoop</strong></a><nav aria-label="Main navigation">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav><a className="primary" href="/oauth2/authorization/github">Sign in with GitHub</a><details className="mobile-navigation"><summary>Menu</summary><nav aria-label="Mobile navigation">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}<a href="/security">Security</a></nav></details></header>;
+  return <header className="landing-nav public-nav">
+    <a className="brand" href="/" aria-label="ForgeLoop home"><img src={favicon} width="30" height="30" alt=""/><strong>ForgeLoop</strong></a>
+    <nav aria-label="Main navigation">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav>
+    <a className="primary" href="/oauth2/authorization/github">Sign in with GitHub</a>
+    <button className="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu" hidden><span/><span/><span/></button>
+    <dialog id="mobile-menu" className="mobile-drawer" aria-labelledby="mobile-menu-title">
+      <div className="drawer-heading"><strong id="mobile-menu-title">Explore ForgeLoop</strong><button type="button" className="menu-close" aria-label="Close navigation">×</button></div>
+      <nav aria-label="Mobile navigation">{[...links,['Security','/security'],['Contact','/contact']].map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav>
+      <a className="primary" href="/oauth2/authorization/github">Sign in with GitHub</a>
+    </dialog>
+    <noscript><nav aria-label="Mobile navigation">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav></noscript>
+  </header>;
 }
 export function PublicFooter() {
   const groups=[['Product',[['Features','/features'],['How it works','/how-it-works'],['Security','/security'],['Open the console','/oauth2/authorization/github']]],['Resources',[['Getting started','/docs'],['Field notes','/blog'],['User guide','/app'],['Release progress',`${REPOSITORY}#readme`]]],['Project',[['About','/about'],['Contact & support','/contact'],['GitHub',REPOSITORY],['Issue tracker',`${REPOSITORY}/issues`]]]] as const;

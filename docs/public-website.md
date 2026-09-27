@@ -15,6 +15,11 @@ requests are made by public pages.
   No fabricated customer stories, traffic claims, benchmarks, reviews, or ratings.
 - Shared header/footer links cover desktop and mobile. Every public page and the
   404 page has a decorative image-backed hero. Informational text remains HTML.
+- Header/footer span the viewport; desktop navigation uses equal outer columns
+  to stay centered. A small progressive enhancement opens the mobile modal drawer
+  with entrance/exit transitions, Escape/backdrop/close controls, focus cycling and
+  restoration, scroll locking and reduced-motion support. No-JavaScript visitors
+  retain ordinary navigation links. Resizing to desktop dismisses the drawer.
 - Public docs distinguish desktop previews from signed distribution and paid
   model execution from free setup checks. The console still contains the full guide.
 
@@ -68,7 +73,7 @@ audit passes. Do not invent a verification token or add analytics without consen
 
 - Frontend lint, type checking, 21 unit tests, production build and 18-page SEO
   contract checks pass.
-- Four public-site browser tests pass against the production Nginx image, including
+- Five public-site browser tests pass against the production Nginx image, including
   JavaScript-disabled content, mobile navigation, real 404/redirect behavior and
   automated WCAG A/AA checks on representative templates.
 - Lighthouse 13.5.0 mobile simulation against the local production image scored

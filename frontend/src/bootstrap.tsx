@@ -1,5 +1,6 @@
 import './styles.css';
 import './public/public.css';
+import { initializeNavigation } from './public/navigation';
 
 // Public visitors do not need operator-console code or tenant API requests.
 if (/^\/app(?:\/|$)/.test(window.location.pathname)) {
@@ -12,3 +13,5 @@ if (/^\/app(?:\/|$)/.test(window.location.pathname)) {
   message.textContent='GitHub sign-in could not be completed. Confirm that your account has been invited to this ForgeLoop organization.';
   document.getElementById('main-content')?.prepend(message);
 }
+
+initializeNavigation();

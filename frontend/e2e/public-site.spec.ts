@@ -31,7 +31,7 @@ test('public navigation is usable on desktop and mobile without tenant requests'
   await page.screenshot({path:'../evidence/public-site/features-desktop.png',fullPage:true});
   await page.goto('/');await page.screenshot({path:'../evidence/public-site/home-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
-  await page.getByText('Menu',{exact:true}).click();
+  await page.getByRole('button',{name:'Open navigation'}).click();
   await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('link',{name:'Blog',exact:true}).click();
   await expect(page.getByRole('heading',{level:1})).toContainText('Better systems');
   for(const path of ['/','/features','/about','/docs','/blog','/blog/self-hosted-ai-runners']){
@@ -40,6 +40,43 @@ test('public navigation is usable on desktop and mobile without tenant requests'
   }
   await page.screenshot({path:'../evidence/public-site/article-mobile.png',fullPage:true});
   expect(errors).toEqual([]);expect(tenantRequests).toEqual([]);
+});
+
+test('full-width chrome and accessible animated mobile drawer',async({page})=>{
+  await page.setViewportSize({width:1920,height:1000});
+  await page.goto('/');
+  for(const selector of ['.public-nav','.public-footer']){
+    const box=await page.locator(selector).boundingBox();
+    expect(box?.width).toBe(1920);
+  }
+  const nav=await page.getByRole('navigation',{name:'Main navigation',exact:true}).boundingBox();
+  expect(Math.abs(nav!.x+nav!.width/2-960)).toBeLessThan(2);
+  await page.setViewportSize({width:390,height:844});
+  const toggle=page.getByRole('button',{name:'Open navigation'});
+  const drawer=page.getByRole('dialog',{name:'Explore ForgeLoop'});
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await expect(drawer).toHaveClass(/is-open/);
+  await expect(page.getByRole('button',{name:'Close navigation'})).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(drawer.getByRole('link',{name:'Sign in with GitHub'})).toBeFocused();
+  expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+  await page.screenshot({path:'../evidence/public-site/mobile-drawer.png'});
+  await page.keyboard.press('Escape');
+  await expect(drawer).not.toBeVisible();
+  await expect(toggle).toBeFocused();
+  await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await toggle.click();
+  await page.mouse.click(5,400);
+  await expect(drawer).not.toBeVisible();
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await toggle.click();
+  await page.getByRole('button',{name:'Close navigation'}).click();
+  await expect(drawer).not.toBeVisible();
+  await toggle.click();
+  await page.setViewportSize({width:1440,height:1000});
+  await expect(drawer).not.toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.style.overflow)).toBe('');
 });
 
 test('static assets, sitemap, and canonical redirects work',async({request})=>{
