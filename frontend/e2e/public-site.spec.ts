@@ -144,4 +144,11 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
   for(const file of ['delivery-v2-hero.webp','delivery-v2-hero-small.webp','delivery-v2-social-preview.jpg']){
     expect((await request.get(`/images/${file}`)).status()).toBe(200);
   }
+  for(const width of [390,1440]){
+    await page.setViewportSize({width,height:1000});
+    const padding=await page.locator('.landing-hero').evaluate(el=>{
+      const css=getComputedStyle(el);return [css.paddingTop,css.paddingBottom];
+    });
+    expect(padding).toEqual(width<=760?['75px','65px']:['110px','85px']);
+  }
 });
