@@ -1,0 +1,16 @@
+.console-app .logout { display: inline-flex; align-items: center; justify-content: center; padding: .65rem 1rem; border: 1px solid #36526a; border-radius: .55rem; background: #142737; color: #ecf2f8; font-weight: 600; text-decoration: none; }
+.console-app .logout:hover { background: #254459; border-color: #5b829e; }
+.console-app .logout:focus-visible, .console-menu-toggle:focus-visible { outline: 2px solid #46dfaa; outline-offset: 3px; }
+.console-app .mobile-signout, .console-menu-toggle { display: none; }
+.console-app .sidebar-note { color: #8ba0b5; }
+@media (max-width: 760px) {
+  .console-app > header { height: 64px; position: sticky; top: 0; }
+  .console-app .desktop-signout { display: none; }
+  .console-app .console-menu-toggle { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: .5rem; color: #ecf2f8; background: #142737; border: 1px solid #36526a; border-radius: .5rem; cursor: pointer; }
+  .console-app .shell > .console-sidebar { position: fixed; top: 64px; left: 0; right: 0; z-index: 19; height: auto; max-height: calc(100dvh - 64px); overflow-y: auto; padding: 1rem; background: #0b1824; border-bottom: 1px solid #36526a; box-shadow: 0 15px 30px #0006; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-12px); transition: opacity .2s ease, transform .2s ease, visibility .2s; }
+  .console-app .shell > .console-sidebar.menu-open { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+  .console-app .console-sidebar nav { display: grid; grid-template-columns: 1fr; gap: .35rem; }
+  .console-app .console-sidebar nav button { justify-content: flex-start; font-size: 1rem; min-height: 44px; padding: .65rem .8rem; }
+  .console-app .mobile-signout { display: flex; margin-top: .6rem; }
+}
+@media (prefers-reduced-motion: reduce) { .console-app .shell > .console-sidebar { transition: none; } }
