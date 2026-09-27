@@ -1,5 +1,9 @@
 /* Public-site styling is scoped so operator console layouts remain unchanged. */
 .runner-downloads .public-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.runner-downloads .public-cards article{display:grid;grid-template-rows:subgrid;grid-row:span 4;min-width:0}
+.runner-downloads .public-cards article>h3,.runner-downloads .public-cards article>p{margin:0}
+.runner-downloads .public-cards article>.primary{margin:0;align-items:center;justify-content:center;text-align:center;white-space:normal}
+.runner-downloads .public-cards article>.download-verification{margin:0}
 .runner-downloads .primary{display:inline-flex;text-decoration:none;margin-block:12px}
 .download-verification{margin-top:12px;font-size:.85rem;line-height:1.6}
 .download-verification summary{cursor:pointer;color:#91bbf4}

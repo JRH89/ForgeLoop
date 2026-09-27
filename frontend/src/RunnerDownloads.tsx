@@ -40,7 +40,7 @@ export default function RunnerDownloads(){
       {manifest.releaseUrl&&<p><a href={manifest.releaseUrl}>Release notes and all downloads</a></p>}
       <div className="public-cards">{manifest.packages.map(item=><article key={item.platform+'-'+item.architecture}>
         <h3>{item.platform} ({item.architecture==='arm64'?'Apple Silicon':item.architecture==='x64'&&item.platform==='macOS'?'Intel':'x64'})</h3>
-        {item.platform==='Linux'&&<p>DEB installer for Debian/Ubuntu desktops.</p>}
+        <p>{item.platform==='Linux'?'DEB installer for Debian/Ubuntu desktops.':item.platform==='Windows'?'MSI installer for Windows x64.':item.architecture==='arm64'?'DMG installer for Apple Silicon Macs.':'DMG installer for Intel Macs.'}</p>
         <a className="primary" href={item.url}>Download for {item.platform} ({item.architecture})</a>
         <details className="download-verification"><summary>Verify download</summary>
           <p>SHA-256</p><code style={{overflowWrap:'anywhere'}}>{item.sha256}</code>
