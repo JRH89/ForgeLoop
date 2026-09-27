@@ -18,6 +18,8 @@ class ControlPlaneFailureTest {
         assertFalse(call(200,"{\"errors\":[{\"message\":\"secret-response-body\",\"extensions\":{\"classification\":\"FORBIDDEN\"}}]}").retryable());
         assertTrue(call(200,"{\"errors\":[{\"extensions\":{\"classification\":\"INTERNAL_ERROR\"}}]}").retryable());
         assertTrue(call(200,"<html>secret-response-body</html>").retryable());
+        assertTrue(call(200,"{\"data\":{}}").retryable());
+        assertTrue(call(200,"{\"data\":{\"runnerHeartbeat\":{\"id\":\"wrong-runner\"}}}").retryable());
     }
     private ControlPlaneFailure call(int code,String body)throws Exception {
         HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);

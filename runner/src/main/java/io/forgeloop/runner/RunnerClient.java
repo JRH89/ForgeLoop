@@ -39,13 +39,20 @@ public final class RunnerClient {
         return new RunnerIdentity(enrollment.path("runner").path("id").asText(),enrollment.path("credential").asText());
     }
 
-    public String heartbeat(RunnerIdentity identity) throws Exception { return post("mutation($runnerId:ID!,$credential:String!){runnerHeartbeat(runnerId:$runnerId,credential:$credential){id lastHeartbeatAt}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
+    public String heartbeat(RunnerIdentity identity) throws Exception {
+        String response=post("mutation($runnerId:ID!,$credential:String!){runnerHeartbeat(runnerId:$runnerId,credential:$credential){id lastHeartbeatAt}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        if(!identity.runnerId().equals(JSON.readTree(response).path("data").path("runnerHeartbeat").path("id").asText()))
+            throw new ControlPlaneFailure("Invalid heartbeat acknowledgement",true);
+        return response;
+    }
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
         String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
-        for (JsonNode task : JSON.readTree(response).path("data").path("availableRunnerTasks")) {
+        JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
+        if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
+        for (JsonNode task : taskNodes) {
             tasks.add(new RunnerTask(task.path("id").asText(), task.path("role").asText(), task.path("title").asText(),
                     task.path("repository").asText(), task.path("baseBranch").asText(), task.path("sourceRef").asText(), task.path("specification").asText(), task.path("requiredCapability").asText(), task.path("budgetUsd").asDouble(),
                     JSON.convertValue(task.path("ownedPaths"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
