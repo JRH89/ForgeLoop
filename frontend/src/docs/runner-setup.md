@@ -1,3 +1,23 @@
+## Desktop downloads and updates
+
+Open [Download runner](/app/runner-downloads) for the latest published desktop
+preview. Downloads come from GitHub Releases and do not require signing in.
+Choose Windows x64, macOS Apple Silicon (arm64) or Intel (x64), or the Linux x64
+DEB package for Debian/Ubuntu desktops. Java is bundled; Git and Docker are required.
+
+Preview installers are unsigned and macOS previews are not notarized. Windows
+and macOS may warn or block installation; use previews only if your device policy
+permits them. Signing remains a separate release milestone.
+
+Expand **Verify download** to copy SHA-256 and see the command for your platform.
+Compare the entire hash. A mismatch means the file must not be installed.
+Checksums confirm file integrity, not the publisher's identity.
+
+For updates, pause the runner, wait for current work to finish, close it, install
+the newer package and reopen it. Your identity, provider keys and settings are
+retained outside the installation folder. The website discovers new releases
+automatically within about five minutes; the app does not install updates itself.
+
 ## Navigation and usage tracking
 
 On mobile, open the hamburger button in the header for the navigation dropdown.
@@ -77,8 +97,8 @@ Preview installer 1.0.3 includes the ForgeLoop favicon for the native launcher
 and operating-system shortcuts. To replace an older Java-branded shortcut,
 pause work, close the app, and install the newer package. Saved runner state
 stays outside the installation directory. CI packages are unsigned previews;
-the download page only lists public GitHub Release packages after an explicit
-release manifest is published.
+the download page discovers explicitly published GitHub Releases automatically
+and displays their version, platform, release notes and optional SHA-256 checks.
 
 The new desktop app includes Java and guides you through **Connect → Provider →
 Run**. Connect opens GitHub sign-in and an administrator approval page; compare
@@ -134,9 +154,9 @@ into sign-in startup. Real OS reboot and funded in-flight delivery verification
 remain separate release checks.
 
 The **Desktop installers and updates** link in Harness & policy reports release
-availability. Public installers remain unavailable until signing/notarization
-and release verification are complete. Do not bypass OS signature warnings.
-The existing guided CLI installation below remains the available fallback.
+availability. Public preview installers are unsigned; signed production installers
+still require signing/notarization and release verification.
+The existing guided CLI installation below remains an advanced fallback.
 
 ### Guided installation (recommended)
 
