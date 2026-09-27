@@ -103,6 +103,28 @@ test('full-width chrome and console-style mobile dropdown',async({page})=>{
   await expect(page).toHaveURL(/\/contact$/);
 });
 
+test('public navbar stays pinned and anchor content stays unobscured',async({page})=>{
+  for(const width of [390,1000,1440]){
+    await page.setViewportSize({width,height:844});
+    await page.goto('/');
+    const header=page.locator('.public-nav');
+    const height=(await header.boundingBox())!.height;
+    await page.getByRole('link',{name:'See the delivery loop'}).click();
+    await expect.poll(async()=>Math.round((await header.boundingBox())!.y)).toBe(0);
+    expect((await page.locator('#how').boundingBox())!.y).toBeGreaterThanOrEqual(height);
+    await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+    await expect.poll(async()=>Math.round((await header.boundingBox())!.y)).toBe(0);
+    if(width<=1000){
+      await page.getByRole('button',{name:'Open navigation'}).click();
+      const panel=page.locator('#mobile-menu');
+      await expect(panel).toBeVisible();
+      await expect.poll(async()=>Math.round((await panel.boundingBox())!.y)).toBe(height-1);
+      await panel.getByRole('link',{name:'Features',exact:true}).click();
+      await expect(page).toHaveURL(/\/features$/);
+    }
+  }
+});
+
 test('static assets, sitemap, and canonical redirects work',async({request})=>{
   for(const path of ['/robots.txt','/sitemap.xml','/images/social-preview.jpg','/images/delivery-hero.webp','/icons/icon-32.png'])expect((await request.get(path)).status()).toBe(200);
   const redirect=await request.get('/about/',{maxRedirects:0});expect(redirect.status()).toBe(308);
