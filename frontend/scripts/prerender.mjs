@@ -34,6 +34,7 @@ ${app||!info.found?'':`<script type="application/ld+json">${JSON.stringify(info.
 }
 for(const path of publicPaths){const file=path==='/'?'dist/index.html':`dist${path}.html`;await mkdir(dirname(file),{recursive:true});await writeFile(file,document(path));}
 await writeFile('dist/404.html',document('/404'));
+await writeFile('dist/support.html',document('/support'));
 await writeFile('dist/app-shell.html',document('/app',true));
 await writeFile('dist/robots.txt',`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /graphql\nDisallow: /oauth2/\nDisallow: /login/\nDisallow: /downloads/\nSitemap: ${SITE}/sitemap.xml\n`);
 await writeFile('dist/sitemap.xml',`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${publicPaths.map(path=>`<url><loc>${SITE}${path==='/'?'/':path}</loc>${articles.find(article=>path===`/blog/${article.slug}`)?`<lastmod>${articles.find(article=>path===`/blog/${article.slug}`).published}</lastmod>`:''}</url>`).join('')}</urlset>`);

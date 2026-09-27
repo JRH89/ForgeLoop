@@ -19,7 +19,7 @@ export function PublicHeader() {
   </header>;
 }
 export function PublicFooter() {
-  const groups=[['Product',[['Features','/features'],['How it works','/how-it-works'],['Security','/security'],['Open the console','/oauth2/authorization/github']]],['Resources',[['Getting started','/docs'],['Field notes','/blog'],['User guide','/app'],['Release progress',`${REPOSITORY}#readme`]]],['Project',[['About','/about'],['Contact & support','/contact'],['GitHub',REPOSITORY],['Issue tracker',`${REPOSITORY}/issues`]]]] as const;
+  const groups=[['Product',[['Features','/features'],['How it works','/how-it-works'],['Security','/security'],['Open the console','/oauth2/authorization/github']]],['Resources',[['Getting started','/docs'],['Field notes','/blog'],['User guide','/app'],['Release progress',`${REPOSITORY}#readme`]]],['Project',[['About','/about'],['Contact & support','/contact'],['Track support tickets','/support'],['GitHub',REPOSITORY],['Issue tracker',`${REPOSITORY}/issues`]]]] as const;
   return <footer className="public-footer"><div className="footer-intro"><a className="brand" href="/"><img src={favicon} width="30" height="30" alt=""/><strong>ForgeLoop</strong></a><p>Evidence-backed software delivery.</p><p>Built by Hooker Hill Studios.</p></div>{groups.map(([title,items])=><nav key={title} aria-label={`${title} footer`}><h2>{title}</h2>{items.map(([label,url])=><a href={url} key={label}>{label}</a>)}</nav>)}<p className="footer-note">© 2026 Hooker Hill Studios. Desktop installers are development previews; signed public distribution remains a release milestone.</p></footer>;
 }
 export function PublicLayout({children}:{children:ReactNode}) {

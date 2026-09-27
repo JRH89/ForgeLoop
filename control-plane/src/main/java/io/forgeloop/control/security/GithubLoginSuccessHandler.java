@@ -22,7 +22,10 @@ public class GithubLoginSuccessHandler implements AuthenticationSuccessHandler {
         try {
             Object githubId = oauth.getPrincipal().getAttribute("id");
             provisioner.requireMembership(String.valueOf(githubId));
-            response.sendRedirect("/app");
+            Object supportReturn=request.getSession().getAttribute("SUPPORT_RETURN");
+            request.getSession().removeAttribute("SUPPORT_RETURN");
+            // Only fixed local destinations are allowed; never reflect a user-supplied redirect.
+            response.sendRedirect("/support#admin".equals(supportReturn)?"/support#admin":"/support#mine".equals(supportReturn)?"/support#mine":"/app");
         } catch (RuntimeException denied) {
             log.warn("GitHub OAuth identity was authenticated but ForgeLoop membership provisioning failed: {}", denied.getMessage(), denied);
             request.getSession().invalidate();

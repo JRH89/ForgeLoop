@@ -61,7 +61,7 @@ public class SecurityConfiguration {
 
     private static void authenticatedRoutes(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/actuator/health", "/actuator/health/**", "/graphql", "/api/auth/session", "/api/github/webhooks", "/api/github/app/callback", "/api/runner/artifacts", "/api/runner/events", "/oauth2/**", "/login/**", "/error").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**", "/graphql", "/api/auth/session", "/api/support/**", "/api/github/webhooks", "/api/github/app/callback", "/api/runner/artifacts", "/api/runner/events", "/oauth2/**", "/login/**", "/error").permitAll()
                 .anyRequest().authenticated());
     }
 
