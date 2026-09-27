@@ -13,6 +13,9 @@ browser checks verify that closing gap as well.
 
 ## Content and routes
 
+- The public navbar stays pinned while scrolling on desktop and mobile. Sticky
+  positioning preserves the hero's space; anchor targets include a header offset.
+
 - The landing page features four field notes in a two-column desktop grid
   (one column on phones); the blog index continues to show all articles.
 
