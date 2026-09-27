@@ -7,7 +7,7 @@ function document(path,app=false) {
   const info=metadata(path);
   const title=app?'ForgeLoop console':info.title;
   const robots=app||!info.found?'noindex, nofollow':'index, follow, max-image-preview:large';
-  const social=`${SITE}/images/social-preview.jpg`;
+  const social=SITE+info.hero.social;
   const head=`<title>${escape(title)}</title>
 <meta name="description" content="${escape(info.description)}"/>
 <meta name="robots" content="${robots}"/>
@@ -21,14 +21,14 @@ ${app?'':`<link rel="canonical" href="${info.url}"/>`}
 <meta property="og:image" content="${social}"/>
 <meta property="og:image:width" content="1200"/>
 <meta property="og:image:height" content="630"/>
-<meta property="og:image:alt" content="Connected specification, coding agent, and verification stages on a dark blue background"/>
+<meta property="og:image:alt" content="${escape(title)} — editorial illustration"/>
 <meta name="twitter:card" content="summary_large_image"/>
 <meta name="twitter:title" content="${escape(title)}"/>
 <meta name="twitter:description" content="${escape(info.description)}"/>
 <meta name="twitter:image" content="${social}"/>
-<meta name="twitter:image:alt" content="ForgeLoop software delivery workflow illustration"/>
+<meta name="twitter:image:alt" content="${escape(title)} — editorial illustration"/>
 ${info.article?`<meta property="article:published_time" content="${info.article.published}"/><meta property="article:modified_time" content="${info.article.published}"/>`:''}
-${app?'':`<link rel="preload" as="image" href="/images/delivery-hero.webp" media="(min-width: 761px)"/><link rel="preload" as="image" href="/images/delivery-hero-small.webp" media="(max-width: 760px)"/>`}
+${app?'':`<link rel="preload" as="image" href="${info.hero.image}" media="(min-width: 761px)"/><link rel="preload" as="image" href="${info.hero.small}" media="(max-width: 760px)"/>`}
 ${app||!info.found?'':`<script type="application/ld+json">${JSON.stringify(info.jsonLd).replaceAll('<','\\u003c')}</script>`}`;
   return template.replace(/<title>[\s\S]*?<\/title>/,'').replace(/<meta\s+(?:name="description"|property="og:[^"]+")[^>]*>/g,'').replace('</head>',`${head}</head>`).replace('<div id="root"></div>',`<div id="root">${app?'':render(path)}</div>`);
 }
