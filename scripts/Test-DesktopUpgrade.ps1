@@ -33,7 +33,7 @@ try {
     $launcher=Join-Path $installDirectory 'ForgeLoop Runner.exe'
     if (!(Test-Path -LiteralPath $launcher)) { throw 'Upgraded launcher missing.' }
     $version=[Diagnostics.FileVersionInfo]::GetVersionInfo($launcher).ProductVersion
-    if ($version -notlike '1.0.2*') { throw "Expected upgraded launcher 1.0.2, got $version" }
+    if ($version -notlike '1.0.3*') { throw "Expected upgraded launcher 1.0.3, got $version" }
     $remove=Start-Process msiexec.exe -ArgumentList @('/x',('"'+$update.FullName+'"'),'/qn') -Wait -PassThru -WindowStyle Hidden
     if ($remove.ExitCode -notin @(0,3010)) { throw 'Uninstall failed.' }
     Assert-StatePreserved

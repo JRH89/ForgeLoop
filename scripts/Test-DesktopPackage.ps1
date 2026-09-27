@@ -11,6 +11,20 @@ if ($PackageType -eq 'msi') {
     try {
         $launcher=Join-Path $installDirectory 'ForgeLoop Runner.exe'
         if (-not (Test-Path -LiteralPath $launcher)) { throw 'Installed launcher missing' }
+        # Verify the installed EXE resource, not just the input icon supplied to jpackage.
+        Add-Type -AssemblyName System.Drawing
+        $expectedIcon=[Drawing.Icon]::new((Join-Path (Get-Location) 'artifacts/native-installer/icons/forgeloop.ico'),32,32)
+        $actualIcon=[Drawing.Icon]::ExtractAssociatedIcon($launcher)
+        $expectedBitmap=$expectedIcon.ToBitmap()
+        $actualBitmap=$actualIcon.ToBitmap()
+        try {
+            if ($actualBitmap.Size -ne $expectedBitmap.Size) { throw 'Installed icon size differs from the favicon' }
+            for ($x=0; $x -lt $actualBitmap.Width; $x++) {
+                for ($y=0; $y -lt $actualBitmap.Height; $y++) {
+                    if ($actualBitmap.GetPixel($x,$y).ToArgb() -ne $expectedBitmap.GetPixel($x,$y).ToArgb()) { throw 'Installed launcher does not use the ForgeLoop favicon' }
+                }
+            }
+        } finally { $expectedBitmap.Dispose(); $actualBitmap.Dispose(); $expectedIcon.Dispose(); $actualIcon.Dispose() }
         $check=Start-Process -FilePath $launcher -ArgumentList '--self-test' -Wait -PassThru -WindowStyle Hidden
         if ($check.ExitCode -ne 0) { throw 'Installed Windows launcher failed' }
     } finally {
@@ -22,6 +36,9 @@ if ($PackageType -eq 'msi') {
     & hdiutil attach -nobrowse -mountpoint $mount $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'DMG mount failed' }
     try {
+        $expectedHash=(Get-FileHash 'artifacts/native-installer/icons/forgeloop.icns').Hash
+        $matchingIcons=@(Get-ChildItem -LiteralPath (Join-Path $mount 'ForgeLoop Runner.app/Contents/Resources') -Filter '*.icns' | Where-Object { (Get-FileHash -LiteralPath $_.FullName).Hash -eq $expectedHash })
+        if ($matchingIcons.Count -eq 0) { throw 'macOS package favicon is missing' }
         & (Join-Path $mount 'ForgeLoop Runner.app/Contents/MacOS/ForgeLoop Runner') --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Packaged macOS app failed' }
     } finally { & hdiutil detach $mount }
@@ -37,6 +54,9 @@ if ($PackageType -eq 'msi') {
         # Resolve the executable from this package's inventory, not a guessed layout.
         $launchers=@((& dpkg-query -L forgeloop-runner) | Where-Object { $_.EndsWith('/bin/ForgeLoop Runner') })
         if ($launchers.Count -ne 1 -or -not $launchers[0].StartsWith('/opt/forgeloop-runner/')) { throw 'Unexpected installed package launcher layout' }
+        $expectedHash=(Get-FileHash 'artifacts/native-installer/icons/forgeloop.png').Hash
+        $matchingIcons=@((& dpkg-query -L forgeloop-runner) | Where-Object { $_.EndsWith('.png') -and (Get-FileHash -LiteralPath $_).Hash -eq $expectedHash })
+        if ($matchingIcons.Count -eq 0) { throw 'Linux package favicon is missing' }
         & $launchers[0] --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Installed Linux launcher failed' }
     } finally { & sudo apt-get remove -y forgeloop-runner }
