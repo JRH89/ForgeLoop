@@ -16,7 +16,7 @@ Copy `.env.example` to `.env`, create a GitHub App with the required repository 
 
 ## Open the operator dashboard
 
-With the Compose stack running, open `http://localhost:5173`. The dashboard is ForgeLoop's operator surface: **Runs** shows the live task graph, attempts, screenshot and log evidence, audit trail, approval controls, and PR links; **Analytics** compares persisted provider and harness telemetry; **Repositories** manages GitHub App authorization; **Harness & policy** manages organization limits, reusable harness definitions, and runner-local MCP context routes; and **User guide** provides the complete setup and operating handbook inside the application.
+With the Compose stack running, open `http://localhost:5173`. The dashboard is ForgeLoop's operator surface: **Runs** shows the live task graph, attempts, screenshot and log evidence, audit trail, approval controls, and PR links; **Usage & costs** tracks persisted spending estimates, daily/model graphs, tokens, pricing coverage, and per-run costs with UTC period/repository filters; **Repositories** manages GitHub App authorization; **Harness & policy** manages organization limits, reusable harness definitions, and runner-local MCP context routes; and **User guide** provides the complete setup and operating handbook inside the application. Mobile navigation uses an accessible hamburger dropdown with Support and Sign out.
 
 The named tunnel serves the public landing page and GitHub-authenticated dashboard at `https://forgeloop.hookerhillstudios.com`. Repository installation, human login, signed webhooks, and runner credentials remain separate security boundaries; see [GitHub user authentication](docs/github-user-authentication.md) and [Cloudflare Tunnel](docs/cloudflare-tunnel.md).
 
@@ -27,6 +27,9 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [ ] Signed, verified Windows/macOS/Linux desktop installer with browser pairing and local runner controls (in development).
 - [x] Desktop preview: browser approval, native OS key storage, bundled-runtime package builds, setup-window tests, and real worker start/pause tests on Windows, macOS and Linux CI.
 - [x] Desktop onboarding polish: dark theme, restored-state indicators, local key/connection checks, pairing recovery, and safe diagnostics export (no model calls).
+- [x] Native launcher branding: preview 1.0.3 uses the ForgeLoop favicon in Windows/macOS/Linux packages; installed icon resources and Windows state-preserving upgrade are CI-tested.
+- [x] Mobile dashboard hamburger dropdown with Support and Sign out, keyboard dismissal, reduced-motion support, and desktop Sign out button styling.
+- [x] Usage & costs: UTC period/repository filters, daily/model graphs, per-run estimates, harness comparison, token counts, archived history, and explicit unpriced coverage with live refresh.
 - [x] Desktop connection recovery: explicit idle/working/offline states, bounded reconnect backoff, prompt pause during retry waits, and stop-on-rejection diagnostics; real child-process server restart tests require no provider calls.
 - [x] First-run checklist: organization-scoped readiness, repository selection, local runner setup guidance, intake/safety settings, safe issue drafting, and on-demand GitHub issue eligibility diagnostics without model calls. See [onboarding verification](docs/first-run-onboarding.md).
 - [x] Expanded public website: image-backed product pages, ten original field notes, responsive navigation, prerendered SEO/social metadata and structured data; see [website verification and publishing guide](docs/public-website.md).
