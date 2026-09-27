@@ -5,9 +5,11 @@ receive complete HTML without executing JavaScript. The authenticated console
 remains a separate client-loaded route and is marked noindex. No tenant GraphQL
 requests are made by public pages.
 
-The landing hero uses compact 32px top padding at widths up to 760px, while
+The landing hero uses compact 24px top padding at widths up to 1000px (matching the mobile navigation breakpoint), while
 desktop retains its 110px top padding. Browser regression tests measure the
-header-to-eyebrow gap at 320, 390, 430, and 760px to prevent excess mobile whitespace.
+header-to-eyebrow gap at 320, 390, 430, 760, 768, and 1000px to prevent excess mobile whitespace.
+On phones the footer ends with 20px padding and no trailing paragraph margin;
+browser checks verify that closing gap as well.
 
 ## Content and routes
 

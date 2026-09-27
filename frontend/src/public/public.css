@@ -70,4 +70,6 @@
 /* A little more breathing room for the landing composition, without forcing a full screen. */
 .public-site .landing-hero{padding-top:110px!important;padding-bottom:85px!important;min-height:630px}
 /* Keep the first message close to mobile navigation; retain the desktop composition. */
-@media(max-width:760px){.public-site .landing-hero{padding-top:32px!important;padding-bottom:65px!important;min-height:0}}
+@media(max-width:1000px){.public-site .landing-hero{padding-top:24px!important;padding-bottom:65px!important;min-height:0}}
+/* Avoid stacking paragraph margins onto the mobile footer's closing padding. */
+@media(max-width:760px){.public-site .public-footer{padding-bottom:20px}.public-site .footer-note{margin-bottom:0}}

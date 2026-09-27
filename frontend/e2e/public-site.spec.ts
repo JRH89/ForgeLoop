@@ -166,19 +166,24 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
   for(const file of ['delivery-v2-hero.webp','delivery-v2-hero-small.webp','delivery-v2-social-preview.jpg']){
     expect((await request.get(`/images/${file}`)).status()).toBe(200);
   }
-  for(const width of [320,390,430,760,1440]){
+  for(const width of [320,390,430,760,768,1000,1440]){
     await page.setViewportSize({width,height:1000});
     const padding=await page.locator('.landing-hero').evaluate(el=>{
       const css=getComputedStyle(el);return [css.paddingTop,css.paddingBottom];
     });
-    expect(padding).toEqual(width<=760?['32px','65px']:['110px','85px']);
+    expect(padding).toEqual(width<=1000?['24px','65px']:['110px','85px']);
     if(width<=760){
+      const footer=await page.locator('.public-footer').boundingBox();
+      const note=await page.locator('.footer-note').boundingBox();
+      expect(Math.round(footer!.y+footer!.height-note!.y-note!.height)).toBe(20);
+    }
+    if(width<=1000){
       // Measure the visible gap, not just padding, to catch margin/layout regressions.
       const header=await page.locator('.public-nav').boundingBox();
       const eyebrow=await page.locator('.landing-hero .eyebrow').boundingBox();
       const gap=eyebrow!.y-(header!.y+header!.height);
-      expect(gap).toBeGreaterThanOrEqual(32);
-      expect(gap).toBeLessThanOrEqual(48);
+      expect(gap).toBeGreaterThanOrEqual(24);
+      expect(gap).toBeLessThanOrEqual(40);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
   }
