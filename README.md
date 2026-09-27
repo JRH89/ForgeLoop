@@ -28,6 +28,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [x] Desktop preview: browser approval, native OS key storage, bundled-runtime package builds, setup-window tests, and real worker start/pause tests on Windows, macOS and Linux CI.
 - [x] Desktop onboarding polish: dark theme, restored-state indicators, local key/connection checks, pairing recovery, and safe diagnostics export (no model calls).
 - [x] Native launcher branding: preview 1.0.3 uses the ForgeLoop favicon in Windows/macOS/Linux packages; installed icon resources and Windows state-preserving upgrade are CI-tested.
+- [x] Desktop preview release pipeline: verified native packages, GitHub Releases, SHA-256 checksums, and automatic public website download discovery. See [publishing and updates](docs/desktop-releases.md); publisher signing remains open.
 - [x] Mobile dashboard hamburger dropdown with Support and Sign out, keyboard dismissal, reduced-motion support, and desktop Sign out button styling.
 - [x] Populated mobile dashboard layout: labeled run cards, wrapped setup/status text, contained specification/log content, and phone-sized forms. Browser regression covers long real-shaped content at 320/390/430/768/1440px.
 - [x] Usage & costs: UTC period/repository filters, daily/model graphs, per-run estimates, harness comparison, token counts, archived history, and explicit unpriced coverage with live refresh.

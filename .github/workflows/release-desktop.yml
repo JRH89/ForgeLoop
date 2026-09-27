@@ -1,0 +1,73 @@
+name: Publish desktop preview
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New installer version (for example 1.0.4); published versions cannot be replaced'
+        required: true
+        default: '1.0.4'
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release request
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/master ]] || { echo 'Publish from master only'; exit 1; }
+          [[ "$VERSION" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]] || { echo 'Invalid installer version'; exit 1; }
+          # Fail on an existing release; reruns must never overwrite published assets.
+          if gh release view "desktop-v$VERSION-preview.1" >/dev/null 2>&1; then
+            echo 'This release already exists. Choose a new version.'; exit 1
+          fi
+  packages:
+    needs: validate
+    uses: ./.github/workflows/desktop-runner.yml
+    with:
+      package-version: ${{ inputs.version }}
+  publish:
+    needs: packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-release-*
+          merge-multiple: true
+          path: release
+      - name: Check assets and publish complete preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          for target in windows-x64.msi macos-arm64.dmg macos-x64.dmg linux-x64.deb; do
+            test -s "forgeloop-runner-$VERSION-$target"
+            sha256sum --check "forgeloop-runner-$VERSION-$target.sha256"
+          done
+          cat *.sha256 > SHA256SUMS
+          tag="desktop-v$VERSION-preview.1"
+          # Draft assets are invisible to the public feed until every upload completes.
+          gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --latest=false \
+            --title "ForgeLoop Runner $VERSION preview" --notes-file ../docs/desktop-preview-release-notes.md
+          gh release upload "$tag" ./*
+          while read -r checksum filename; do
+            remote_digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq ".assets[] | select(.name == \"$filename\") | .digest")
+            [[ "$remote_digest" == "sha256:$checksum" ]] || { echo "Uploaded digest mismatch: $filename"; exit 1; }
+          done < SHA256SUMS
+          gh release edit "$tag" --draft=false --prerelease --latest=false

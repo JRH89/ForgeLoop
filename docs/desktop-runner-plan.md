@@ -16,6 +16,8 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
   logs, single-instance protection, configuration and optional login startup.
 - [x] Development distribution: Windows/macOS/Linux native build matrix, checksums,
   installed-runtime smoke tests and gated dashboard downloads.
+- [x] Preview distribution: GitHub Releases workflow, versioned assets and checksums,
+  automatic website discovery, and public downloads with explicit unsigned labeling.
 - [x] Guide and automated verification: first-install walkthrough and recovery coverage;
   distinguish tested operating systems from merely buildable packages.
 - [ ] Public release: signing/notarization, publication approval, signed install/update
@@ -28,11 +30,11 @@ x64 DEB builds and native key-store round trips passed. Native setup screenshots
 were inspected. The real child-worker test proves heartbeat, polling and graceful
 idle pause without provider calls. The final matrix also exercises native package
 installation/launch on disposable hosts. The public download/update page remains
-explicitly unpublished until signed release artifacts exist. Prices for custom
+available for explicitly published unsigned previews. Prices for custom
 models remain explicit overrides, not invented defaults.
 
 Remaining owner-dependent release gate: Apple Developer signing/notarization and
-Windows code signing, permission to publish a release, and testing the signed
+Windows code signing and testing the signed
 install/update path through normal OS trust prompts. Do not bypass those prompts
 or claim unsigned CI artifacts are trusted public installers.
 

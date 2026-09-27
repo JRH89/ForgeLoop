@@ -19,7 +19,7 @@ export default function RunnerSetup({operator}:{operator:OperatorSession}) {
   async function enroll(){setBusy(true);setError('');try{setToken(await issueRunnerToken(operator.organizationId));setExpires(Date.now()+15*60*1000);}catch(reason){setError(reason instanceof Error?reason.message:'Enrollment failed');}finally{setBusy(false);}}
   return <section className="panel guide-section" id="runner-install">
     <h2>Install and connect a runner</h2>
-    <p><a href="/app/runner-downloads">Desktop installers and updates</a> — simplified browser-pairing setup is in development verification. The advanced CLI setup below remains supported.</p>
+    <p><a href="/app/runner-downloads">Desktop installers and updates</a> — download the latest preview from GitHub Releases and connect through browser pairing. The advanced CLI setup below remains supported.</p>
     <p>Run agents on a dedicated machine you control. The packaged installer needs Java 21+, Git, and Docker with Linux containers. No source build or Maven is required.</p>
     <ol><li><a href="/downloads/forgeloop-runner.zip" download>Download runner package</a> and <a href="/downloads/forgeloop-runner.zip.sha256" download>SHA-256 checksum</a>. Extract into a private, permanent folder outside your repositories.</li>
       <li>Generate a one-time enrollment token below. It belongs only to this organization and expires after 15 minutes.</li>

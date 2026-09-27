@@ -1,8 +1,13 @@
 name: Desktop runner packages
 on:
   pull_request:
-    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', 'scripts/Test-DesktopUpgrade.ps1', '.github/workflows/desktop-runner.yml']
+    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', 'scripts/Test-DesktopUpgrade.ps1', 'scripts/Prepare-DesktopRelease.ps1', '.github/workflows/desktop-runner.yml', '.github/workflows/release-desktop.yml']
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      package-version:
+        type: string
+        default: '1.0.4'
 permissions: {contents: read}
 jobs:
   package:
@@ -11,10 +16,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: windows-latest, type: msi}
-          - {os: macos-latest, type: dmg}
-          - {os: ubuntu-latest, type: deb}
+          - {os: windows-latest, type: msi, platform: windows, architecture: x64}
+          - {os: macos-15, type: dmg, platform: macos, architecture: arm64}
+          - {os: macos-15-intel, type: dmg, platform: macos, architecture: x64}
+          - {os: ubuntu-latest, type: deb, platform: linux, architecture: x64}
     runs-on: ${{ matrix.os }}
+    env:
+      PACKAGE_VERSION: ${{ inputs.package-version || '1.0.4' }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -35,7 +43,7 @@ jobs:
           xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; mvn -B verify'
       - name: Build bundled-runtime image
         shell: pwsh
-        run: ./scripts/Build-DesktopRunner.ps1 -PackageType app-image
+        run: ./scripts/Build-DesktopRunner.ps1 -PackageType app-image -PackageVersion $env:PACKAGE_VERSION
       - name: Smoke test packaged runtime without enrolling or spending credits
         shell: pwsh
         run: |
@@ -47,7 +55,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Packaged runtime failed' }
       - name: Build unsigned native development installer
         shell: pwsh
-        run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer
+        run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer -PackageVersion $env:PACKAGE_VERSION
       - name: Verify native installer launch on disposable host
         if: runner.os != 'Linux'
         shell: pwsh
@@ -57,10 +65,6 @@ jobs:
         shell: bash
         run: |
           xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; pwsh -File scripts/Test-DesktopPackage.ps1 -PackageType deb'
-      - uses: actions/upload-artifact@v7
-        with:
-          name: desktop-runner-${{ matrix.os }}-unsigned
-          path: artifacts/native-installer/packages/*
       - name: Build previous installer revision for upgrade regression
         if: runner.os == 'Windows'
         shell: pwsh
@@ -68,7 +72,15 @@ jobs:
       - name: Verify Windows upgrade and uninstall preserve private state
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/Test-DesktopUpgrade.ps1
+        run: ./scripts/Test-DesktopUpgrade.ps1 -ExpectedVersion $env:PACKAGE_VERSION
+      - name: Prepare named installer and checksum
+        shell: pwsh
+        run: ./scripts/Prepare-DesktopRelease.ps1 -Version $env:PACKAGE_VERSION -Platform '${{ matrix.platform }}' -Architecture '${{ matrix.architecture }}' -PackageType '${{ matrix.type }}'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: desktop-release-${{ matrix.platform }}-${{ matrix.architecture }}
+          path: artifacts/release/*
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-setup-screenshot-${{ matrix.os }}

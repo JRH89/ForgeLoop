@@ -1,7 +1,7 @@
 param(
     [ValidateSet('app-image','msi','dmg','deb')][string]$PackageType='app-image',
     [string]$OutputDirectory='artifacts/desktop-runner',
-    [string]$PackageVersion='1.0.3'
+    [ValidatePattern('^[1-9][0-9]*\.[0-9]+\.[0-9]+$')][string]$PackageVersion='1.0.4'
 )
 $ErrorActionPreference='Stop'
 # Native packages are built on their target OS. jlink retains java for the worker child JVM.

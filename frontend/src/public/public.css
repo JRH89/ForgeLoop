@@ -1,4 +1,9 @@
 /* Public-site styling is scoped so operator console layouts remain unchanged. */
+.runner-downloads .public-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+.runner-downloads .primary{display:inline-flex;text-decoration:none;margin-block:12px}
+.download-verification{margin-top:12px;font-size:.85rem;line-height:1.6}
+.download-verification summary{cursor:pointer;color:#91bbf4}
+.download-verification button{display:block;margin-top:12px;padding:8px 12px;background:#142737;color:#ecf2f8;border:1px solid #36526a;border-radius:6px;cursor:pointer}
 .public-site .capability-icon{display:inline-flex;align-items:center;color:#65a7ff}
 @font-face{font-family:Inter;font-style:normal;font-weight:100 900;font-display:swap;src:url('/fonts/inter-latin-variable.woff2') format('woff2')}
 .public-site{--accent:#65a7ff;--accent-dim:#142d4c;background:#071019!important;overflow:clip}

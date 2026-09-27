@@ -68,12 +68,11 @@ and an explicit jlink runtime retaining the child-JVM launcher. Native credentia
 calls use [JNA](https://github.com/java-native-access/jna). Sonnet defaults reference
 [Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
 
-Still required before public release: signed
-Windows packages, Apple Developer signing/notarization, trusted checksums and
-release hosting and publication of `frontend/public/downloads/desktop-manifest.json`,
-OS login validation, and signed-install/update acceptance. The manifest remains
-unpublished until installers have trusted signatures and recorded SHA-256 hashes.
-Do not bypass OS security warnings to market this as production-ready.
+Unsigned previews are distributed through GitHub Releases with SHA-256 checksums
+and automatic website discovery; see [release publishing](desktop-releases.md).
+Still required for signed production distribution: Windows code signing, Apple
+Developer signing/notarization, OS login validation, and signed-install/update
+acceptance. Preview downloads identify their unsigned status explicitly.
 
 ## Desktop 1.0.1 usability and free checks
 
@@ -103,4 +102,4 @@ redaction, and child-worker start/pause/restart against a loopback fake control
 plane. Native package CI covers all three supported build targets; Windows also
 tests 1.0.0-to-1.0.1 installer replacement and private-state survival across
 uninstall/reinstall. These checks do not replace real-provider delivery evidence
-or actual OS sign-in/reboot acceptance. The public manifest remains unpublished.
+or actual OS sign-in/reboot acceptance. Public previews use the GitHub release feed.
