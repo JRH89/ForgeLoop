@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-const favicon='/icons/icon-32.png';
+const favicon='/icons/icon-192.png';
 import { REPOSITORY } from './content';
 
 const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs']];

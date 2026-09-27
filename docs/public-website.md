@@ -52,13 +52,29 @@ Run `PLAYWRIGHT_BASE_URL=<nginx deployment> npx playwright test e2e/public-site.
 with the environment variable syntax for your shell. These tests require the
 production Nginx route behavior, not Vite's development fallback. They check all
 pages with JavaScript disabled, navigation/hydration, mobile overflow, real 404s,
-assets and redirects. Existing dashboard/pairing tests remain part of full CI.
+assets and redirects, plus automated WCAG A/AA accessibility checks. Existing
+dashboard/pairing tests remain part of full CI. Public production pages use native
+HTML navigation/disclosures and a tiny bootstrap rather than hydrating React;
+React runs during static generation and loads on demand for the operator console.
+Inter is self-hosted with its license, avoiding third-party font requests.
 
 After deploying, validate canonical URLs and social images through the public
 tunnel. Search Console ownership, sitemap submission, indexing coverage, real
 field Core Web Vitals, and external share-preview refreshes require owner/provider
 access or actual traffic. Never claim these are completed merely because a local
 audit passes. Do not invent a verification token or add analytics without consent.
+
+## Verification snapshot (2026-09-26)
+
+- Frontend lint, type checking, 21 unit tests, production build and 18-page SEO
+  contract checks pass.
+- Four public-site browser tests pass against the production Nginx image, including
+  JavaScript-disabled content, mobile navigation, real 404/redirect behavior and
+  automated WCAG A/AA checks on representative templates.
+- Lighthouse 13.5.0 mobile simulation against the local production image scored
+  100 performance, 100 accessibility, 100 best practices and 100 SEO; LCP was 1.4s.
+  These are local lab results, not live field metrics or a search-ranking promise.
+  Report: `evidence/public-site/lighthouse-home.json` (local evidence, not committed).
 
 ## Hero artwork provenance
 

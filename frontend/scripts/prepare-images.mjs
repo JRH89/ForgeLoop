@@ -1,7 +1,10 @@
 import sharp from 'sharp';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, copyFile } from 'node:fs/promises';
 await mkdir('public/images',{recursive:true});
 await mkdir('public/icons',{recursive:true});
+await mkdir('public/fonts',{recursive:true});
+await copyFile('node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2','public/fonts/inter-latin-variable.woff2');
+await copyFile('node_modules/@fontsource-variable/inter/LICENSE','public/fonts/INTER-LICENSE.txt');
 const hero='src/assets/delivery-hero-generated.png';
 // Encoding/size derivatives of the approved generated asset, not substitute artwork.
 await sharp(hero).resize({width:1774,withoutEnlargement:true}).webp({quality:82}).toFile('public/images/delivery-hero.webp');

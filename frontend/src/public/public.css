@@ -1,4 +1,5 @@
 /* Public-site styling is scoped so operator console layouts remain unchanged. */
+@font-face{font-family:Inter;font-style:normal;font-weight:100 900;font-display:swap;src:url('/fonts/inter-latin-variable.woff2') format('woff2')}
 .public-site{--accent:#65a7ff;--accent-dim:#142d4c;background:#071019!important;overflow:clip}
 .public-site main{min-height:55vh}.public-site a{color:#91bbf4}.public-site .primary{color:#071827}.public-site .secondary{color:#edf4ff}
 .public-site .public-nav{height:82px;max-width:1440px!important;padding:0 5%;border-bottom:1px solid #213446;background:#071019;gap:24px;position:relative}
