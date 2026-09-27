@@ -77,6 +77,18 @@
 @media(max-width:760px){.public-site .landing-hero,.public-site .public-hero{--hero-source:var(--hero-small);--hero-overlay-start:.96;--hero-overlay-end:.88}}
 
 /* A little more breathing room for the landing composition, without forcing a full screen. */
+.guide-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:56px;align-items:start}
+.guide-toc{position:sticky;top:110px;display:grid;gap:4px;padding:22px;border:1px solid #23384d;border-radius:14px;background:#0b1723}
+.guide-toc .eyebrow{margin:0 0 12px;font-size:.7rem}
+.public-site .guide-toc a{display:block;padding:9px 0;color:#a6bad0;font-size:.85rem;line-height:1.5;text-decoration:none;white-space:normal;overflow-wrap:anywhere;min-width:0}
+.guide-toc a:hover,.guide-links a:hover{color:#edf4ff;text-decoration:underline}
+.guide-toc a:focus-visible,.guide-links a:focus-visible{outline:2px solid #91c5ff;outline-offset:4px}
+.guide-toc .guide-download{margin-top:12px;padding-top:16px;border-top:1px solid #23384d;color:#91bbf4}
+.guide-sections{min-width:0}.page-sections.guide-sections>section{display:block;padding:30px 0;scroll-margin-top:110px;overflow-wrap:anywhere}
+.page-sections.guide-sections>section:first-child{padding-top:0}.guide-sections h2{line-height:1.25}
+.guide-sections ul{padding-left:22px;margin:20px 0 0}.guide-links{display:flex;flex-wrap:wrap;gap:12px 24px;margin-top:22px}.guide-links a{color:#91bbf4;font-size:.9rem;line-height:1.6;text-underline-offset:4px}
+@media(max-width:1000px){.guide-layout{grid-template-columns:minmax(0,1fr);gap:28px}.guide-toc{position:static;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px}.guide-toc .eyebrow,.guide-toc .guide-download{grid-column:1/-1}}
+@media(max-width:480px){.guide-toc{grid-template-columns:minmax(0,1fr)}.guide-links{flex-direction:column;gap:12px}}
 .public-site .landing-hero{padding-top:110px!important;padding-bottom:85px!important;min-height:630px}
 /* Keep the first message close to mobile navigation; retain the desktop composition. */
 @media(max-width:1000px){.public-site .landing-hero{padding-top:24px!important;padding-bottom:65px!important;min-height:0}}
