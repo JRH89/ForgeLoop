@@ -2,6 +2,17 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { expect, it } from 'vitest';
 import LandingPage from './LandingPage';
+import { articles } from './public/articles';
+
+it('features four articles with working article destinations', () => {
+  const { container } = render(<LandingPage />);
+  const cards = container.querySelectorAll('.article-card');
+  expect(cards).toHaveLength(4);
+  cards.forEach((card, index) => {
+    expect(card).toHaveAttribute('href', `/blog/${articles[index].slug}`);
+    expect(card).toHaveTextContent(articles[index].title);
+  });
+});
 
 it('offers GitHub authentication without loading tenant data', () => {
   render(<LandingPage />);

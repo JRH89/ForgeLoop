@@ -13,6 +13,9 @@ browser checks verify that closing gap as well.
 
 ## Content and routes
 
+- The landing page features four field notes in a two-column desktop grid
+  (one column on phones); the blog index continues to show all articles.
+
 - Landing capability cards use decorative Lucide icons (repository branch,
   delivery loop, verification shield, runner server), with headings providing
   their accessible meaning instead of numbered step labels.

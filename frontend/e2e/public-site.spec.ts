@@ -27,6 +27,7 @@ test('public navigation is usable on desktop and mobile without tenant requests'
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('/');
   await expect(page.getByRole('heading',{name:/Turn GitHub issues into/})).toBeVisible();
+  await expect(page.locator('.article-card')).toHaveCount(4);
   await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('link',{name:'Features',exact:true}).click();
   await expect(page.getByRole('heading',{level:1})).toContainText('More than an agent');
   await page.screenshot({path:'../evidence/public-site/features-desktop.png',fullPage:true});
