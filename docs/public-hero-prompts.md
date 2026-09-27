@@ -19,6 +19,7 @@ Use case: ads-marketing. Asset: unique ForgeLoop website hero background, wide l
 - `coding-agents-vs-delivery-harnesses.png`: a small luminous processor suspended within a larger structural orchestration frame.
 - `acceptance-criteria-for-coding-agents.png`: three glass inspection lenses aligning over separate verification tiles.
 - `self-hosted-ai-runners.png`: a compact premium workstation tower inside a clear local boundary sphere.
+- `self-hosted-ai-runner-restart-recovery.png`: three separated glass-like modules for durable task state, local runner, and verification evidence reconnect through restrained cyan lines and a mint health pulse; dark left-side headline space. Generated with the built-in image tool as a new scene in the site's cinematic navy/teal style, without text or logos.
 - `safe-auto-merge-ai-pull-requests.png`: two branching rails converging through a guarded mint checkpoint.
 - `ai-coding-agent-cost-budgets.png`: a precision metering instrument with restrained luminous tokens and a budget boundary ring.
 - `bounded-repair-loops.png`: a circular repair track with three distinct stopping checkpoints and an exit ramp.

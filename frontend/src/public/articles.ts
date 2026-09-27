@@ -3,6 +3,41 @@ import { PUBLISHED } from './content';
 export type Article = { slug: string; title: string; description: string; category: string; published: string; body: string };
 // Publication dates describe actual publication, never a manufactured project history.
 export const articles: Article[] = [
+  {slug:'self-hosted-ai-runner-restart-recovery',title:'Recover a Self-Hosted AI Coding Runner',description:'Use a practical restart recovery checklist for self-hosted AI coding runners: verify durable state, credentials, heartbeats, leases, and safe task resumption.',category:'Runner operations',published:'2026-09-27',body:`
+A self-hosted AI coding runner can disappear halfway through a task because a laptop sleeps, Docker restarts, or a host reboots. The dangerous assumption is that “the container is running again” means the work is safe to resume. Restart recovery has two separate questions: can the machine reconnect, and does the delivery system still know who owns the task?
+
+This checklist is for operators diagnosing a stopped or reconnecting runner. It is not a promise that every interrupted provider call can be resumed. Treat in-flight work as uncertain until the control plane reconciles its lease and evidence.
+
+## 1. Check the durable state before restarting anything
+
+Confirm that the control plane is using the expected database and evidence storage. A fresh-looking dashboard can mean the service has attached to a new empty volume, not that the old runs were deleted. Check the configured volume or database endpoint and backup history before changing storage settings.
+
+Docker [volumes persist beyond a container's lifecycle](https://docs.docker.com/get-started/docker-concepts/running-containers/persisting-container-data/), but data written only to a container's writable layer is not a durable recovery plan. Keep runner identity, connection settings, task records, and evidence on explicitly managed storage. Do not run volume-pruning or stack-reset commands as a first diagnostic step.
+
+## 2. Prove each connection boundary independently
+
+Verify the public site, then the control-plane health endpoint, authenticated dashboard data, and runner heartbeat. A homepage loading does not prove GraphQL or the runner endpoint is reachable through the same proxy. If the runner says “connected” but claims no work, inspect eligibility, capabilities, paused state, and task leases before changing the provider key.
+
+On a desktop installation, check that Git and Docker are available and that the saved provider credential can be read from the operating-system key store. A local key-store check should not make a paid model request. Distinguish a missing credential from an account with no provider credit.
+
+## 3. Reconcile the interrupted task lease
+
+A heartbeat reports that a runner is alive; it does not prove that an old task finished. A task lease needs an owner, an expiry, and an idempotent result boundary. After restart, inspect whether the original lease is still active, expired, or already acknowledged. The scheduler should never hand an active task to a second runner solely because the first machine briefly went offline.
+
+When an expired lease is recovered, keep the previous attempt and any accepted evidence. Retry within the configured attempt and budget limits, or hold the run for a person if the result is ambiguous. Never infer success from a partial worktree, a model response, or a green-looking UI indicator.
+
+## 4. Rebuild execution from trusted inputs
+
+For a new attempt, verify the repository, policy revision, base commit, owned paths, and required verification commands. Recreate a task-scoped worktree or container rather than trusting an unknown leftover process. If a prior commit exists, compare its SHA with the control-plane record before deciding whether to reuse it. Run the required gates against the exact candidate commit and store fresh, checksummed evidence.
+
+GitHub App installation tokens are short-lived—[GitHub currently documents a one-hour lifetime](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app-installation)—so a restarted runner should obtain a new authorized token when needed, not persist one as a long-lived checkout credential.
+
+## 5. Test recovery without paying for a model call
+
+Use a disposable environment and a fake provider. Start an eligible task, stop the worker at a controlled point, restart the runner and control plane, then assert that one owner remains, prior evidence is preserved, and a bounded retry or explicit hold occurs. Test a genuine host reboot separately from a process restart; [Docker restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/) can restart containers, but they do not validate application state or external routing.
+
+ForgeLoop's desktop preview has automated reconnect and idle start/pause coverage, but a real operating-system reboot with funded in-flight work remains a separate release check. If you are setting up your first runner, follow the [installation guide](/docs). For why leases matter even with separate worktrees, read [Git worktrees for parallel coding agents](/blog/git-worktrees-parallel-agents).
+`},
   {slug:'github-issues-to-pull-requests',title:'From GitHub issues to AI pull requests',description:'Build an issue-to-PR workflow with explicit intake rules, bounded tasks, verification evidence, and a deliberate approval point.',category:'GitHub workflows',published:PUBLISHED,body:`
 An issue-to-pull-request system needs more than an agent that can edit files. It needs a reliable answer to three questions: which issue is authorized, what counts as done, and who can approve delivery? Start there before choosing a model.
 

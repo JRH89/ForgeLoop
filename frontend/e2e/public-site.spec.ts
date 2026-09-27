@@ -153,6 +153,18 @@ test('article cards open from their read action and every page has distinct artw
   }
 });
 
+test('new runner recovery article has truthful date and unique search/social metadata',async({page})=>{
+  await page.goto('/blog/self-hosted-ai-runner-restart-recovery');
+  await expect(page.locator('time[datetime="2026-09-27"]')).toHaveText('September 27, 2026');
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content',/restart recovery checklist/);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content',/self-hosted-ai-runner-restart-recovery-social-preview\.jpg$/);
+  await expect(page.locator('.markdown-content')).toContainText('A heartbeat reports that a runner is alive');
+  const schema=JSON.parse(await page.locator('script[type="application/ld+json"]').innerText());
+  expect(schema['@graph'].find((entry:{'@type':string})=>entry['@type']==='BlogPosting').datePublished).toBe('2026-09-27');
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
 test('public templates pass automated accessibility checks',async({page})=>{
   for(const path of ['/','/features','/blog','/blog/self-hosted-ai-runners']){
     await page.goto(path);

@@ -26,9 +26,12 @@ browser checks verify that closing gap as well.
 - Existing landing-page headlines, paragraphs, capability descriptions, and CTAs
   are retained. Additional explanatory sections and FAQs follow the original copy.
 - `/about`, `/features`, `/how-it-works`, `/security`, `/docs`, `/contact`, `/blog`.
-- Ten original engineering articles live in `frontend/src/public/articles.ts`.
+- Eleven original engineering articles live in `frontend/src/public/articles.ts`.
   Publication dates reflect the actual publication date, not invented history.
   No fabricated customer stories, traffic claims, benchmarks, reviews, or ratings.
+  The September 27 field note targets the specific question of recovering a
+  self-hosted AI coding runner after a restart; it cites Docker and GitHub
+  documentation and distinguishes tested reconnect behavior from deferred reboot proof.
 - Shared header/footer links cover desktop and mobile. Every public page and the
   404 page has a decorative image-backed hero. Informational text remains HTML.
 - Each page and article now has unique artwork, responsive derivatives, and a

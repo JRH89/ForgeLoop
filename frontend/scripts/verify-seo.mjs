@@ -29,12 +29,13 @@ for(const path of publicPaths){
   }
   assert(doc.querySelector('.public-hero,.landing-hero'),`${path}: missing hero`);
 }
-assert.equal(articles.length,10);
-for(const article of articles){assert(article.body.trim().split(/\s+/).length>=280,`${article.slug}: thin content`);assert.equal(article.published,'2026-09-26');}
+assert(articles.length>=11,'Expected the original ten articles and a new field note');
+assert(articles.some(article=>article.published==='2026-09-27'),'Today\'s field note is missing');
+for(const article of articles){assert(article.body.trim().split(/\s+/).length>=280,`${article.slug}: thin content`);assert(/^\d{4}-\d{2}-\d{2}$/.test(article.published),`${article.slug}: invalid publication date`);}
 assert((await stat('dist/images/delivery-hero.webp')).size<500_000,'Hero exceeds image budget');
 assert((await readFile('dist/app-shell.html','utf8')).includes('noindex, nofollow'));
 assert((await readFile('dist/404.html','utf8')).includes('noindex, nofollow'));
 const sitemap=await readFile('dist/sitemap.xml','utf8');
 assert.equal((sitemap.match(/<loc>/g)||[]).length,publicPaths.length);
 assert(!sitemap.includes('/app'));
-console.log(`SEO checks passed: ${publicPaths.length} pages; 10 substantive articles; metadata, schema, links, and image budgets.`);
+console.log(`SEO checks passed: ${publicPaths.length} pages; ${articles.length} substantive articles; metadata, schema, links, and image budgets.`);

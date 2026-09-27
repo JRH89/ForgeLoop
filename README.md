@@ -34,7 +34,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [x] Usage & costs: UTC period/repository filters, daily/model graphs, per-run estimates, harness comparison, token counts, archived history, and explicit unpriced coverage with live refresh.
 - [x] Desktop connection recovery: explicit idle/working/offline states, bounded reconnect backoff, prompt pause during retry waits, and stop-on-rejection diagnostics; real child-process server restart tests require no provider calls.
 - [x] First-run checklist: organization-scoped readiness, repository selection, local runner setup guidance, intake/safety settings, safe issue drafting, and on-demand GitHub issue eligibility diagnostics without model calls. See [onboarding verification](docs/first-run-onboarding.md).
-- [x] Expanded public website: image-backed product pages, ten original field notes, responsive navigation, prerendered SEO/social metadata and structured data; see [website verification and publishing guide](docs/public-website.md).
+- [x] Expanded public website: image-backed product pages, eleven original field notes, responsive navigation, prerendered SEO/social metadata and structured data; see [website verification and publishing guide](docs/public-website.md).
 - [x] Customer support: contact form, guest private-link tracking, signed-in ticket history, and service-owner admin inbox with replies, statuses, and private notes. See [support setup and security](docs/support.md); email notifications are not enabled.
 
 - [x] Self-service administrator runner enrollment, downloadable runner package, Windows encrypted-key setup and optional login startup.
