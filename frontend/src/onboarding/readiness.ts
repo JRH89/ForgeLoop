@@ -16,6 +16,7 @@ export function configurationWarnings(repository: RepositoryConnection, config: 
   if (repository.maxBudgetUsd <= 0 || repository.maxBudgetUsd > config.policy.maxRunBudgetUsd)
     warnings.push('Align the repository budget with the organization run limit before submitting an issue.');
   if (!repository.issueLabel.trim()) warnings.push('Configure an intake label for this repository.');
+  if (!repository.requiredGates.length) warnings.push('Configure repository verification gates before submitting work.');
   if (!config.policy.allowedProviders.length) warnings.push('Allow a provider in the organization policy.');
   return warnings;
 }

@@ -44,6 +44,14 @@ force for mutations accessed through other pages.
   layout using deterministic API fixtures (not evidence of a live GitHub delivery).
 - Run `npm run check` in `frontend` and `mvn verify` in `control-plane`.
 
+Local verification on 2026-09-27: backend Docker/Maven verification passed;
+frontend lint, typecheck, production build and 18-page SEO checks passed; 11
+browser checks passed against an isolated PostgreSQL/control-plane/Nginx stack
+(dashboard, onboarding at 390px/1440px, and public website). Spring reported no
+unmapped GraphQL fields or arguments. The isolated stack had no provider keys
+or runners. GitHub HTTP behavior was tested against a local server, not a paid
+provider or a live issue mutation.
+
 Funded end-to-end repository execution, signed installers, off-host backups, and
 server/reboot validation remain separate release gates; see
 [deferred launch checks](deferred-launch-checks.md).

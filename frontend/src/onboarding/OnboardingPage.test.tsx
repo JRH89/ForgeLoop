@@ -59,6 +59,28 @@ it('does not offer admin installation to viewers and keeps local key checks expl
   expect(screen.getByText(/The website cannot verify your local key/)).toBeInTheDocument();
 });
 
+it('clears a diagnostic when changing repositories', async () => {
+  mockApi([repository, { ...repository, id: 'second', repository: 'acme/second' }]);
+  render(<OnboardingPage operator={operator} navigate={vi.fn()} />);
+  await screen.findByLabelText('Repository');
+  fireEvent.change(screen.getByLabelText('Existing GitHub issue number'), { target: { value: '7' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check issue intake' }));
+  await screen.findByText('Add the required label: forgeloop');
+  fireEvent.change(screen.getByLabelText('Repository'), { target: { value: 'acme/second' } });
+  expect(screen.queryByText('Add the required label: forgeloop')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Existing GitHub issue number')).toHaveValue(null);
+});
+
+it('marks previously successful metadata stale when refresh fails', async () => {
+  mockApi();
+  render(<OnboardingPage operator={operator} navigate={vi.fn()} />);
+  await screen.findByLabelText('Repository');
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh readiness' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Previous results may be stale');
+  expect(screen.getByRole('status')).toHaveTextContent('Last successful check');
+});
+
 it('shows an actionable error and supports retry instead of false readiness', async () => {
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
   render(<OnboardingPage operator={operator} navigate={vi.fn()} />);
