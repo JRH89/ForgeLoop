@@ -12,7 +12,8 @@ import OnboardingPage from './onboarding/OnboardingPage';
 import UsagePage from './usage/UsagePage';
 import './console-navigation.css';
 import './support/console-link.css';
-import { BarChart3, BookOpen, GitBranch, LifeBuoy, ListChecks, Menu, X, SlidersHorizontal } from "lucide-react";
+import { BarChart3, GitBranch, LifeBuoy, ListChecks, Menu, X, SlidersHorizontal } from "lucide-react";
+import GuideNavigation from "./GuideNavigation";
 import {
   approveFeatureRun,
   archiveRun,
@@ -833,6 +834,17 @@ function App() {
     return () => { document.removeEventListener('keydown', escape); document.removeEventListener('pointerdown', outside); };
   }, [mobileMenuOpen]);
   const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted">("Runs");
+  const [guideTarget, setGuideTarget] = useState<{ id: string }>();
+  useEffect(() => {
+    if (page !== 'Guide' || !guideTarget) return;
+    // Wait for React to mount the guide before moving keyboard focus and scrolling.
+    const section = document.getElementById(guideTarget.id);
+    if (section) {
+      section.tabIndex = -1;
+      section.focus({ preventScroll: true });
+      section.scrollIntoView({ block: 'start' });
+    }
+  }, [page, guideTarget]);
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
   const [operator, setOperator] = useState<OperatorSession>();
@@ -895,7 +907,7 @@ function App() {
               <span className="nav-icon" aria-hidden="true"><GitBranch size={17} strokeWidth={1.9} /></span> Repositories
             </button>
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
-            <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon" aria-hidden="true"><BookOpen size={17} strokeWidth={1.9} /></span> User guide</button>
+            <GuideNavigation active={page === 'Guide'} onSelect={id => { setGuideTarget({ id }); setPage('Guide'); }}/>
             <button className={page === "GettingStarted" ? "active" : ""} onClick={() => setPage("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
             <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support</a>
             <a className="logout mobile-signout" href="/logout">Sign out</a>

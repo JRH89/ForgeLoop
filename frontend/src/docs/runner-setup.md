@@ -23,7 +23,10 @@ automatically within about five minutes; the app does not install updates itself
 On mobile, open the hamburger button in the header for the navigation dropdown.
 It includes **Support** and **Sign out**, closes when you choose a page, and
 supports Escape to close. Desktop keeps the sidebar and a Sign out button in the
-header. User guide remains the fifth sidebar destination.
+header. Expand **User guide**, the fifth sidebar item, to choose Quick start,
+Runner setup & API keys, Repositories, Runs, Settings, Delivery, or Troubleshooting.
+Choosing a section opens the guide at that section and closes the mobile menu;
+expanding the submenu itself keeps the mobile menu open.
 
 On phones, Runs uses labeled cards rather than a wide table. Each card keeps
 repository, status, progress, cost, start time, and archive controls visible.

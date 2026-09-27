@@ -110,6 +110,13 @@ it('provides an in-app operator guide as the fifth navigation item', async () =>
   const guide = screen.getByRole('button', { name: /User guide/ });
   expect(guide).toBeInTheDocument();
   fireEvent.click(guide);
+  expect(guide).toHaveAttribute('aria-expanded', 'true');
+  Element.prototype.scrollIntoView = vi.fn();
+  fireEvent.click(screen.getByRole('button', { name: 'Quick start' }));
+  expect(document.getElementById('quick-start')).toHaveFocus();
+  fireEvent.click(guide);
+  expect(guide).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByRole('button', { name: 'Quick start' })).not.toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Using ForgeLoop' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'What every setting does' })).toBeInTheDocument();
   expect(screen.getByText('Auto-merge', { selector: 'dt' })).toBeInTheDocument();

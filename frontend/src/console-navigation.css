@@ -2,7 +2,15 @@
 .console-app .logout:hover { background: #254459; border-color: #5b829e; }
 .console-app .logout:focus-visible, .console-menu-toggle:focus-visible { outline: 2px solid #46dfaa; outline-offset: 3px; }
 .console-app .mobile-signout, .console-menu-toggle { display: none; }
-.console-app .sidebar-note { color: #8ba0b5; }
+.console-app .shell > .console-sidebar { display: flex; flex-direction: column; overflow-y: auto; }
+.console-app .sidebar-note { position: static; margin-top: auto; padding-top: 24px; color: #8ba0b5; }
+.console-app .guide-navigation > button { width: 100%; }
+.console-app .guide-chevron { margin-left: auto; flex-shrink: 0; transition: transform .2s ease; }
+.console-app [aria-expanded="true"] > .guide-chevron { transform: rotate(180deg); }
+.console-app .guide-submenu { margin: 6px 0 10px 22px; padding-left: 10px; border-left: 1px solid #36526a; }
+.console-app .guide-submenu button { width: 100%; min-height: 36px; padding: 8px; font-size: .78rem; text-align: left; }
+.console-app .guide-navigation button:focus-visible { outline: 2px solid #46dfaa; outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .console-app .guide-chevron { transition: none; } }
 @media (max-width: 760px) {
   .console-app > header { height: 64px; position: sticky; top: 0; }
   .console-app .desktop-signout { display: none; }
