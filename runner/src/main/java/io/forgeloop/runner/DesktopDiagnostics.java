@@ -7,7 +7,7 @@ final class DesktopDiagnostics {
     private DesktopDiagnostics() {}
     static String summary(Path directory, DesktopConfiguration config, boolean running) {
         return "ForgeLoop Runner desktop diagnostics\n"
-            + "Installer generation: 1.0.1 development preview\n"
+            + "Installer generation: 1.0.2 development preview\n"
             + "OS: " + System.getProperty("os.name") + " / " + System.getProperty("os.arch") + "\n"
             + "Java: " + System.getProperty("java.version") + "\n"
             + "Connection saved: " + Files.exists(directory.resolve("identity")) + "\n"

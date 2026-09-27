@@ -49,6 +49,19 @@ or claim unsigned CI artifacts are trusted public installers.
   on disposable CI hosts; real OS reboot/login acceptance remains deferred.
 - [ ] Paid real-provider delivery and signed public release remain separate gates.
 
+## Connection-recovery follow-up (1.0.2)
+
+- [x] Secret-free atomic worker status snapshots instead of inferring health from a live process.
+- [x] Explicit connecting, idle, working, reconnecting, pausing, and rejected-request states.
+- [x] Bounded 2/4/8/16-second retry delays with pause-aware waiting and last-contact timestamps.
+- [x] HTTP/GraphQL permanent versus temporary failure classification without response-body logging.
+- [x] Real child JVM tests for server shutdown/restart, offline pause, and rejected credentials.
+- [ ] Real OS reboot/login and funded in-flight recovery remain owner-dependent checks, not claimed by these tests.
+
+See the shared runner setup guide for recovery steps and the boundary between
+idle reconnection and server-managed lease recovery. Existing installed desktop
+binaries require an explicit upgrade; CI preview artifacts remain unsigned.
+
 ## Security boundaries
 
 Provider keys never reach the control plane. Browser approval never starts paid

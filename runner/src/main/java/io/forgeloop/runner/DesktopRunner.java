@@ -83,7 +83,15 @@ public final class DesktopRunner {
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter(){@Override public void windowClosing(WindowEvent e){if(worker.running()||busy.get()){JOptionPane.showMessageDialog(frame,"Pause the runner and wait for current work/setup to finish before closing.");return;}System.exit(0);}});
         start.setEnabled(false);pause.setEnabled(false);
-        statusTimer=new Timer(1000,e->{boolean enabled=!busy.get()&&!worker.running();connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled);check.setEnabled(!busy.get());start.setEnabled(enabled&&configuration!=null&&Files.exists(directory.resolve("identity")));pause.setEnabled(!busy.get()&&worker.running());status.setText(worker.running()?"Running — eligible work can spend API credits":busy.get()?"Setup in progress — no paid work started":"Stopped — no work is being claimed");});statusTimer.start();
+        statusTimer=new Timer(1000,e->{
+            boolean enabled=!busy.get()&&!worker.running();
+            connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled);check.setEnabled(!busy.get());
+            start.setEnabled(enabled&&configuration!=null&&Files.exists(directory.resolve("identity")));
+            pause.setEnabled(!busy.get()&&worker.running()&&!worker.pausing());
+            var snapshot=worker.status();
+            status.setText(worker.pausing()?"Pausing - waiting for current work or request to finish":busy.get()&&!worker.running()?"Setup in progress - no paid work started":snapshot.label());
+            status.setToolTipText(snapshot.lastContactMillis()==0?"No successful worker poll in this session":"Last successful control-plane poll: "+java.time.Instant.ofEpochMilli(snapshot.lastContactMillis()));
+        });statusTimer.start();
         JTextField modelEditor=(JTextField)model.getEditor().getEditorComponent();
         modelEditor.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){changed();}public void removeUpdate(javax.swing.event.DocumentEvent e){changed();}public void changedUpdate(javax.swing.event.DocumentEvent e){changed();}private void changed(){boolean preset="anthropic".equals(provider.getSelectedItem())&&"claude-sonnet-5".equals(modelEditor.getText());input.setText(preset?"2":"");output.setText(preset?"10":"");prices.setVisible(!preset);}});
         provider.addActionListener(e->{model.setModel(new DefaultComboBoxModel<>("anthropic".equals(provider.getSelectedItem())?new String[]{"claude-sonnet-5"}:new String[]{""}));refreshSavedStatus();});
