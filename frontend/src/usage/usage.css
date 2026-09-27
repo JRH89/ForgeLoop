@@ -1,0 +1,17 @@
+.usage-page p { line-height: 1.65; color: var(--muted); }
+.usage-filters { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin: 1.5rem 0; }
+.usage-filters > div { display: grid; gap: .5rem; min-width: 180px; max-width: 100%; }
+.usage-page .usage-metrics { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.usage-charts { display: grid; grid-template-columns: 1.3fr 1fr; gap: 1rem; }
+.usage-charts > * { min-width: 0; }
+.daily-cost-chart { width: 100%; margin-top: 1rem; color: var(--muted); }
+.chart-axis { display: flex; justify-content: space-between; gap: .5rem; font-size: .7rem; color: var(--muted); }
+.usage-page details { margin-top: 1rem; }
+.model-costs, .run-costs { list-style: none; padding: 0; margin: 0; }
+.model-costs li, .run-costs li { padding: 1rem 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.model-costs li > div:first-child, .run-costs li { display: flex; justify-content: space-between; gap: 1rem; }
+.run-costs small, .model-costs small { display: block; margin-top: .4rem; color: var(--muted); }
+.cost-track { height: .5rem; background: var(--raised); border-radius: .25rem; margin: .6rem 0; overflow: hidden; }
+.cost-track i { display: block; height: 100%; background: var(--blue); }
+.usage-page .usage-warning { border-left: 3px solid #e6b65c; background: #2b2415; color: #f2d597; padding: 1rem; border-radius: .4rem; }
+@media(max-width:760px) { .usage-charts { grid-template-columns: 1fr; } .usage-page .usage-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } .usage-filters > div { width: 100%; } .run-costs li { flex-direction: column; } }

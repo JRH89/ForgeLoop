@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllGlobals());
 it('gives support tickets a decorative icon matching the sidebar navigation', async () => {
   vi.stubGlobal('fetch', controlPlane({}));
   render(<App />);
-  const support = await screen.findByRole('link', { name: 'Support tickets' });
+  const support = await screen.findByRole('link', { name: 'Support' });
   expect(support).toHaveAttribute('href', '/support#mine');
   expect(support.querySelector('.nav-icon')).toHaveAttribute('aria-hidden', 'true');
   expect(support.querySelector('svg')).toHaveAttribute('width', '17');

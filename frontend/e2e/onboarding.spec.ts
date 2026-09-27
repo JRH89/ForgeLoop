@@ -19,11 +19,31 @@ for (const width of [390, 1440]) {
       await route.fulfill({ json: { data } });
     });
     await page.goto('/app');
+    if (width === 390) {
+      await expect(page.getByRole('navigation', { name: 'ForgeLoop navigation' })).not.toBeVisible();
+      await page.getByRole('button', { name: 'Open navigation' }).click();
+      await expect(page.getByRole('link', { name: 'Support', exact: true })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Support tickets', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('navigation').getByRole('link', { name: 'Sign out' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
+      await expect(page.getByRole('navigation', { name: 'ForgeLoop navigation' })).not.toBeVisible();
+      await page.getByRole('button', { name: 'Open navigation' }).click();
+      await page.getByRole('button', { name: 'Usage & costs', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Usage & costs', exact: true })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'ForgeLoop navigation' })).not.toBeVisible();
+      await page.getByRole('button', { name: 'Open navigation' }).click();
+      await page.getByRole('button', { name: 'Runs', exact: true }).click();
+    } else {
+      await expect(page.getByRole('link', { name: 'Sign out' })).toHaveCSS('border-top-style', 'solid');
+    }
     await page.getByRole('button', { name: 'Open setup checklist' }).click();
     await expect(page.getByRole('heading', { name: 'Getting started', exact: true })).toBeVisible();
     await expect(page.getByText('No enabled runner is enrolled.', { exact: true })).toBeVisible();
     const navigation = page.getByRole('navigation', { name: 'ForgeLoop navigation' });
+    if (width === 390) await page.getByRole('button', { name: 'Open navigation' }).click();
     await expect(navigation.getByRole('button').nth(4)).toHaveText('User guide');
+    if (width === 390) await page.keyboard.press('Escape');
     await page.getByLabel('Existing GitHub issue number').fill('7');
     await page.getByRole('button', { name: 'Check issue intake', exact: true }).click();
     await expect(page.getByText('Add the required label: forgeloop', { exact: true })).toBeVisible();

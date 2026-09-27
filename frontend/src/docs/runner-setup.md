@@ -1,3 +1,26 @@
+## Navigation and usage tracking
+
+On mobile, open the hamburger button in the header for the navigation dropdown.
+It includes **Support** and **Sign out**, closes when you choose a page, and
+supports Escape to close. Desktop keeps the sidebar and a Sign out button in the
+header. User guide remains the fifth sidebar destination.
+
+**Usage & costs** replaces Analytics. Filter by repository and the last 7, 30,
+or 90 UTC calendar days to see daily estimated spending, cost by model, token
+usage, pricing coverage, harness comparison, and individual run costs. Costs are
+grouped by the provider telemetry's recording time, not the run creation date.
+Archived runs remain included. The all-time delivery overview is explicitly
+separate and does not change with these filters.
+
+Dollar amounts are estimates from the runner's configured token prices, not a
+provider invoice or account balance. **N/A** means no priced usage is available;
+partially priced totals exclude unknown prices and show an unpriced-record count.
+Configure prices in the desktop Provider tab for future requests. Historical
+unknown costs are not silently backfilled. Use **Budget & execution settings**
+for organization limits and approval policies; only administrators can change
+those policies. Usage viewing is read-only and makes no model calls. Updates
+refresh every ten seconds; failures show a stale-data warning and a retry button.
+
 ## Start with the setup checklist
 
 Open **Getting started** in the dashboard sidebar, or **Open setup checklist**
@@ -43,6 +66,13 @@ GitHub sign-in, repository installation, runner enrollment, and model-provider
 credentials are separate. Connecting a repository does not install a runner.
 
 ### Desktop setup (development preview)
+
+Preview installer 1.0.3 includes the ForgeLoop favicon for the native launcher
+and operating-system shortcuts. To replace an older Java-branded shortcut,
+pause work, close the app, and install the newer package. Saved runner state
+stays outside the installation directory. CI packages are unsigned previews;
+the download page only lists public GitHub Release packages after an explicit
+release manifest is published.
 
 The new desktop app includes Java and guides you through **Connect → Provider →
 Run**. Connect opens GitHub sign-in and an administrator approval page; compare

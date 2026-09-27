@@ -2,14 +2,17 @@ import {
   FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
 import { createRoot } from "react-dom/client";
 import OnboardingPage from './onboarding/OnboardingPage';
+import UsagePage from './usage/UsagePage';
+import './console-navigation.css';
 import './support/console-link.css';
-import { BarChart3, BookOpen, GitBranch, LifeBuoy, ListChecks, SlidersHorizontal } from "lucide-react";
+import { BarChart3, BookOpen, GitBranch, LifeBuoy, ListChecks, Menu, X, SlidersHorizontal } from "lucide-react";
 import {
   approveFeatureRun,
   archiveRun,
@@ -108,24 +111,6 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
       </section>
     </>
   );
-}
-
-function AnalyticsPage({analytics:initialAnalytics}:{analytics?:RunAnalytics}){
-  const [analytics,setAnalytics]=useState(initialAnalytics);
-  const [status,setStatus]=useState('Refreshing analytics');
-  useEffect(()=>{
-    let stopped=false;
-    let timer:number;
-    async function refresh(){
-      try{const updated=await loadRunAnalytics();if(!stopped){setAnalytics(updated);setStatus(`Updated ${new Date().toLocaleTimeString()} · refreshes every 5 seconds`);}}
-      catch{if(!stopped)setStatus('Analytics updates interrupted. Showing last known data; retrying.');}
-      finally{if(!stopped)timer=window.setTimeout(()=>void refresh(),document.hidden?15000:5000);}
-    }
-    void refresh();return()=>{stopped=true;window.clearTimeout(timer);};
-  },[]);
-  if(!analytics)return <p className="loading">Loading analytics…</p>;
-  const table=(title:string,items:RunAnalytics["modelComparisons"])=><section className="panel"><h2>{title}</h2>{items.length?items.map(item=><div className="item" key={item.name}><div><b>{item.name}</b><small>{item.runCount} runs · {item.requestCount} requests · {item.successfulRequests} succeeded · {(item.inputTokens+item.outputTokens).toLocaleString()} tokens</small></div><span>{money(item.knownCostMicros)}</span></div>):<p className="empty">No comparison data recorded yet.</p>}</section>;
-  return <><section className="hero"><p className="eyebrow">Measured delivery</p><h1>Run analytics</h1><p role="status">{status}</p><p>Tenant-scoped facts from persisted provider telemetry—never fabricated estimates.</p></section><section className="metrics analytics-metrics"><article><b>{analytics.totalRuns}</b><span>Total runs</span></article><article><b>{analytics.activeRuns}</b><span>Active runs</span></article><article><b>{analytics.deliveredRuns}</b><span>Delivered runs</span></article><article><b>{analytics.providerRequests}</b><span>Provider requests</span></article><article><b>{analytics.costCoverage===0?"Unpriced":money(analytics.knownCostMicros)}</b><span>Known cost · {Math.round(analytics.costCoverage*100)}% coverage</span></article></section><div className="two-column">{table("Model comparison",analytics.modelComparisons)}{table("Harness comparison",analytics.harnessComparisons)}</div></>;
 }
 
 function NewRun({
@@ -829,6 +814,23 @@ function ConfigurationPage({operator}:{operator:OperatorSession}) {
 }
 
 function App() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobile, setMobile] = useState(() => window.matchMedia?.('(max-width: 760px)').matches ?? false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const menuPanel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 760px)');
+    const resize = () => { setMobile(media?.matches ?? false); setMobileMenuOpen(false); };
+    media?.addEventListener('change', resize);
+    return () => media?.removeEventListener('change', resize);
+  }, []);
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMobileMenuOpen(false); menuButton.current?.focus(); } };
+    const outside = (event: PointerEvent) => { if (!menuPanel.current?.contains(event.target as Node) && !menuButton.current?.contains(event.target as Node)) setMobileMenuOpen(false); };
+    document.addEventListener('keydown', escape); document.addEventListener('pointerdown', outside);
+    return () => { document.removeEventListener('keydown', escape); document.removeEventListener('pointerdown', outside); };
+  }, [mobileMenuOpen]);
   const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted">("Runs");
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
@@ -854,7 +856,7 @@ function App() {
     [runs],
   );
   return (
-    <main>
+    <main className="console-app">
       <header>
         <div>
           <a className="brand" href="/">
@@ -871,11 +873,12 @@ function App() {
               {operator.role.toLowerCase()} · {operator.organizationId}
             </span>
           )}
-          <a className="logout" href="/logout">Sign out</a>
+          <a className="logout desktop-signout" href="/logout">Sign out</a>
+          <button ref={menuButton} className="console-menu-toggle" aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenuOpen} aria-controls="console-navigation" onClick={() => setMobileMenuOpen(value => !value)}>{mobileMenuOpen ? <X aria-hidden="true" size={22}/> : <Menu aria-hidden="true" size={22}/>}</button>
         </div>
       </header>
       <div className="shell">
-        <aside>
+        <aside ref={menuPanel} id="console-navigation" className={mobileMenuOpen ? 'console-sidebar menu-open' : 'console-sidebar'} inert={mobile && !mobileMenuOpen} aria-hidden={mobile && !mobileMenuOpen ? true : undefined} onClick={() => { if (mobile) { setMobileMenuOpen(false); menuButton.current?.focus(); } }}>
           <nav aria-label="ForgeLoop navigation">
             <button
               className={page === "Runs" ? "active" : ""}
@@ -883,7 +886,7 @@ function App() {
             >
               <span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Runs
             </button>
-            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}><span className="nav-icon" aria-hidden="true"><BarChart3 size={17} strokeWidth={1.9} /></span> Analytics</button>
+            <button className={page === "Analytics" ? "active" : ""} onClick={() => setPage("Analytics")}><span className="nav-icon" aria-hidden="true"><BarChart3 size={17} strokeWidth={1.9} /></span> Usage &amp; costs</button>
             <button
               className={page === "Repositories" ? "active" : ""}
               onClick={() => setPage("Repositories")}
@@ -893,7 +896,8 @@ function App() {
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
             <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon" aria-hidden="true"><BookOpen size={17} strokeWidth={1.9} /></span> User guide</button>
             <button className={page === "GettingStarted" ? "active" : ""} onClick={() => setPage("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
-            <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support tickets</a>
+            <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support</a>
+            <a className="logout mobile-signout" href="/logout">Sign out</a>
           </nav>
           <p className="sidebar-note">
             Repository code and commands execute only on an enrolled customer
@@ -921,7 +925,7 @@ function App() {
           ) : page === "Guide" ? (
             <UserGuidePage />
           ) : (
-            <AnalyticsPage analytics={analytics}/>
+            <UsagePage initialAnalytics={analytics} onSettings={() => setPage('Configuration')}/>
           )}
         </div>
       </div>
