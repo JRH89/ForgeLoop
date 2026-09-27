@@ -49,3 +49,6 @@ type RunComparison { dimension: String!, name: String!, runCount: Float!, reques
 type OrganizationPolicy { organizationId: ID!, maxRunBudgetUsd: Float!, maxParallelTasks: Int!, allowedProviders: [String!]!, requireHumanApproval: Boolean!, autoMergeEnabled: Boolean!, revision: Int! }
 type HarnessDefinition { id: ID!, organizationId: ID!, name: String!, description: String!, allowedRoles: [String!]!, defaultAttemptBudget: Int!, enabled: Boolean!, revision: Int! }
 type LocalMcpConfiguration { id: ID!, name: String!, command: String!, arguments: [String!]!, allowedRoles: [String!]!, contextTool: String!, toolArguments: String!, enabled: Boolean!, revision: Int! }
+
+extend type Query { issueIntakeCheck(repository: String!, issueNumber: Int!): IssueIntakeCheck! }
+type IssueIntakeCheck { eligible: Boolean!, reasons: [String!]!, checkedAt: String! }

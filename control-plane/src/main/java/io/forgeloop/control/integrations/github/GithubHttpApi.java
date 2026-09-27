@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 
 /** GitHub REST adapter. Tokens are short-lived and only held for the individual API request. */
 @Component
-public class GithubHttpApi implements GithubApi {
+public class GithubHttpApi implements GithubApi, GithubIssueReader {
     private final String apiUrl, appId, privateKey;
     private final ObjectMapper json;
     private final HttpClient http = HttpClient.newHttpClient();
@@ -28,6 +28,11 @@ public class GithubHttpApi implements GithubApi {
                          @Value("${forgeloop.github.app-id:}") String appId,
                          @Value("${forgeloop.github.private-key:}") String privateKey, ObjectMapper json) {
         this.apiUrl = apiUrl.replaceAll("/$", ""); this.appId = appId; this.privateKey = privateKey; this.json = json;
+    }
+    @Override public JsonNode readIssue(long installationId, String repository, int issueNumber) {
+        if (issueNumber < 1 || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))
+            throw new IllegalArgumentException("Invalid repository or issue number");
+        return request(installationId, "GET", "/repos/" + repository + "/issues/" + issueNumber, Map.of());
     }
     @Override public List<GithubInstalledRepository> listInstallationRepositories(long installationId) {
         JsonNode response = request(installationId, "GET", "/installation/repositories", Map.of());
@@ -88,7 +93,7 @@ public class GithubHttpApi implements GithubApi {
     }
     private JsonNode request(long installationId, String method, String path, Object body) {
         try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + issueInstallationToken(installationId));
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).timeout(java.time.Duration.ofSeconds(15)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + issueInstallationToken(installationId));
             HttpRequest request = "GET".equals(method) ? builder.GET().build() : builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
             HttpResponse<String> response = sendWithRetry(request);
             return json.readTree(response.body());
@@ -96,7 +101,7 @@ public class GithubHttpApi implements GithubApi {
     }
     private JsonNode requestAsApp(String method, String path, Object body) {
         try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + appJwt());
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(apiUrl + path)).timeout(java.time.Duration.ofSeconds(15)).header("Accept", "application/vnd.github+json").header("Authorization", "Bearer " + appJwt());
             HttpRequest request = "GET".equals(method) ? builder.GET().build() : builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
             HttpResponse<String> response = sendWithRetry(request);
             return json.readTree(response.body());
