@@ -62,4 +62,5 @@
 
 /* A little more breathing room for the landing composition, without forcing a full screen. */
 .public-site .landing-hero{padding-top:110px!important;padding-bottom:85px!important;min-height:630px}
-@media(max-width:760px){.public-site .landing-hero{padding-top:75px!important;padding-bottom:65px!important;min-height:0}}
+/* Keep the first message close to mobile navigation; retain the desktop composition. */
+@media(max-width:760px){.public-site .landing-hero{padding-top:32px!important;padding-bottom:65px!important;min-height:0}}

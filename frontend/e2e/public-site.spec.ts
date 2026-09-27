@@ -144,11 +144,20 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
   for(const file of ['delivery-v2-hero.webp','delivery-v2-hero-small.webp','delivery-v2-social-preview.jpg']){
     expect((await request.get(`/images/${file}`)).status()).toBe(200);
   }
-  for(const width of [390,1440]){
+  for(const width of [320,390,430,760,1440]){
     await page.setViewportSize({width,height:1000});
     const padding=await page.locator('.landing-hero').evaluate(el=>{
       const css=getComputedStyle(el);return [css.paddingTop,css.paddingBottom];
     });
-    expect(padding).toEqual(width<=760?['75px','65px']:['110px','85px']);
+    expect(padding).toEqual(width<=760?['32px','65px']:['110px','85px']);
+    if(width<=760){
+      // Measure the visible gap, not just padding, to catch margin/layout regressions.
+      const header=await page.locator('.public-nav').boundingBox();
+      const eyebrow=await page.locator('.landing-hero .eyebrow').boundingBox();
+      const gap=eyebrow!.y-(header!.y+header!.height);
+      expect(gap).toBeGreaterThanOrEqual(32);
+      expect(gap).toBeLessThanOrEqual(48);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
   }
 });
