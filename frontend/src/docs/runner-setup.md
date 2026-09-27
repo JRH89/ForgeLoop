@@ -45,10 +45,11 @@ grouped by the provider telemetry's recording time, not the run creation date.
 Archived runs remain included. The all-time delivery overview is explicitly
 separate and does not change with these filters.
 
-Dollar amounts are estimates from the runner's configured token prices, not a
-provider invoice or account balance. **N/A** means no priced usage is available;
+Dollar amounts are estimates from the runner's public base-rate lookup or manual
+override, not a provider invoice or account balance. **N/A** means no priced usage is available;
 partially priced totals exclude unknown prices and show an unpriced-record count.
-Configure prices in the desktop Provider tab for future requests. Historical
+The desktop Provider tab looks up public base rates for supported models; use
+manual prices only for account-specific terms or a missing catalog entry. Historical
 unknown costs are not silently backfilled. Use **Budget & execution settings**
 for organization limits and approval policies; only administrators can change
 those policies. Usage viewing is read-only and makes no model calls. Updates
@@ -111,8 +112,12 @@ The new desktop app includes Java and guides you through **Connect → Provider 
 Run**. Connect opens GitHub sign-in and an administrator approval page; compare
 the fingerprint in both windows. No enrollment token is copied. Choose a model,
 save your API key in your operating system's secure storage, check Git/Docker,
-and explicitly start work. Sonnet 5 pricing defaults can be overridden; custom
-models require explicit prices. No provider call is made during setup.
+and explicitly start work. The Provider step looks up public base token rates
+for the selected provider and model without using your API key. It shows the
+lookup date and published source; use manual prices for account-specific terms.
+If no verified rate is available or the catalog cannot be reached, save the
+model without prices and cost will display N/A rather than $0. No provider call
+is made during setup.
 
 On reopening, **Run** is selected when your setup is saved. An empty key field
 does not mean your key was lost: leave it blank to retain the stored key.
@@ -165,7 +170,7 @@ availability. Public preview installers are unsigned; signed production installe
 still require signing/notarization and release verification.
 The existing guided CLI installation below remains an advanced fallback.
 
-### Guided installation (recommended)
+### Guided CLI installation (advanced fallback)
 
 Open **Harness & policy → Install and connect a runner**. Administrators can
 generate a single-use enrollment token there; other roles ask their administrator.
@@ -177,7 +182,8 @@ The panel lists runner heartbeats so you can confirm the connection.
    package includes the tested runner JAR; no source checkout or Maven is needed.
 3. On Windows run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Runner.ps1`.
    Setup prompts for the control-plane URL, enrollment token, provider/model,
-   API key, and input/output USD prices per million tokens.
+   API key. It looks up public base rates; manual input/output USD prices per
+   million tokens are optional. Unknown prices remain N/A.
 4. Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Start-Runner.ps1` when
    ready to process eligible issues. Setup itself makes no paid model request.
 
@@ -335,16 +341,18 @@ in the repository's `runner/README.md`.
 
 ### Prices, costs, and budgets
 
-The installer writes `inputUsdPerMillion` and `outputUsdPerMillion` alongside
-provider/model/maxAttempts in the runner-local policy. For source installations,
-add both nonnegative numeric fields to each role (or a `default` entry). Example
-shape using illustrative rates, not current vendor prices:
+The guided installer looks up public base rates automatically and writes
+`inputUsdPerMillion` and `outputUsdPerMillion` alongside
+provider/model/maxAttempts only when rates are known or manually overridden.
+For source installations, add both nonnegative numeric fields to each role (or
+a `default` entry) if you want estimates. Example shape using illustrative
+rates, not current vendor prices:
 
 ```json
 {"default":{"provider":"anthropic","model":"YOUR_MODEL_ID","maxAttempts":2,"inputUsdPerMillion":3,"outputUsdPerMillion":15}}
 ```
 
-Use rates from your actual provider account. Policy rates override legacy pricing
+Override with rates from your actual provider account when they differ. Policy rates override legacy pricing
 environment variables. Costs are estimates for recorded input/output tokens,
 not provider invoices; caching, tools, tiers and other charges can differ.
 Unknown older requests remain explicitly unpriced, not $0.00, and are not

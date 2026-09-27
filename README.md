@@ -39,7 +39,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 
 - [x] Self-service administrator runner enrollment, downloadable runner package, Windows encrypted-key setup and optional login startup.
 - [x] Reversible intake-queue archive/restore and repository-specific GitHub assignee gating.
-- [x] Runner-local per-model pricing, explicit unpriced requests, and automatic two-second run updates with metadata progress events.
+- [x] Runner-local per-model pricing with automatic public base-rate lookup, optional manual overrides, explicit unpriced requests, and automatic two-second run updates with metadata progress events.
 
 Build the complete downloadable-runner web image through `docker compose build web`
 (root-context `deploy/web.Dockerfile`). The standalone `frontend/Dockerfile` builds

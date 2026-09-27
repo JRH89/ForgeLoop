@@ -58,7 +58,7 @@ const costSummary = (run:FeatureRun, compact = false) => {
   const unknown = attempts.filter(attempt=>!attempt.costKnown).length;
   // Keep queue cells short while retaining the full explanation in their tooltip.
   if (compact && (attempts.length===0 || unknown===attempts.length)) return 'N/A';
-  return attempts.length===0?'No usage recorded':unknown===attempts.length?'Cost unavailable — configure model pricing':`${money(run.spentCostMicros)} estimated${unknown?` + ${unknown} unpriced requests`:''}`;
+  return attempts.length===0?'No usage recorded':unknown===attempts.length?'Cost unavailable — no model rate':`${money(run.spentCostMicros)} estimated${unknown?` + ${unknown} unpriced requests`:''}`;
 };
 const stamp = (value: string) =>
   new Intl.DateTimeFormat(undefined, {

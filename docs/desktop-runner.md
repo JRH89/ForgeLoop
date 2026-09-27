@@ -16,9 +16,11 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
    administrator. The sign-in link opens a separate tab so the pairing request
    remains available. Return to the original tab to approve. Approval expires
    after five minutes; the desktop waits up to ten minutes for approval.
-5. On the Provider step select the provider, model, and API key. Sonnet 5 price
-   defaults are dated estimates. Pricing overrides are collapsed by default;
-   custom models require explicit prices. Save to advance to the Run step.
+5. On the Provider step select the provider, model, and API key. The app looks
+   up public base text-token rates automatically, without using your API key.
+   Review the displayed source and lookup date. Use **manual prices** for
+   account-specific terms; an unknown or offline model can be saved with N/A
+   cost estimates. Save to advance to the Run step.
 6. Check Git and Docker. Click **Start runner** and confirm potential API charges.
 
 No enrollment token needs copying. The local pairing secret never enters a URL.
@@ -65,8 +67,16 @@ not an assertion that every Linux distribution or CPU has been tested.
 
 Native packaging uses [jpackage](https://docs.oracle.com/en/java/javase/21/jpackage/packaging-tool-user-guide.pdf)
 and an explicit jlink runtime retaining the child-JVM launcher. Native credential
-calls use [JNA](https://github.com/java-native-access/jna). Sonnet defaults reference
-[Anthropic pricing](https://platform.claude.com/docs/en/about-claude/pricing).
+calls use [JNA](https://github.com/java-native-access/jna). The desktop and
+advanced Windows installer look up base input/output rates from LiteLLM's public
+[model price catalog](https://github.com/BerriAI/litellm/blob/main/model_prices_and_context_window.json)
+and require an exact provider/model match and an official provider pricing source.
+No API key or repository content is sent for this lookup. Rates are snapshots of
+public base text-token prices, not invoices; caching, tools, context tiers,
+regional billing and account discounts may differ. Automatic lookup refreshes
+when selecting a model in the desktop app; saved prices remain a snapshot until
+settings are reopened and saved again. Manual overrides remain available and
+unknown/offline models are recorded as unpriced rather than free.
 
 Unsigned previews are distributed through GitHub Releases with SHA-256 checksums
 and automatic website discovery; see [release publishing](desktop-releases.md).

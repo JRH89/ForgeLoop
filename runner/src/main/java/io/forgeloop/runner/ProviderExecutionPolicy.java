@@ -1,6 +1,7 @@
 package io.forgeloop.runner;
 
 /** Immutable local policy that bounds provider retries before any untrusted output is used. */
+@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 public record ProviderExecutionPolicy(String provider, String model, int maxAttempts,
                                       java.math.BigDecimal inputUsdPerMillion, java.math.BigDecimal outputUsdPerMillion) {
     public ProviderExecutionPolicy(String provider, String model, int maxAttempts) { this(provider, model, maxAttempts, null, null); }

@@ -38,13 +38,30 @@ function Read-Rate([string]$label) {
     if (-not [decimal]::TryParse($value, [Globalization.NumberStyles]::Number, [Globalization.CultureInfo]::InvariantCulture, [ref]$rate) -or $rate -lt 0) { throw 'Enter a nonnegative USD price using a decimal point.' }
     return $rate
 }
-$inputRate = Read-Rate 'Input USD per million tokens (from your provider pricing)'
-$outputRate = Read-Rate 'Output USD per million tokens (from your provider pricing)'
+# Public catalog lookup is free and carries only the provider/model identifier.
+$quote = & java -cp (Join-Path $root 'runner.jar') io.forgeloop.runner.RunnerMain model-price $provider $model | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Model price lookup failed; retry setup or use the desktop installer.' }
+$inputRate = $null
+$outputRate = $null
+if ($null -ne $quote.inputUsdPerMillion -and $null -ne $quote.outputUsdPerMillion) {
+    $inputRate = [decimal]$quote.inputUsdPerMillion
+    $outputRate = [decimal]$quote.outputUsdPerMillion
+    Write-Host "Public base rates: input `$$inputRate / output `$$outputRate per million tokens. Checked $($quote.checkedAt)."
+    Write-Host "Source: $($quote.source) (community catalog; verify account-specific terms)."
+} else {
+    Write-Host 'No catalog base rate for this model; cost will display N/A.'
+}
+if ((Read-Host 'Use account-specific/manual prices instead? (y/N)') -match '^[Yy]$') {
+    $inputRate = Read-Rate 'Input USD per million tokens'
+    $outputRate = Read-Rate 'Output USD per million tokens'
+}
 $apiKey = Read-Host 'Provider API key (encrypted for your Windows user)' -AsSecureString
 if ($apiKey.Length -eq 0) { throw 'Provider key is required.' }
 try { $apiKey | Export-Clixml -LiteralPath (Join-Path $root 'provider-key.xml') }
 finally { Remove-Variable apiKey }
-@{ default = @{ provider=$provider; model=$model; maxAttempts=2; inputUsdPerMillion=$inputRate; outputUsdPerMillion=$outputRate } } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'provider-policy.json') -Encoding UTF8
+$policy = @{ provider=$provider; model=$model; maxAttempts=2 }
+if ($null -ne $inputRate -and $null -ne $outputRate) { $policy.inputUsdPerMillion=$inputRate; $policy.outputUsdPerMillion=$outputRate }
+@{ default = $policy } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'provider-policy.json') -Encoding UTF8
 @{ endpoint=$endpoint; provider=$provider } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'runner-config.json') -Encoding UTF8
 & (Join-Path $root 'Start-Runner.ps1') -CheckOnly
 if ($StartAtLogin) {

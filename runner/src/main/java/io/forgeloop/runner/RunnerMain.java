@@ -20,6 +20,13 @@ public final class RunnerMain {
     }
 
     public static void main(String[] arguments) throws Exception {
+        if (arguments.length == 3 && "model-price".equals(arguments[0])) {
+            Object result;
+            try { result = new ModelPriceCatalog().find(arguments[1], arguments[2]).<Object>map(found -> found).orElse(java.util.Map.of("known", false)); }
+            catch (java.io.IOException unavailable) { result = java.util.Map.of("known", false); }
+            System.out.println(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(result));
+            return;
+        }
         // Enrollment secrets can be supplied through stdin instead of process arguments.
         if (arguments.length == 4 && "register-stdin".equals(arguments[0])) {
             String token = new java.io.BufferedReader(new java.io.InputStreamReader(System.in)).readLine();

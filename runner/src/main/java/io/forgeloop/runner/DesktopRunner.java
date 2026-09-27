@@ -17,7 +17,7 @@ public final class DesktopRunner {
     private final Path directory;
     private final DesktopWorker worker;
     private final JFrame frame=new JFrame("ForgeLoop Runner");
-    private final JTextField endpoint=new JTextField("https://forgeloop.hookerhillstudios.com"),name=new JTextField("My runner"),input=new JTextField("2"),output=new JTextField("10");
+    private final JTextField endpoint=new JTextField("https://forgeloop.hookerhillstudios.com"),name=new JTextField("My runner"),input=new JTextField(),output=new JTextField();
     private final JComboBox<String> model=new JComboBox<>(new String[]{"claude-sonnet-5"});
     private final JTabbedPane steps=new JTabbedPane();
     private final JComboBox<String> provider=new JComboBox<>(new String[]{"anthropic","openai","gemini"});
@@ -27,6 +27,12 @@ public final class DesktopRunner {
     private final JLabel status=new JLabel("Not started. Setup does not spend API credits.");
     private final JLabel fingerprint=new JLabel(" ");
     private final JLabel connectionStatus=new JLabel("Not connected yet"),keyStatus=new JLabel("No saved provider settings");
+    private final JLabel priceStatus=new JLabel("Open Provider to check public model pricing.");
+    private final ModelPriceCatalog priceCatalog=new ModelPriceCatalog();
+    private volatile ModelPriceCatalog.Quote selectedQuote;
+    private volatile boolean manualPrices;
+    private volatile boolean lookingUpPrice;
+    private final java.util.concurrent.atomic.AtomicLong priceLookupVersion=new java.util.concurrent.atomic.AtomicLong();
     private final JButton reopen=new JButton("Reopen approval page"),cancelPairing=new JButton("Cancel connection");
     private volatile URI approvalPage;
     private final java.util.concurrent.atomic.AtomicBoolean pairingCancelled=new java.util.concurrent.atomic.AtomicBoolean();
@@ -38,7 +44,7 @@ public final class DesktopRunner {
         this.directory=directory;worker=new DesktopWorker(directory);
         var icon=DesktopRunner.class.getResource("/desktop/favicon.png");if(icon!=null)frame.setIconImage(new ImageIcon(icon).getImage());
         model.setEditable(true);
-        if(Files.exists(directory.resolve("config.json"))){configuration=JSON.readValue(directory.resolve("config.json").toFile(),DesktopConfiguration.class);endpoint.setText(configuration.endpoint());provider.setSelectedItem(configuration.provider());model.setSelectedItem(configuration.model());input.setText(configuration.inputUsdPerMillion().toPlainString());output.setText(configuration.outputUsdPerMillion().toPlainString());}
+        if(Files.exists(directory.resolve("config.json"))){configuration=JSON.readValue(directory.resolve("config.json").toFile(),DesktopConfiguration.class);endpoint.setText(configuration.endpoint());provider.setSelectedItem(configuration.provider());model.setSelectedItem(configuration.model());input.setText(configuration.inputUsdPerMillion()==null?"":configuration.inputUsdPerMillion().toPlainString());output.setText(configuration.outputUsdPerMillion()==null?"":configuration.outputUsdPerMillion().toPlainString());manualPrices="manual".equals(configuration.priceSource())||(configuration.priceSource()==null&&configuration.inputUsdPerMillion()!=null);}
         if(Files.exists(directory.resolve("endpoint")))endpoint.setText(Files.readString(directory.resolve("endpoint")));
         endpoint.setEditable(!Files.exists(directory.resolve("identity")));
         if(Files.exists(directory.resolve("runner-name")))name.setText(Files.readString(directory.resolve("runner-name")));
@@ -60,8 +66,9 @@ public final class DesktopRunner {
         key.setToolTipText("Leave blank to keep the saved key for this provider. Enter a key only to replace it.");
         JButton checkKey=new JButton("Check saved key locally");providerForm.add(checkKey);providerForm.add(new JLabel("Checks storage, not API credit or key validity"));
         checkKey.addActionListener(e->{String selected=(String)provider.getSelectedItem();background(()->{new DesktopSecretStore(directory,selected).load();log("Saved key is readable from protected storage. No API request was made.");SwingUtilities.invokeLater(()->{if(selected.equals(provider.getSelectedItem()))keyStatus.setText("Saved key readable - no API request made");});});});
-        JPanel prices=new JPanel(new GridLayout(0,2,12,12));field(prices,"Input USD / million tokens",input);field(prices,"Output USD / million tokens",output);prices.setVisible(false);
-        JButton advanced=new JButton("Pricing overrides");advanced.setToolTipText("Standard Sonnet 5 estimates verified 2026-09-26. Review account-specific prices before paid work.");advanced.addActionListener(e->prices.setVisible(!prices.isVisible()));providerForm.add(new JLabel("Sonnet 5: $2 input / $10 output per million."));providerForm.add(advanced);providerForm.add(login);providerForm.add(save);
+        JPanel prices=new JPanel(new GridLayout(0,2,12,12));field(prices,"Input USD / million tokens",input);field(prices,"Output USD / million tokens",output);prices.setVisible(manualPrices);
+        JButton advanced=new JButton(manualPrices?"Use automatic prices":"Use manual prices");advanced.setToolTipText("Override public rates for custom models or account-specific pricing.");advanced.addActionListener(e->{manualPrices=!manualPrices;selectedQuote=null;priceLookupVersion.incrementAndGet();lookingUpPrice=false;prices.setVisible(manualPrices);advanced.setText(manualPrices?"Use automatic prices":"Use manual prices");if(!manualPrices)refreshPricing();else priceStatus.setText("Manual override: enter both prices, or leave both blank for N/A.");});
+        providerForm.add(new JLabel("Price estimate"));providerForm.add(priceStatus);providerForm.add(new JLabel("Account-specific rates?"));providerForm.add(advanced);providerForm.add(login);providerForm.add(save);
         JPanel providerStep=new JPanel(new BorderLayout(12,12));providerStep.add(providerForm,BorderLayout.NORTH);providerStep.add(prices,BorderLayout.CENTER);
         JPanel controls=new JPanel(new GridLayout(0,2,12,12));controls.add(check);controls.add(new JLabel("Git and Docker are required; Java is bundled."));controls.add(start);controls.add(pause);
         JButton updates=new JButton("Downloads / updates");updates.addActionListener(e->{URI uri=URI.create(endpoint.getText().trim());background(()->{PairingRequest.validateEndpoint(uri);Desktop.getDesktop().browse(uri.resolve("/app/runner-downloads"));});});controls.add(updates);controls.add(new JLabel("Pause before installing updates; local state is retained."));
@@ -85,7 +92,7 @@ public final class DesktopRunner {
         start.setEnabled(false);pause.setEnabled(false);
         statusTimer=new Timer(1000,e->{
             boolean enabled=!busy.get()&&!worker.running();
-            connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled);check.setEnabled(!busy.get());
+            connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled&&!lookingUpPrice);check.setEnabled(!busy.get());
             start.setEnabled(enabled&&configuration!=null&&Files.exists(directory.resolve("identity")));
             pause.setEnabled(!busy.get()&&worker.running()&&!worker.pausing());
             var snapshot=worker.status();
@@ -93,8 +100,10 @@ public final class DesktopRunner {
             status.setToolTipText(snapshot.lastContactMillis()==0?"No successful worker poll in this session":"Last successful control-plane poll: "+java.time.Instant.ofEpochMilli(snapshot.lastContactMillis()));
         });statusTimer.start();
         JTextField modelEditor=(JTextField)model.getEditor().getEditorComponent();
-        modelEditor.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){changed();}public void removeUpdate(javax.swing.event.DocumentEvent e){changed();}public void changedUpdate(javax.swing.event.DocumentEvent e){changed();}private void changed(){boolean preset="anthropic".equals(provider.getSelectedItem())&&"claude-sonnet-5".equals(modelEditor.getText());input.setText(preset?"2":"");output.setText(preset?"10":"");prices.setVisible(!preset);}});
-        provider.addActionListener(e->{model.setModel(new DefaultComboBoxModel<>("anthropic".equals(provider.getSelectedItem())?new String[]{"claude-sonnet-5"}:new String[]{""}));refreshSavedStatus();});
+        Timer priceDebounce=new Timer(500,e->refreshPricing());priceDebounce.setRepeats(false);
+        modelEditor.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){changed();}public void removeUpdate(javax.swing.event.DocumentEvent e){changed();}public void changedUpdate(javax.swing.event.DocumentEvent e){changed();}private void changed(){if(steps.getSelectedIndex()!=1)return;if(manualPrices){input.setText("");output.setText("");priceStatus.setText("Model changed — enter both account-specific rates, or leave blank for N/A.");}else queuePriceLookup(priceDebounce);}});
+        provider.addActionListener(e->{model.setModel(new DefaultComboBoxModel<>("anthropic".equals(provider.getSelectedItem())?new String[]{"claude-sonnet-5"}:new String[]{""}));refreshSavedStatus();if(steps.getSelectedIndex()==1){if(manualPrices){input.setText("");output.setText("");priceStatus.setText("Provider changed — enter both account-specific rates, or leave blank for N/A.");}else queuePriceLookup(priceDebounce);}});
+        steps.addChangeListener(e->{if(steps.getSelectedIndex()==1&&!manualPrices)refreshPricing();});
         frame.setMinimumSize(new Dimension(900,640));frame.pack();frame.setLocationByPlatform(true);frame.setVisible(true);
         if(autoStart&&configuration!=null&&configuration.startAtLogin())background(()->{startWorker();log("Started using your saved sign-in consent.");});
     }
@@ -127,11 +136,54 @@ public final class DesktopRunner {
             }finally{approvalPage=null;SwingUtilities.invokeLater(()->{reopen.setEnabled(false);cancelPairing.setEnabled(false);fingerprint.setText(" ");refreshSavedStatus();});}});
     }
     private void save(){
+        if(lookingUpPrice){JOptionPane.showMessageDialog(frame,"Wait for the public price lookup to finish, or choose manual prices.");return;}
         DesktopConfiguration next;
-        try{next=new DesktopConfiguration(endpoint.getText().trim(),(String)provider.getSelectedItem(),model.getEditor().getItem().toString().trim(),new BigDecimal(input.getText().trim()),new BigDecimal(output.getText().trim()),login.isSelected());}
-        catch(Exception invalid){JOptionPane.showMessageDialog(frame,"Check the address, model, and nonnegative prices. Custom models need explicit input/output prices.");return;}
+        try{
+            BigDecimal inputRate=input.getText().isBlank()?null:new BigDecimal(input.getText().trim());
+            BigDecimal outputRate=output.getText().isBlank()?null:new BigDecimal(output.getText().trim());
+            String source=manualPrices?"manual":selectedQuote!=null?selectedQuote.source():null;
+            String checked=manualPrices?null:selectedQuote!=null?selectedQuote.checkedAt():null;
+            next=new DesktopConfiguration(endpoint.getText().trim(),(String)provider.getSelectedItem(),model.getEditor().getItem().toString().trim(),inputRate,outputRate,login.isSelected(),source,checked);
+        }
+        catch(Exception invalid){JOptionPane.showMessageDialog(frame,"Check the address, model, and prices. Leave both prices blank for an unpriced model, or enter both nonnegative rates.");return;}
         char[] password=key.getPassword();key.setText("");
         background(()->{try{if(Files.exists(directory.resolve("endpoint"))&&!Files.readString(directory.resolve("endpoint")).equals(next.endpoint()))throw new IllegalStateException("Address must match this runner's enrollment");var secrets=new DesktopSecretStore(directory,next.provider());if(password.length>0)secrets.save(new String(password));else secrets.load();if(next.startAtLogin()||(configuration!=null&&configuration.startAtLogin()))DesktopLoginStartup.configure(next.startAtLogin());DesktopFiles.writeAtomic(directory.resolve("config.json"),JSON.writeValueAsBytes(next));configuration=next;SwingUtilities.invokeLater(()->{refreshSavedStatus();steps.setSelectedIndex(2);});log("Settings saved. No paid provider call was made.");}finally{java.util.Arrays.fill(password,'\0');}});
+    }
+    /** Public catalog traffic contains only the selected model, never API keys or repository content. */
+    private void refreshPricing(){
+        if(manualPrices)return;
+        String selectedProvider=(String)provider.getSelectedItem();
+        String selectedModel=model.getEditor().getItem().toString().trim();
+        long version=priceLookupVersion.incrementAndGet();
+        lookingUpPrice=true;selectedQuote=null;input.setText("");output.setText("");
+        priceStatus.setText("Checking public model prices…");
+        Thread.ofVirtual().start(()->{
+            try{
+                var found=priceCatalog.find(selectedProvider,selectedModel);
+                SwingUtilities.invokeLater(()->{
+                    if(version!=priceLookupVersion.get()||manualPrices)return;
+                    lookingUpPrice=false;
+                    if(found.isEmpty()){priceStatus.setText("N/A — no catalog base rate; manual override is optional.");return;}
+                    selectedQuote=found.get();
+                    input.setText(selectedQuote.inputUsdPerMillion().stripTrailingZeros().toPlainString());
+                    output.setText(selectedQuote.outputUsdPerMillion().stripTrailingZeros().toPlainString());
+                    priceStatus.setText("Auto: $"+input.getText()+" / $"+output.getText()+" per 1M · checked "+selectedQuote.checkedAt().substring(0,10));
+                    priceStatus.setToolTipText("Community catalog; published provider source: "+selectedQuote.source()+". Base text tokens only; estimates are not invoices.");
+                });
+            }catch(Exception unavailable){
+                SwingUtilities.invokeLater(()->{if(version!=priceLookupVersion.get()||manualPrices)return;lookingUpPrice=false;priceStatus.setText("N/A — public price lookup unavailable. Manual override is optional.");});
+            }
+        });
+    }
+    /** Invalidate the previous model's quote as soon as selection changes, before debouncing network traffic. */
+    private void queuePriceLookup(Timer debounce){
+        priceLookupVersion.incrementAndGet();
+        lookingUpPrice=true;
+        selectedQuote=null;
+        input.setText("");output.setText("");
+        priceStatus.setText("Checking public model prices…");
+        save.setEnabled(false);
+        debounce.restart();
     }
     private void startWorker()throws Exception{if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");prerequisites();DesktopFiles.writeAtomic(directory.resolve("provider-policy.json"),JSON.writeValueAsBytes(configuration.policy()));worker.start(configuration,new DesktopSecretStore(directory,configuration.provider()).load(),this::log);}
     private static void prerequisites()throws Exception{
