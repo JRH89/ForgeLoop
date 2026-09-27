@@ -33,6 +33,8 @@ management:
     metrics:
       export: { enabled: true }
 forgeloop:
+  support:
+    admin-organization-id: "${FORGELOOP_SUPPORT_ADMIN_ORGANIZATION_ID:${FORGELOOP_GITHUB_DEFAULT_ORGANIZATION_ID:local-development}}"
   security:
     mode: "${FORGELOOP_SECURITY_MODE:production}"
     development-organization-id: "${FORGELOOP_DEVELOPMENT_ORGANIZATION_ID:local-development}"
