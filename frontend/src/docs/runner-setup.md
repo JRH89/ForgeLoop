@@ -20,6 +20,10 @@ automatically within about five minutes; the app does not install updates itself
 
 ## Navigation and usage tracking
 
+The browser runner-connection page displays your runner name and verification
+fingerprint in a dedicated panel. Compare it with the desktop app, then select
+the confirmation checkbox to enable approval. Approval alone never starts paid work.
+
 On mobile, open the hamburger button in the header for the navigation dropdown.
 It includes **Support** and **Sign out**, closes when you choose a page, and
 supports Escape to close. Desktop keeps the sidebar and a Sign out button in the
