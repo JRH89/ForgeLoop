@@ -13,6 +13,10 @@ browser checks verify that closing gap as well.
 
 ## Content and routes
 
+- Landing capability cards use decorative Lucide icons (repository branch,
+  delivery loop, verification shield, runner server), with headings providing
+  their accessible meaning instead of numbered step labels.
+
 - Existing landing-page headlines, paragraphs, capability descriptions, and CTAs
   are retained. Additional explanatory sections and FAQs follow the original copy.
 - `/about`, `/features`, `/how-it-works`, `/security`, `/docs`, `/contact`, `/blog`.
