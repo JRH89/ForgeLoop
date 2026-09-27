@@ -1,4 +1,4 @@
-param([string]$BaselineDirectory='artifacts/desktop-baseline/packages',[string]$UpdateDirectory='artifacts/native-installer/packages')
+param([string]$BaselineDirectory='artifacts/desktop-baseline/packages',[string]$UpdateDirectory='artifacts/native-installer/packages',[string]$ExpectedVersion='1.0.4')
 $ErrorActionPreference='Stop'
 if ($env:GITHUB_ACTIONS -ne 'true' -or !$IsWindows) { throw 'Upgrade tests are restricted to disposable Windows CI hosts.' }
 $baseline=Get-ChildItem -LiteralPath $BaselineDirectory -Filter '*.msi' | Select-Object -First 1
@@ -33,7 +33,7 @@ try {
     $launcher=Join-Path $installDirectory 'ForgeLoop Runner.exe'
     if (!(Test-Path -LiteralPath $launcher)) { throw 'Upgraded launcher missing.' }
     $version=[Diagnostics.FileVersionInfo]::GetVersionInfo($launcher).ProductVersion
-    if ($version -notlike '1.0.3*') { throw "Expected upgraded launcher 1.0.3, got $version" }
+    if ($version -notlike "$ExpectedVersion*") { throw "Expected upgraded launcher $ExpectedVersion, got $version" }
     $remove=Start-Process msiexec.exe -ArgumentList @('/x',('"'+$update.FullName+'"'),'/qn') -Wait -PassThru -WindowStyle Hidden
     if ($remove.ExitCode -notin @(0,3010)) { throw 'Uninstall failed.' }
     Assert-StatePreserved
