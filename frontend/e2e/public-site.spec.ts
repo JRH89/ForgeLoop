@@ -136,3 +136,12 @@ test('hero overlays protect text below large desktop widths',async({page})=>{
     }
   }
 });
+
+test('landing hero uses the refined reference-inspired artwork',async({page,request})=>{
+  await page.goto('/');
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content',/delivery-v2-social-preview.jpg$/);
+  await expect(page.locator('.landing-hero')).toHaveAttribute('style',/delivery-v2-hero.webp/);
+  for(const file of ['delivery-v2-hero.webp','delivery-v2-hero-small.webp','delivery-v2-social-preview.jpg']){
+    expect((await request.get(`/images/${file}`)).status()).toBe(200);
+  }
+});
