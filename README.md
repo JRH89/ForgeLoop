@@ -29,6 +29,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [x] Desktop onboarding polish: dark theme, restored-state indicators, local key/connection checks, pairing recovery, and safe diagnostics export (no model calls).
 - [x] Native launcher branding: preview 1.0.3 uses the ForgeLoop favicon in Windows/macOS/Linux packages; installed icon resources and Windows state-preserving upgrade are CI-tested.
 - [x] Mobile dashboard hamburger dropdown with Support and Sign out, keyboard dismissal, reduced-motion support, and desktop Sign out button styling.
+- [x] Populated mobile dashboard layout: labeled run cards, wrapped setup/status text, contained specification/log content, and phone-sized forms. Browser regression covers long real-shaped content at 320/390/430/768/1440px.
 - [x] Usage & costs: UTC period/repository filters, daily/model graphs, per-run estimates, harness comparison, token counts, archived history, and explicit unpriced coverage with live refresh.
 - [x] Desktop connection recovery: explicit idle/working/offline states, bounded reconnect backoff, prompt pause during retry waits, and stop-on-rejection diagnostics; real child-process server restart tests require no provider calls.
 - [x] First-run checklist: organization-scoped readiness, repository selection, local runner setup guidance, intake/safety settings, safe issue drafting, and on-demand GitHub issue eligibility diagnostics without model calls. See [onboarding verification](docs/first-run-onboarding.md).

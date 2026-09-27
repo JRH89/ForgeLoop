@@ -5,6 +5,12 @@ It includes **Support** and **Sign out**, closes when you choose a page, and
 supports Escape to close. Desktop keeps the sidebar and a Sign out button in the
 header. User guide remains the fifth sidebar destination.
 
+On phones, Runs uses labeled cards rather than a wide table. Each card keeps
+repository, status, progress, cost, start time, and archive controls visible.
+Tap a card to open its task/evidence details. Archive is a separate action and
+still requires confirmation. Long specifications and logs stay within their
+panels; wide code or Markdown tables may scroll inside their own evidence area.
+
 **Usage & costs** replaces Analytics. Filter by repository and the last 7, 30,
 or 90 UTC calendar days to see daily estimated spending, cost by model, token
 usage, pricing coverage, harness comparison, and individual run costs. Costs are

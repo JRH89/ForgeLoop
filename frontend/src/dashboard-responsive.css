@@ -1,0 +1,54 @@
+/* Grid items must be allowed to shrink below the intrinsic width of tables and logs.
+   Contain wide evidence locally; do not hide page overflow to mask inaccessible content. */
+.console-app .shell > .content,
+.console-app .panel,
+.console-app .detail-stack,
+.console-app .two-column > *,
+.console-app .config-columns > *,
+.console-app .task > *,
+.console-app .metrics > * { min-width: 0; }
+.console-app .content { overflow-wrap: anywhere; }
+.console-app .run-head > div { min-width: 0; max-width: 100%; flex: 1; }
+.console-app pre { max-width: 100%; overflow-x: auto; }
+.console-app .setup-entry > * { min-width: 0; max-width: 100%; }
+@media (max-width: 760px) {
+  .console-app .shell { grid-template-columns: minmax(0, 1fr); }
+  .console-app .content { padding: 20px 14px 48px; }
+  .console-app .panel { padding: 16px; }
+  .console-app .content button { min-height: 44px; }
+  .console-app .setup-entry { display: grid; grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .console-app .setup-entry button { margin: 0; min-height: 44px; white-space: normal; }
+  .console-app .runs-title { align-items: flex-start; gap: 12px; }
+  .console-app .runs-dashboard { margin: 0; padding: 14px; overflow: visible; }
+  .console-app .run-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 0; }
+  .console-app .run-filters button { justify-content: center; gap: 4px; min-width: 0; min-height: 44px; }
+  /* Keep the same row/actions/data, but present each run as a labeled card on phones. */
+  .console-app .runs-table-wrap { overflow: visible; }
+  .console-app .runs-table { display: block; min-width: 0; width: 100%; }
+  .console-app .runs-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .console-app .runs-table tbody { display: grid; gap: 14px; padding-top: 14px; }
+  .console-app .runs-table tbody tr { display: block; min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .console-app .runs-table td { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 0; white-space: normal; border: 0; min-width: 0; font-size: .875rem; }
+  .console-app .runs-table td:first-child b { font-size: .95rem; }
+  .console-app .runs-table td:first-child small { font-size: .82rem; }
+  .console-app .runs-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: .72rem; }
+  .console-app .runs-table td:first-child { display: block; min-width: 0; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .console-app .runs-table td:first-child small { max-width: none; overflow: visible; white-space: normal; line-height: 1.6; }
+  .console-app .runs-table .status { justify-self: start; max-width: 100%; white-space: normal; }
+  .console-app .run-progress { min-width: 0; width: 100%; }
+  .console-app .runs-table td button { justify-self: start; min-height: 44px; padding: 8px 14px; border: 1px solid #36526a; border-radius: 6px; background: #142737; color: var(--text); }
+  .console-app .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .console-app .metrics b { overflow-wrap: anywhere; font-size: clamp(1rem, 5vw, 1.8rem); }
+  .console-app .task-title, .console-app .item, .console-app .definition > div, .console-app .evidence summary { flex-wrap: wrap; gap: 8px; }
+  .console-app .task-title > b, .console-app .item > div { min-width: 0; }
+  .console-app .actions { flex-wrap: wrap; }
+  .console-app .actions button { min-height: 44px; }
+  .console-app .markdown-content table { display: block; max-width: 100%; overflow-x: auto; }
+  .console-app .guide-toc { top: 64px; }
+}
+@media (max-width: 360px) {
+  .console-app > header { padding-inline: 12px; }
+  .console-app .brand { gap: 6px; }
+  .console-app .brand strong { font-size: 1rem; }
+  .console-app .session { gap: 6px; font-size: .7rem; }
+}

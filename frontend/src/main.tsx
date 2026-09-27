@@ -47,6 +47,7 @@ import RunnerDownloads from "./RunnerDownloads";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
 import "./styles.css";
+import "./dashboard-responsive.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
 const retryable = new Set(["FAILED", "HELD", "RETRYABLE_FAILURE"]);
@@ -770,12 +771,12 @@ function RunsPage({
                   return (
                     <tr key={item.id} className={selected === item.id ? "selected" : ""} tabIndex={0} aria-label={`Open run ${item.title}`} onClick={() => setSelected(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(item.id); } }}>
                       <td><b>{item.sourceRef}</b><small>{item.title}</small></td>
-                      <td>{item.repository}</td>
-                      <td><span className={`status ${displayedRunState(item).toLowerCase()}`}>{displayedRunState(item).replaceAll("_", " ")}</span></td>
-                      <td><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
-                      <td title={costSummary(item)}>{costSummary(item, true)}</td>
-                      <td><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
-                      <td>{operator.role!=='VIEWER'&&(item.archived||terminal.has(displayedRunState(item)))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
+                      <td data-label="Repository">{item.repository}</td>
+                      <td data-label="Status"><span className={`status ${displayedRunState(item).toLowerCase()}`}>{displayedRunState(item).replaceAll("_", " ")}</span></td>
+                      <td data-label="Progress"><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
+                      <td data-label="Cost" title={costSummary(item)}>{costSummary(item, true)}</td>
+                      <td data-label="Started"><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
+                      <td data-label="Queue">{operator.role!=='VIEWER'&&(item.archived||terminal.has(displayedRunState(item)))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
                     </tr>
                   );
                 })}
