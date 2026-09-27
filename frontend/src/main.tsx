@@ -36,7 +36,6 @@ import {
 import favicon from "./assets/favicon.png";
 import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
-import LandingPage from "./LandingPage";
 import RunnerSetup from "./RunnerSetup";
 import RunnerPairingPage from "./RunnerPairingPage";
 import RunnerDownloads from "./RunnerDownloads";
@@ -929,6 +928,6 @@ if (import.meta.env.MODE !== "test") {
   if (!root) throw new Error("ForgeLoop root element is missing");
   const pairing = isRunnerPairingRoute(window.location.pathname, window.location.hash);
   if(pairing && window.location.pathname !== '/app/runner-connect') window.history.replaceState(null, '', `/app/runner-connect${window.location.hash}`);
-  createRoot(root).render(window.location.pathname==='/app/runner-downloads'?<RunnerDownloads/>:pairing?<RunnerPairingPage/>:window.location.pathname.startsWith("/app") ? <App /> : <LandingPage />);
+  createRoot(root).render(window.location.pathname==='/app/runner-downloads'?<RunnerDownloads/>:pairing?<RunnerPairingPage/>:<App />);
 }
 export default App;
