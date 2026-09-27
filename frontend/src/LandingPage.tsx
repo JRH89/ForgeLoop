@@ -28,6 +28,6 @@ export default function LandingPage() {
       ['Does connecting a runner start paid work?','No. Browser pairing, saving settings, local key checks, and heartbeat checks do not invoke a model. Start runner can claim eligible work; it is not a dry run.'],
       ['Is the desktop installer a signed public release?','Not yet. Windows, macOS, and Linux native packages have development-preview CI coverage. Signing, public distribution, and remaining live validation have separate release gates.']
     ].map(([question,answer])=><details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</section>
-    <section className="public-section"><p className="eyebrow">Field notes</p><h2>The engineering behind dependable agent workflows.</h2><ArticleCards limit={3}/><a className="text-link" href="/blog">Read all field notes →</a></section>
+    <section className="public-section"><p className="eyebrow">Field notes</p><h2>The engineering behind dependable agent workflows.</h2><ArticleCards limit={4}/><a className="text-link" href="/blog">Read all field notes →</a></section>
   </PublicLayout>;
 }
