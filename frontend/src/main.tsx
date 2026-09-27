@@ -6,7 +6,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 import { BarChart3, BookOpen, GitBranch, ListChecks, SlidersHorizontal } from "lucide-react";
 import {
   approveFeatureRun,
@@ -36,7 +36,7 @@ import {
 import favicon from "./assets/favicon.png";
 import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
-import LandingPage from "./LandingPage";
+import PublicSite from "./public/PublicSite";
 import RunnerSetup from "./RunnerSetup";
 import RunnerPairingPage from "./RunnerPairingPage";
 import RunnerDownloads from "./RunnerDownloads";
@@ -929,6 +929,9 @@ if (import.meta.env.MODE !== "test") {
   if (!root) throw new Error("ForgeLoop root element is missing");
   const pairing = isRunnerPairingRoute(window.location.pathname, window.location.hash);
   if(pairing && window.location.pathname !== '/app/runner-connect') window.history.replaceState(null, '', `/app/runner-connect${window.location.hash}`);
-  createRoot(root).render(window.location.pathname==='/app/runner-downloads'?<RunnerDownloads/>:pairing?<RunnerPairingPage/>:window.location.pathname.startsWith("/app") ? <App /> : <LandingPage />);
+  if(!window.location.pathname.startsWith('/app')){
+    const page=<PublicSite path={window.location.pathname}/>;
+    if(root.hasChildNodes())hydrateRoot(root,page);else createRoot(root).render(page);
+  }else createRoot(root).render(window.location.pathname==='/app/runner-downloads'?<RunnerDownloads/>:pairing?<RunnerPairingPage/>:<App />);
 }
 export default App;

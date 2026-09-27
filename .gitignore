@@ -10,4 +10,5 @@
 .env
 evidence/
 artifacts/
+frontend/.prerender/
 forgeloop-dev.2026-09-20.private-key.pem
