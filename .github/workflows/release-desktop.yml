@@ -67,7 +67,8 @@ jobs:
             --title "ForgeLoop Runner $VERSION preview" --notes-file ../docs/desktop-preview-release-notes.md
           gh release upload "$tag" ./*
           while read -r checksum filename; do
-            remote_digest=$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq ".assets[] | select(.name == \"$filename\") | .digest")
+            # The tag REST endpoint cannot resolve an unpublished draft.
+            remote_digest=$(gh release view "$tag" --json assets --jq ".assets[] | select(.name == \"$filename\") | .digest")
             [[ "$remote_digest" == "sha256:$checksum" ]] || { echo "Uploaded digest mismatch: $filename"; exit 1; }
           done < SHA256SUMS
           gh release edit "$tag" --draft=false --prerelease --latest=false
