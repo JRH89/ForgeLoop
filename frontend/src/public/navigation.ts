@@ -13,8 +13,13 @@ export function initializeNavigation() {
     drawer.classList.remove('is-open');
     // Keep the native modal/focus trap active until the exit transition completes.
     window.setTimeout(() => {
+      // Restore synchronously: the native close event is queued and can arrive
+      // after a fast reopen, otherwise capturing 'hidden' as the prior state.
+      toggle.setAttribute('aria-expanded', 'false');
+      document.documentElement.style.overflow = previousOverflow;
       drawer.close();
       closing = false;
+      toggle.focus();
     }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260);
   };
   toggle.addEventListener('click', () => {
@@ -23,7 +28,9 @@ export function initializeNavigation() {
     document.documentElement.style.overflow = 'hidden';
     drawer.showModal();
     toggle.setAttribute('aria-expanded', 'true');
-    requestAnimationFrame(() => requestAnimationFrame(() => drawer.classList.add('is-open')));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (drawer.open && !closing) drawer.classList.add('is-open');
+    }));
   });
   drawer.querySelector('.menu-close')?.addEventListener('click', close);
   drawer.addEventListener('cancel', event => { event.preventDefault(); close(); });
@@ -39,12 +46,6 @@ export function initializeNavigation() {
     }
   });
   drawer.addEventListener('click', event => { if (event.target === drawer) close(); });
-  drawer.addEventListener('close', () => {
-    drawer.classList.remove('is-open');
-    toggle.setAttribute('aria-expanded', 'false');
-    document.documentElement.style.overflow = previousOverflow;
-    toggle.focus();
-  });
   // Do not leave an invisible modal trapping focus when rotating to desktop width.
   matchMedia('(min-width: 1001px)').addEventListener('change', event => { if (event.matches) close(); });
 }
