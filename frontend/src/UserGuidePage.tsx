@@ -26,7 +26,7 @@ export default function UserGuidePage() {
       <section className="panel guide-section" id="quick-start">
         <p className="eyebrow">Start here</p><h2>How delivery works</h2>
         <div className="guide-steps">{lifecycle.map(([number,title,body])=><div key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}</div>
-        <div className="guide-callout"><b>ForgeLoop works with any authorized repository.</b><span>Ticketly is a validation repository, not a special product integration. Repository policy determines the workflow and verification commands.</span></div>
+        <div className="guide-callout"><b>ForgeLoop works with any authorized repository.</b><span>Connect your own repositories and define the workflow and verification commands through repository policy.</span></div>
       </section>
       <section className="panel guide-section" id="runner-setup">
         <MarkdownContent content={runnerSetup} />

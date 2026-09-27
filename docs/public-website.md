@@ -15,6 +15,12 @@ requests are made by public pages.
   No fabricated customer stories, traffic claims, benchmarks, reviews, or ratings.
 - Shared header/footer links cover desktop and mobile. Every public page and the
   404 page has a decorative image-backed hero. Informational text remains HTML.
+- Each page and article now has unique artwork, responsive derivatives, and a
+  matching social preview. See [hero prompts and asset map](public-hero-prompts.md).
+- Article cards are whole-card links, including the visible read action; browser
+  tests open every article through that action. The decorative pipeline status
+  strip has been removed. Customer-facing pages and the guide never name internal
+  demonstration repositories; generated public HTML is checked for regressions.
 - Header/footer span the viewport; desktop navigation uses equal outer columns
   to stay centered. A small progressive enhancement opens the mobile modal drawer
   with entrance/exit transitions, Escape/backdrop/close controls, focus cycling and
@@ -73,7 +79,7 @@ audit passes. Do not invent a verification token or add analytics without consen
 
 - Frontend lint, type checking, 21 unit tests, production build and 18-page SEO
   contract checks pass.
-- Five public-site browser tests pass against the production Nginx image, including
+- Six public-site browser tests pass against the production Nginx image, including
   JavaScript-disabled content, mobile navigation, real 404/redirect behavior and
   automated WCAG A/AA checks on representative templates.
 - Lighthouse 13.5.0 mobile simulation against the local production image scored

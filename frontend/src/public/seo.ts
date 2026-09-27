@@ -1,5 +1,6 @@
 import { articles } from './articles';
 import { pages, SITE } from './content';
+import { heroFor } from './heroes';
 
 export const publicPaths=[...pages.map(page=>page.path),...articles.map(article=>`/blog/${article.slug}`)];
 /** One metadata source serves static HTML, sitemap generation, and regression tests. */
@@ -15,5 +16,7 @@ export function metadata(path:string) {
   if(article)graph.push({'@type':'BlogPosting',headline:article.title,description,datePublished:article.published,dateModified:article.published,author:{'@type':'Organization',name:'Hooker Hill Studios',url:`${SITE}/about`},publisher:{'@id':`${SITE}/#organization`},mainEntityOfPage:{'@id':`${url}#page`},image:[`${SITE}/images/social-preview.jpg`],articleSection:article.category});
   if(path==='/')graph.push({'@type':'SoftwareApplication',name:'ForgeLoop',applicationCategory:'DeveloperApplication',operatingSystem:'Web; Windows; macOS; Linux',url:`${SITE}/`,description:page?.description});
   if(path!=='/'&&(page||article))graph.push({'@type':'BreadcrumbList',itemListElement:[{'@type':'ListItem',position:1,name:'Home',item:`${SITE}/`},...(article?[{'@type':'ListItem',position:2,name:'Field notes',item:`${SITE}/blog`},{'@type':'ListItem',position:3,name:article.title,item:url}]:[{'@type':'ListItem',position:2,name:page?.heading,item:url}])]});
-  return {title,description,url,article,found:!!(page||article),jsonLd:{'@context':'https://schema.org','@graph':graph}};
+  const hero=heroFor(page||article?path:'/not-found');
+  for(const entry of graph)if(entry['@type']==='BlogPosting')entry.image=[SITE+hero.social];
+  return {title,description,url,article,hero,found:!!(page||article),jsonLd:{'@context':'https://schema.org','@graph':graph}};
 }

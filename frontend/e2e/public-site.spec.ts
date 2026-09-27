@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { publicPaths } from '../src/public/seo';
 import AxeBuilder from '@axe-core/playwright';
+import { articles } from '../src/public/articles';
 
 test('public pages serve content and social metadata without JavaScript',async({browser})=>{
   const context=await browser.newContext({javaScriptEnabled:false});
@@ -83,6 +84,28 @@ test('static assets, sitemap, and canonical redirects work',async({request})=>{
   for(const path of ['/robots.txt','/sitemap.xml','/images/social-preview.jpg','/images/delivery-hero.webp','/icons/icon-32.png'])expect((await request.get(path)).status()).toBe(200);
   const redirect=await request.get('/about/',{maxRedirects:0});expect(redirect.status()).toBe(308);
   expect(redirect.headers().location).toMatch(/\/about$/);
+});
+
+test('article cards open from their read action and every page has distinct artwork',async({page,request})=>{
+  for(const article of articles){
+    await page.goto('/blog');
+    const card=page.locator(`a.article-card[href="/blog/${article.slug}"]`);
+    await card.getByText('Read field note').click();
+    await expect(page).toHaveURL(new RegExp(`/blog/${article.slug}$`));
+    await expect(page.getByRole('heading',{level:1})).toHaveText(article.title);
+    await expect(page.locator('.markdown-content')).toBeVisible();
+  }
+  const images=new Set<string>();
+  for(const path of publicPaths){
+    await page.goto(path);
+    await expect(page.locator('main')).not.toContainText(/Ticketly/i);
+    await expect(page.locator('.landing-terminal')).toHaveCount(0);
+    const image=await page.locator('.public-hero,.landing-hero').evaluate(el=>getComputedStyle(el).getPropertyValue('--hero-image'));
+    expect(images.has(image),path).toBe(false);images.add(image);
+    const url=image.match(/url\("?([^"\s)]+)/)?.[1];
+    expect(url,path).toBeTruthy();
+    expect((await request.get(url!)).status()).toBe(200);
+  }
 });
 
 test('public templates pass automated accessibility checks',async({page})=>{

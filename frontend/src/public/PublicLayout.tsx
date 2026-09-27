@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 const favicon='/icons/icon-192.png';
 import { REPOSITORY } from './content';
+import { heroStyle } from './heroes';
 
 const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs']];
 export function PublicHeader() {
@@ -24,6 +25,6 @@ export function PublicFooter() {
 export function PublicLayout({children}:{children:ReactNode}) {
   return <div className="landing public-site"><a className="skip-link" href="#main-content">Skip to content</a><PublicHeader/><main id="main-content">{children}</main><PublicFooter/></div>;
 }
-export function PublicHero({eyebrow,heading,intro}:{eyebrow:string;heading:string;intro:string}) {
-  return <section className="public-hero"><div><p className="eyebrow">{eyebrow}</p><h1>{heading}</h1><p>{intro}</p></div></section>;
+export function PublicHero({path,eyebrow,heading,intro}:{path:string;eyebrow:string;heading:string;intro:string}) {
+  return <section className="public-hero" style={heroStyle(path)}><div><p className="eyebrow">{eyebrow}</p><h1>{heading}</h1><p>{intro}</p></div></section>;
 }

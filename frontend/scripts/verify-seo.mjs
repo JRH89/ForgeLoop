@@ -1,8 +1,8 @@
 import { readFile, stat } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
-import { publicPaths, articles, SITE } from '../.prerender/prerender.js';
-const titles=new Set(),descriptions=new Set();
+import { publicPaths, articles, SITE, metadata } from '../.prerender/prerender.js';
+const titles=new Set(),descriptions=new Set(),heroes=new Set();
 for(const path of publicPaths){
   const html=await readFile(path==='/'?'dist/index.html':`dist${path}.html`,'utf8');
   const doc=new JSDOM(html).window.document;
@@ -14,7 +14,12 @@ for(const path of publicPaths){
   assert.equal(doc.querySelector('link[rel="canonical"]').href,SITE+path);
   assert.equal(doc.querySelector('meta[property="og:title"]').content,title);
   assert.equal(doc.querySelector('meta[name="twitter:card"]').content,'summary_large_image');
-  assert.equal(doc.querySelector('meta[property="og:image"]').content,`${SITE}/images/social-preview.jpg`);
+  const hero=metadata(path).hero;
+  assert.equal(doc.querySelector('meta[property="og:image"]').content,SITE+hero.social);
+  assert(!heroes.has(hero.image),`${path}: duplicate hero`);heroes.add(hero.image);
+  for(const asset of Object.values(hero))assert((await stat(`dist${asset}`)).size<500_000,`${path}: missing or oversized image`);
+  assert(!/ticketly/i.test(doc.querySelector('main').textContent),`${path}: internal demo reference`);
+  assert(!doc.querySelector('.landing-terminal'),`${path}: removed status strip`);
   const schema=JSON.parse(doc.querySelector('script[type="application/ld+json"]').textContent);
   assert.equal(schema['@context'],'https://schema.org');
   assert(doc.querySelector('main').textContent.length>400,`${path}: real prerendered content`);
