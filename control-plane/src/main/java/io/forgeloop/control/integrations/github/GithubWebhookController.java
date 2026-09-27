@@ -100,15 +100,11 @@ public class GithubWebhookController {
         if (!List.of("opened", "labeled", "assigned", "reopened").contains(action)) return;
         String repository = root.path("repository").path("full_name").asText();
         long installationId = root.path("installation").path("id").asLong();
-        List<String> labels = root.path("issue").path("labels").findValuesAsText("name");
         RepositoryConnection connection = connections.findByRepository(repository).orElse(null);
-        if (connection == null || (installationId > 0 && !connection.isInstalledAs(installationId))
-                || labels.stream().noneMatch(connection::acceptsIssueLabel)) return;
+        if (connection == null || (installationId > 0 && !connection.isInstalledAs(installationId))) return;
         JsonNode issue = root.path("issue");
-        if (issue.has("pull_request") || "closed".equals(issue.path("state").asText())) return;
-        if (!connection.acceptsAssignees(issue.path("assignees").findValuesAsText("login"))) return;
+        if (!GithubIssueIntakePolicy.reasons(connection, issue).isEmpty()) return;
         String specification = issue.path("body").asText();
-        if (specification.isBlank()) return;
         runs.submitIssue(new FeatureSubmission(repository, "issue-" + issue.path("number").asText(), issue.path("title").asText(), specification,
                 connection.getMaxBudgetUsd()));
     }

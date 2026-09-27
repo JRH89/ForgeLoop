@@ -7,6 +7,7 @@ import {
   type SetStateAction,
 } from "react";
 import { createRoot } from "react-dom/client";
+import OnboardingPage from './onboarding/OnboardingPage';
 import './support/console-link.css';
 import { BarChart3, BookOpen, GitBranch, LifeBuoy, ListChecks, SlidersHorizontal } from "lucide-react";
 import {
@@ -828,7 +829,7 @@ function ConfigurationPage({operator}:{operator:OperatorSession}) {
 }
 
 function App() {
-  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide">("Runs");
+  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted">("Runs");
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
   const [operator, setOperator] = useState<OperatorSession>();
@@ -891,6 +892,7 @@ function App() {
             </button>
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
             <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon" aria-hidden="true"><BookOpen size={17} strokeWidth={1.9} /></span> User guide</button>
+            <button className={page === "GettingStarted" ? "active" : ""} onClick={() => setPage("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
             <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support tickets</a>
           </nav>
           <p className="sidebar-note">
@@ -904,12 +906,14 @@ function App() {
           ) : !operator ? (
             <p className="loading">Loading operator workspace…</p>
           ) : page === "Runs" ? (
-            <RunsPage
+            <><div className="setup-entry"><span>Setting up a repository or diagnosing waiting work?</span><button onClick={() => setPage("GettingStarted")}>Open setup checklist</button></div><RunsPage
               repositories={repositories}
               runs={runs}
               operator={operator}
               setRuns={setRuns}
-            />
+            /></>
+          ) : page === "GettingStarted" ? (
+            <OnboardingPage operator={operator} navigate={setPage} />
           ) : page === "Repositories" ? (
             <RepositoryPage items={repositories} operator={operator} onSaved={updated=>setRepositories(current=>current.map(item=>item.id===updated.id?updated:item))}/>
           ) : page === "Configuration" ? (
