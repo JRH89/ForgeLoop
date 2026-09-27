@@ -5,7 +5,7 @@ New-Item -ItemType Directory -Path $testRoot | Out-Null
 Copy-Item -Path (Join-Path $PSScriptRoot '../runner/install/*.ps1') -Destination $testRoot
 New-Item -ItemType File -Path (Join-Path $testRoot 'runner.jar') | Out-Null
 $global:forgeLoopInstallerTestAnswers = [Collections.Generic.Queue[string]]::new()
-@('https://example.test','test-runner','enrollment-placeholder','anthropic','test-model','3','15','provider-placeholder') | ForEach-Object { $global:forgeLoopInstallerTestAnswers.Enqueue($_) }
+@('https://example.test','test-runner','enrollment-placeholder','anthropic','test-model','n','provider-placeholder') | ForEach-Object { $global:forgeLoopInstallerTestAnswers.Enqueue($_) }
 function Read-Host { param([string]$Prompt,[switch]$AsSecureString) $answer=$global:forgeLoopInstallerTestAnswers.Dequeue(); if($AsSecureString){ConvertTo-SecureString $answer -AsPlainText -Force}else{$answer} }
 function docker { $global:LASTEXITCODE=0; 'linux' }
 function git { $global:LASTEXITCODE=0 }
@@ -22,6 +22,9 @@ function java {
         if($args -contains 'enrollment-placeholder') { throw 'Token leaked into command arguments' }
         if(($input | Out-String).Trim() -ne 'enrollment-placeholder') { throw 'Missing stdin token' }
         Set-Content -LiteralPath $env:FORGELOOP_RUNNER_STATE_FILE -Value 'test-identity'
+    } elseif($args -contains 'model-price') {
+        if($args -notcontains 'anthropic' -or $args -notcontains 'test-model') { throw 'Wrong model price lookup' }
+        '{"inputUsdPerMillion":3,"outputUsdPerMillion":15,"source":"https://platform.claude.com/docs/en/about-claude/pricing","checkedAt":"2026-09-27T12:00:00Z"}'
     } elseif($args -contains 'serve') {
         if($env:ANTHROPIC_API_KEY -ne 'provider-placeholder') { throw 'Key was not decrypted into child environment' }
     } elseif($args -notcontains 'heartbeat') { throw 'Unexpected Java invocation' }
@@ -32,12 +35,16 @@ try {
     & (Join-Path $testRoot 'Install-Runner.ps1') -StartAtLogin
     if(-not $global:forgeLoopInstallerTaskCreated) { throw 'Optional startup task was not registered' }
     $policy=Get-Content -LiteralPath (Join-Path $testRoot 'provider-policy.json') -Raw | ConvertFrom-Json
-    if($policy.default.inputUsdPerMillion -ne 3 -or $policy.default.outputUsdPerMillion -ne 15) { throw 'Pricing was not saved' }
+    if($policy.default.inputUsdPerMillion -ne 3 -or $policy.default.outputUsdPerMillion -ne 15) { throw 'Automatic catalog pricing was not saved' }
     $encrypted=Get-Content -LiteralPath (Join-Path $testRoot 'provider-key.xml') -Raw
     if($encrypted.Contains('provider-placeholder')) { throw 'Provider key persisted in cleartext' }
     & (Join-Path $testRoot 'Start-Runner.ps1')
     if($env:ANTHROPIC_API_KEY -ne $previousKey) { throw 'Process environment was not restored' }
-    Write-Host 'Runner installer passed: stdin enrollment, encrypted credentials, pricing, heartbeat and startup.'
+    @('https://example.test','anthropic','test-model','y','7','11','provider-placeholder') | ForEach-Object { $global:forgeLoopInstallerTestAnswers.Enqueue($_) }
+    & (Join-Path $testRoot 'Install-Runner.ps1')
+    $manual=Get-Content -LiteralPath (Join-Path $testRoot 'provider-policy.json') -Raw | ConvertFrom-Json
+    if($manual.default.inputUsdPerMillion -ne 7 -or $manual.default.outputUsdPerMillion -ne 11) { throw 'Manual account-rate override was not saved' }
+    Write-Host 'Runner installer passed: stdin enrollment, encrypted credentials, automatic/manual pricing, heartbeat and startup.'
 } finally {
     Remove-Variable forgeLoopInstallerTestAnswers -Scope Global
     Remove-Variable forgeLoopInstallerTaskCreated -Scope Global -ErrorAction SilentlyContinue
