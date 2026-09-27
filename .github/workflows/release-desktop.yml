@@ -60,7 +60,9 @@ jobs:
             test -s "forgeloop-runner-$VERSION-$target"
             sha256sum --check "forgeloop-runner-$VERSION-$target.sha256"
           done
-          cat *.sha256 > SHA256SUMS
+          # Recompute the aggregate with LF line endings: Windows companions can
+          # contain CRLF, which breaks the filename used for remote digest lookup.
+          sha256sum *.msi *.dmg *.deb > SHA256SUMS
           tag="desktop-v$VERSION-preview.1"
           # Draft assets are invisible to the public feed until every upload completes.
           gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --latest=false \
