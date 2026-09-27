@@ -1,7 +1,9 @@
 /* An external support destination follows the five established console tabs. */
 .support-console-link {
-  display: block;
-  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid transparent;
   padding: 11px 12px;
   color: var(--muted);
   text-decoration: none;

@@ -8,7 +8,7 @@ import {
 } from "react";
 import { createRoot } from "react-dom/client";
 import './support/console-link.css';
-import { BarChart3, BookOpen, GitBranch, ListChecks, SlidersHorizontal } from "lucide-react";
+import { BarChart3, BookOpen, GitBranch, LifeBuoy, ListChecks, SlidersHorizontal } from "lucide-react";
 import {
   approveFeatureRun,
   archiveRun,
@@ -891,7 +891,7 @@ function App() {
             </button>
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
             <button className={page === "Guide" ? "active" : ""} onClick={() => setPage("Guide")}><span className="nav-icon" aria-hidden="true"><BookOpen size={17} strokeWidth={1.9} /></span> User guide</button>
-            <a className="support-console-link" href="/support#mine">Support tickets</a>
+            <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support tickets</a>
           </nav>
           <p className="sidebar-note">
             Repository code and commands execute only on an enrolled customer

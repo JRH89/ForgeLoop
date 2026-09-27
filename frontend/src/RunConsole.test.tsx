@@ -5,6 +5,15 @@ import App from './main';
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('gives support tickets a decorative icon matching the sidebar navigation', async () => {
+  vi.stubGlobal('fetch', controlPlane({}));
+  render(<App />);
+  const support = await screen.findByRole('link', { name: 'Support tickets' });
+  expect(support).toHaveAttribute('href', '/support#mine');
+  expect(support.querySelector('.nav-icon')).toHaveAttribute('aria-hidden', 'true');
+  expect(support.querySelector('svg')).toHaveAttribute('width', '17');
+});
+
 function controlPlane(data: Record<string, unknown>) {
   return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
     const query = (JSON.parse(String(init.body)) as { query: string }).query;
