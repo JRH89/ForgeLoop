@@ -30,10 +30,11 @@ header-to-eyebrow gap at 320, 390, 430, and 760px to prevent excess mobile white
   strip has been removed. Customer-facing pages and the guide never name internal
   demonstration repositories; generated public HTML is checked for regressions.
 - Header/footer span the viewport; desktop navigation uses equal outer columns
-  to stay centered. A small progressive enhancement opens the mobile modal drawer
-  with entrance/exit transitions, Escape/backdrop/close controls, focus cycling and
-  restoration, scroll locking and reduced-motion support. No-JavaScript visitors
-  retain ordinary navigation links. Resizing to desktop dismisses the drawer.
+  to stay centered. Mobile navigation matches the console's full-width dropdown,
+  icon tiles, outlined sign-in button and 200ms vertical slide/fade. The header
+  toggle, Escape, outside clicks and leaving with Tab close the non-modal panel;
+  closed links are inert. Escape restores focus. Reduced motion removes animation.
+  No-JavaScript visitors retain ordinary links. Desktop resizing closes the panel.
 - Public docs distinguish desktop previews from signed distribution and paid
   model execution from free setup checks. The console still contains the full guide.
 

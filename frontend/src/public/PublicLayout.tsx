@@ -2,19 +2,20 @@ import type { ReactNode } from 'react';
 const favicon='/icons/icon-192.png';
 import { REPOSITORY } from './content';
 import { heroStyle } from './heroes';
+import { BookOpen, CircleHelp, FileText, Info, Layers, LifeBuoy, Menu, Shield, X } from 'lucide-react';
 
 const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs']];
+const mobileIcons = [Layers, CircleHelp, Info, FileText, BookOpen, Shield, LifeBuoy];
 export function PublicHeader() {
   return <header className="landing-nav public-nav">
     <a className="brand" href="/" aria-label="ForgeLoop home"><img src={favicon} width="30" height="30" alt=""/><strong>ForgeLoop</strong></a>
     <nav aria-label="Main navigation">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav>
     <a className="primary" href="/oauth2/authorization/github">Sign in with GitHub</a>
-    <button className="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu" hidden><span/><span/><span/></button>
-    <dialog id="mobile-menu" className="mobile-drawer" aria-labelledby="mobile-menu-title">
-      <div className="drawer-heading"><strong id="mobile-menu-title">Explore ForgeLoop</strong><button type="button" className="menu-close" aria-label="Close navigation">×</button></div>
-      <nav aria-label="Mobile navigation">{[...links,['Security','/security'],['Contact','/contact']].map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav>
-      <a className="primary" href="/oauth2/authorization/github">Sign in with GitHub</a>
-    </dialog>
+    <button className="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="mobile-menu" hidden><Menu className="menu-open-icon" size={22} aria-hidden="true"/><X className="menu-close-icon" size={22} aria-hidden="true"/></button>
+    <div id="mobile-menu" className="mobile-dropdown" inert aria-hidden="true">
+      <nav aria-label="Mobile navigation">{[...links,['Security','/security'],['Contact','/contact']].map(([label,path],index)=>{const Icon=mobileIcons[index];return <a key={path} href={path}><span className="menu-link-icon"><Icon size={20} aria-hidden="true"/></span>{label}</a>;})}</nav>
+      <a className="mobile-signin" href="/oauth2/authorization/github">Sign in with GitHub</a>
+    </div>
     <noscript><nav aria-label="Mobile navigation">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav></noscript>
   </header>;
 }

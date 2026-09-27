@@ -1,51 +1,38 @@
-/** Enhance static HTML without loading React or the authenticated console. */
+/** Enhance static HTML with the console's non-modal dropdown interaction. */
 export function initializeNavigation() {
   const toggle = document.querySelector<HTMLButtonElement>('.menu-toggle');
-  const drawer = document.querySelector<HTMLDialogElement>('.mobile-drawer');
-  if (!toggle || !drawer || toggle.dataset.ready) return;
+  const panel = document.querySelector<HTMLElement>('.mobile-dropdown');
+  if (!toggle || !panel || toggle.dataset.ready) return;
   toggle.dataset.ready = 'true';
   toggle.hidden = false;
-  let closing = false;
-  let previousOverflow = '';
-  const close = () => {
-    if (!drawer.open || closing) return;
-    closing = true;
-    drawer.classList.remove('is-open');
-    // Keep the native modal/focus trap active until the exit transition completes.
-    window.setTimeout(() => {
-      // Restore synchronously: the native close event is queued and can arrive
-      // after a fast reopen, otherwise capturing 'hidden' as the prior state.
-      toggle.setAttribute('aria-expanded', 'false');
-      document.documentElement.style.overflow = previousOverflow;
-      drawer.close();
-      closing = false;
-      toggle.focus();
-    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260);
+  let open = false;
+  const setOpen = (value: boolean, restoreFocus = false) => {
+    open = value;
+    panel.classList.toggle('is-open', open);
+    panel.inert = !open;
+    panel.setAttribute('aria-hidden', String(!open));
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+    if (restoreFocus) toggle.focus();
   };
-  toggle.addEventListener('click', () => {
-    if (drawer.open) return;
-    previousOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = 'hidden';
-    drawer.showModal();
-    toggle.setAttribute('aria-expanded', 'true');
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (drawer.open && !closing) drawer.classList.add('is-open');
-    }));
+  toggle.addEventListener('click', () => setOpen(!open));
+  document.addEventListener('keydown', event => {
+    if (open && event.key === 'Escape') setOpen(false, true);
   });
-  drawer.querySelector('.menu-close')?.addEventListener('click', close);
-  drawer.addEventListener('cancel', event => { event.preventDefault(); close(); });
-  drawer.addEventListener('keydown', event => {
-    if (event.key !== 'Tab') return;
-    const items = Array.from(drawer.querySelectorAll<HTMLElement>('button, a[href]'));
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault(); last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault(); first.focus();
-    }
+  document.addEventListener('pointerdown', event => {
+    if (open && event.target instanceof Node && !panel.contains(event.target) && !toggle.contains(event.target)) setOpen(false);
   });
-  drawer.addEventListener('click', event => { if (event.target === drawer) close(); });
-  // Do not leave an invisible modal trapping focus when rotating to desktop width.
-  matchMedia('(min-width: 1001px)').addEventListener('change', event => { if (event.matches) close(); });
+  // Normal tabbing can leave this non-modal panel; no scroll lock or focus trap.
+  document.addEventListener('focusin', event => {
+    if (open && event.target instanceof Node && !panel.contains(event.target) && !toggle.contains(event.target)) setOpen(false);
+  });
+  panel.addEventListener('click', event => {
+    if (event.target instanceof Element && event.target.closest('a')) setOpen(false);
+  });
+  for (const link of panel.querySelectorAll<HTMLAnchorElement>('nav a')) {
+    if (link.pathname === window.location.pathname) link.setAttribute('aria-current', 'page');
+  }
+  matchMedia('(min-width: 1001px)').addEventListener('change', event => {
+    if (event.matches) setOpen(false);
+  });
 }

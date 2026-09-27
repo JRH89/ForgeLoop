@@ -43,41 +43,63 @@ test('public navigation is usable on desktop and mobile without tenant requests'
   expect(errors).toEqual([]);expect(tenantRequests).toEqual([]);
 });
 
-test('full-width chrome and accessible animated mobile drawer',async({page})=>{
+test('full-width chrome and console-style mobile dropdown',async({page})=>{
   await page.setViewportSize({width:1920,height:1000});
   await page.goto('/');
   for(const selector of ['.public-nav','.public-footer']){
-    const box=await page.locator(selector).boundingBox();
-    expect(box?.width).toBe(1920);
+    expect((await page.locator(selector).boundingBox())?.width).toBe(1920);
   }
   const nav=await page.getByRole('navigation',{name:'Main navigation',exact:true}).boundingBox();
   expect(Math.abs(nav!.x+nav!.width/2-960)).toBeLessThan(2);
+  const toggle=page.locator('.menu-toggle');
+  const panel=page.locator('#mobile-menu');
+  for(const width of [320,390,760,1000]){
+    await page.setViewportSize({width,height:844});
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded','true');
+    await expect(panel).toHaveClass(/is-open/);
+    await expect(panel).toHaveAttribute('aria-hidden','false');
+    await expect(toggle).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(panel.getByRole('link',{name:'Features',exact:true})).toBeFocused();
+    // Absolute positioning starts at the header's inner border edge.
+    await expect.poll(async()=>Math.round((await panel.boundingBox())!.y)).toBe(75);
+    const box=(await panel.boundingBox())!;
+    expect(box.x).toBe(0);expect(box.width).toBe(width);
+    expect(await panel.evaluate(el=>getComputedStyle(el).backgroundColor)).toBe('rgb(11, 24, 36)');
+    expect(await panel.evaluate(el=>getComputedStyle(el).transitionDuration)).toContain('0.2s');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    if(width===390){
+      expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
+      await page.screenshot({path:'../evidence/public-site/mobile-dropdown.png'});
+    }
+    await page.keyboard.press('Escape');
+    await expect(panel).not.toBeVisible();
+    await expect(toggle).toBeFocused();
+    expect(await panel.evaluate(el=>el.inert)).toBe(true);
+  }
   await page.setViewportSize({width:390,height:844});
-  const toggle=page.getByRole('button',{name:'Open navigation'});
-  const drawer=page.getByRole('dialog',{name:'Explore ForgeLoop'});
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded','true');
-  await expect(drawer).toHaveClass(/is-open/);
-  await expect(page.getByRole('button',{name:'Close navigation'})).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(drawer.getByRole('link',{name:'Sign in with GitHub'})).toBeFocused();
-  expect((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze()).violations).toEqual([]);
-  await page.screenshot({path:'../evidence/public-site/mobile-drawer.png'});
-  await page.keyboard.press('Escape');
-  await expect(drawer).not.toBeVisible();
-  await expect(toggle).toBeFocused();
-  await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await page.mouse.click(5,800);
+  await expect(panel).not.toBeVisible();
   await toggle.click();
-  await page.mouse.click(5,400);
-  await expect(drawer).not.toBeVisible();
+  await panel.getByRole('link',{name:'Sign in with GitHub'}).focus();
+  await page.keyboard.press('Tab');
+  await expect(panel).not.toBeVisible();
   await page.emulateMedia({reducedMotion:'reduce'});
   await toggle.click();
-  await page.getByRole('button',{name:'Close navigation'}).click();
-  await expect(drawer).not.toBeVisible();
+  expect(await panel.evaluate(el=>getComputedStyle(el).transitionDuration)).toBe('0s');
+  await toggle.click();
+  await expect(panel).not.toBeVisible();
   await toggle.click();
   await page.setViewportSize({width:1440,height:1000});
-  await expect(drawer).not.toBeVisible();
-  expect(await page.evaluate(()=>document.documentElement.style.overflow)).toBe('');
+  await expect(panel).not.toBeVisible();
+  await page.goto('/features');
+  await page.setViewportSize({width:390,height:500});
+  await toggle.click();
+  await expect(panel.getByRole('link',{name:'Features',exact:true})).toHaveAttribute('aria-current','page');
+  await panel.getByRole('link',{name:'Contact',exact:true}).click();
+  await expect(page).toHaveURL(/\/contact$/);
 });
 
 test('static assets, sitemap, and canonical redirects work',async({request})=>{
