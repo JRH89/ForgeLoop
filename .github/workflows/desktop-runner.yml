@@ -52,10 +52,23 @@ jobs:
           elseif ($IsMacOS) { $launcher = "$root.app/Contents/MacOS/ForgeLoop Runner" }
           else { $launcher = "$root/bin/ForgeLoop Runner" }
           if (-not (Test-Path -LiteralPath $launcher)) { throw "Packaged launcher missing: $launcher" }
-          # Exercise jpackage's launcher so this verifies its embedded version option too.
-          $actualVersion = & $launcher --version
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged runtime failed' }
-          if ($actualVersion.Trim() -ne $env:PACKAGE_VERSION) { throw "Packaged version mismatch: $actualVersion" }
+          if ($IsWindows) {
+            # Windows jpackage launchers are GUI processes, so their stdout is not capturable.
+            # Validate both launcher metadata and its generated JVM option, then launch it.
+            $configuration = "$root/app/ForgeLoop Runner.cfg"
+            if (-not (Test-Path -LiteralPath $configuration)) { throw 'Packaged launcher configuration missing' }
+            $configText = Get-Content -LiteralPath $configuration -Raw
+            if (-not $configText.Contains("-Dforgeloop.desktop.version=$env:PACKAGE_VERSION")) { throw 'Packaged launcher version option missing' }
+            if ((Get-Item -LiteralPath $launcher).VersionInfo.ProductVersion -ne $env:PACKAGE_VERSION) { throw 'Packaged Windows executable version mismatch' }
+            $process = Start-Process -FilePath $launcher -ArgumentList '--version' -Wait -PassThru -WindowStyle Hidden
+            if ($process.ExitCode -ne 0) { throw 'Packaged Windows launcher failed' }
+          }
+          else {
+            # Exercise jpackage's launcher so this verifies its embedded version option too.
+            $actualVersion = & $launcher --version
+            if ($LASTEXITCODE -ne 0) { throw 'Packaged runtime failed' }
+            if ($actualVersion.Trim() -ne $env:PACKAGE_VERSION) { throw "Packaged version mismatch: $actualVersion" }
+          }
       - name: Build unsigned native development installer
         shell: pwsh
         run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer -PackageVersion $env:PACKAGE_VERSION
