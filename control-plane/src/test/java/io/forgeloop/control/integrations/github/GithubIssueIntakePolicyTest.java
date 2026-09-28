@@ -25,6 +25,18 @@ class GithubIssueIntakePolicyTest {
             """)).isEmpty());
     }
 
+    @Test void requiresAnyAssigneeWhenConfiguredWithoutAnExactLogin() throws Exception {
+        connection.configureAssignmentPolicy(true, "");
+        var unassigned = GithubIssueIntakePolicy.reasons(connection, json.readTree("""
+            {"state":"open","body":"Do the work","labels":[{"name":"forgeloop"}],"assignees":[]}
+            """));
+        assertTrue(unassigned.contains("Assign the issue to a GitHub user before intake."));
+        var assigned = GithubIssueIntakePolicy.reasons(connection, json.readTree("""
+            {"state":"open","body":"Do the work","labels":[{"name":"forgeloop"}],"assignees":[{"login":"worker"}]}
+            """));
+        assertTrue(assigned.isEmpty());
+    }
+
     @Test void rejectsClosedIssuesAndPullRequests() throws Exception {
         var reasons = GithubIssueIntakePolicy.reasons(connection, json.readTree("""
             {"state":"closed","pull_request":{},"body":"Do the work","labels":[{"name":"forgeloop"}]}

@@ -25,6 +25,14 @@ class QueuePolicyTest {
         repository.configureRequiredAssignee("");
         assertTrue(repository.acceptsAssignees(List.of()));
     }
+    @Test void anyAssigneeCanBeRequiredWithoutSelectingAnExactLogin() {
+        var repository = new RepositoryConnection("org", "owner/repo", 1, "main", "forgeloop", "GENERIC", List.of("unit"), 10);
+        repository.configureAssignmentPolicy(true, "");
+        assertFalse(repository.acceptsAssignees(List.of()));
+        assertTrue(repository.acceptsAssignees(List.of("someone")));
+        repository.configureAssignmentPolicy(false, "");
+        assertTrue(repository.acceptsAssignees(List.of()));
+    }
     @Test void confirmedMergeCanArchiveLegacyDeliveryWithoutChangingItsState() {
         var run = new FeatureRun("org", "owner/repo", "issue-1", "title", "spec", 10, "GENERIC", 1);
         // A fixture without required gates models a previously verified delivery.

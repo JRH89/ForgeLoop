@@ -28,17 +28,27 @@ public class RepositoryConnection {
   @Column(nullable = false) private double maxBudgetUsd;
   @Column(nullable = false) private int policyRevision;
   private String requiredAssignee;
+  @Column(nullable = false) private boolean requireAssignee;
   public String getRequiredAssignee() { return requiredAssignee; }
+  public boolean isRequireAssignee() { return requireAssignee || requiredAssignee != null; }
   /** Null disables assignment gating; usernames are compared case-insensitively. */
   public void configureRequiredAssignee(String login) {
     String normalized = login == null ? "" : login.trim();
-    if (!normalized.isEmpty() && !normalized.matches("[A-Za-z0-9][A-Za-z0-9\\-]{0,38}(\\[bot\\])?"))
-      throw new IllegalArgumentException("Enter a GitHub assignee login, without @");
-    requiredAssignee = normalized.isEmpty() ? null : normalized;
-    policyRevision++;
+    configureAssignmentPolicy(!normalized.isEmpty(), normalized);
   }
   public boolean acceptsAssignees(List<String> logins) {
-    return requiredAssignee == null || logins.stream().anyMatch(requiredAssignee::equalsIgnoreCase);
+    if (!isRequireAssignee()) return true;
+    if (requiredAssignee != null) return logins.stream().anyMatch(requiredAssignee::equalsIgnoreCase);
+    return logins != null && !logins.isEmpty();
+  }
+  /** Requires any GitHub assignment, optionally constrained to one exact login. */
+  public void configureAssignmentPolicy(boolean required, String login) {
+    String normalized = login == null ? "" : login.trim();
+    if (!normalized.isEmpty() && !normalized.matches("[A-Za-z0-9][A-Za-z0-9\\-]{0,38}(\\[bot\\])?"))
+      throw new IllegalArgumentException("Enter a GitHub assignee login, without @");
+    requireAssignee = required;
+    requiredAssignee = required && !normalized.isEmpty() ? normalized : null;
+    policyRevision++;
   }
   @OneToMany(mappedBy = "connection", cascade = CascadeType.ALL, orphanRemoval = true)
   private List<RepositoryVerificationPolicy> verificationPolicies = new ArrayList<>();

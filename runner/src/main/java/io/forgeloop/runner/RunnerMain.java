@@ -380,9 +380,11 @@ public final class RunnerMain {
                 String pauseFile=System.getenv("FORGELOOP_RUNNER_PAUSE_FILE");
                 if(pauseFile!=null && Files.exists(Path.of(pauseFile))) return;
                 List<RunnerTask> available;
+                RepositoryScanGrant scan = null;
                 try {
                     client.heartbeat(identity);
                     available = client.availableTasks(identity);
+                    if (available.isEmpty()) scan = client.claimRepositoryScan(identity);
                     if(failedPolls>0)System.out.println("Control-plane connection restored.");
                     failedPolls = 0;
                     status.publish(available.isEmpty()?WorkerStatus.Phase.IDLE:WorkerStatus.Phase.WORKING,0);
@@ -402,6 +404,12 @@ public final class RunnerMain {
                     continue;
                 }
                 if (available.isEmpty()) {
+                    if (scan != null) {
+                        idlePolls = 0;
+                        status.publish(WorkerStatus.Phase.WORKING, 0);
+                        executeRepositoryScan(client, identity, scan, arguments);
+                        continue;
+                    }
                     idlePolls++;
                     Thread.sleep(2000);
                     continue;
@@ -413,6 +421,40 @@ public final class RunnerMain {
                     futures.add(workers.submit(() -> executeDispatchedTask(arguments, stateRoot, task)));
                 }
                 for (Future<?> future : futures) future.get();
+            }
+        }
+    }
+
+    /** Performs one manually requested, read-only scan in an isolated runner worktree. */
+    private static void executeRepositoryScan(RunnerClient client, RunnerIdentity identity, RepositoryScanGrant scan,
+                                              String[] arguments) {
+        Path repositoriesRoot = Path.of(arguments[3]);
+        Path workspaceRoot = Path.of(arguments[4]);
+        String worktreeId = "scan_" + scan.id().replace("-", "");
+        Path repository = null;
+        boolean worktreeCreated = false;
+        try {
+            GithubCheckoutGrant checkout = new GithubCheckoutGrant(scan.repository(), scan.baseBranch(), scan.token());
+            repository = new RepositoryWorkspaceResolver().resolveOrClone(repositoriesRoot, checkout);
+            GitWorktreeManager worktrees = new GitWorktreeManager();
+            Path worktree = worktrees.create(repository, "refs/remotes/origin/" + scan.baseBranch(), worktreeId, workspaceRoot);
+            worktreeCreated = true;
+            String commitSha = worktrees.headSha(worktree);
+            String context = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"), 48 * 1024);
+            ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("REPOSITORY_SCAN");
+            RepositoryScanResult result = new RepositoryScanWorker().execute(policy, new ProviderClientFactory().create(policy),
+                    context, commitSha, scan.id());
+            client.completeRepositoryScan(identity, scan, result);
+            System.out.println("Repository scan completed: findings=" + result.findings().size()
+                    + ", cost=" + (result.usage().costKnown() ? result.usage().estimatedCostMicros() + " micros" : "N/A"));
+        } catch (Exception failure) {
+            try { client.failRepositoryScan(identity, scan); }
+            catch (Exception reportFailure) { System.err.println("Could not report repository scan failure: " + reportFailure.getClass().getSimpleName()); }
+            System.err.println("Repository scan failed: " + failure.getClass().getSimpleName());
+        } finally {
+            if (worktreeCreated && repository != null) {
+                try { new GitWorktreeManager().remove(repository, worktreeId, workspaceRoot); }
+                catch (Exception cleanupFailure) { System.err.println("Repository scan worktree cleanup failed: " + cleanupFailure.getClass().getSimpleName()); }
             }
         }
     }

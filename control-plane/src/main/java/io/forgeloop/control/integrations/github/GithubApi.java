@@ -10,6 +10,8 @@ public interface GithubApi {
     String getBranchHead(long installationId, String repository, String branch);
     long createCompletedCheck(long installationId, String repository, String headSha, String name, String summary);
     long createPullRequest(long installationId, String repository, String head, String base, String title, String body, boolean draft);
+    /** Creates one issue without labels or assignees; issue intake remains an explicit policy decision. */
+    GithubIssueReceipt createIssue(long installationId, String repository, String title, String body);
     boolean checksPass(long installationId, String repository, String headSha);
     String getPullRequestHead(long installationId, String repository, long pullRequestNumber);
     String getPullRequestState(long installationId, String repository, long pullRequestNumber);

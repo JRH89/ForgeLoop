@@ -5,7 +5,7 @@ import OnboardingPage from './OnboardingPage';
 import { configurationWarnings, newIssueUrl, recentRunners, runExplanation } from './readiness';
 import type { FeatureRun, PlatformConfiguration, RepositoryConnection, Runner } from '../api';
 
-const repository: RepositoryConnection = { id: 'repo', repository: 'acme/project', installationId: 1, enabled: true, defaultBranch: 'main', issueLabel: 'forgeloop', requiredAssignee: 'owner', harnessProfile: 'JVM_REACT', requiredGates: ['compile'], maxBudgetUsd: 5, policyRevision: 1 };
+const repository: RepositoryConnection = { id: 'repo', repository: 'acme/project', installationId: 1, enabled: true, defaultBranch: 'main', issueLabel: 'forgeloop', requiredAssignee: 'owner', requireAssignee:true, harnessProfile: 'JVM_REACT', requiredGates: ['compile'], maxBudgetUsd: 5, policyRevision: 1 };
 const config: PlatformConfiguration = { policy: { organizationId: 'org', maxRunBudgetUsd: 10, maxParallelTasks: 2, allowedProviders: ['ANTHROPIC'], requireHumanApproval: true, autoMergeEnabled: false, revision: 1 }, harnesses: [{ id: 'h', organizationId: 'org', name: 'JVM_REACT', description: '', allowedRoles: ['BACKEND'], defaultAttemptBudget: 2, enabled: true, revision: 1 }], mcp: [] };
 const runner: Runner = { id: 'r', name: 'Desktop', version: '1', enabled: true, lastHeartbeatAt: new Date().toISOString(), capabilities: ['BACKEND'] };
 const operator = { subject: 'me', organizationId: 'org', role: 'ADMIN' as const };

@@ -21,9 +21,29 @@ class RunnerExecutionControllerTest {
     private final RunnerDispatchService dispatch = mock(RunnerDispatchService.class);
     private final io.forgeloop.control.integrations.github.GithubRunnerPushService githubPush = mock(io.forgeloop.control.integrations.github.GithubRunnerPushService.class);
     private final io.forgeloop.control.application.ReviewEvidenceService reviews = mock(io.forgeloop.control.application.ReviewEvidenceService.class);
+    private final io.forgeloop.control.application.RepositoryScanService scans = mock(io.forgeloop.control.application.RepositoryScanService.class);
     private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch,
             mock(io.forgeloop.control.application.TaskPlanningService.class), githubPush,
-            mock(io.forgeloop.control.integrations.github.GithubRunnerCheckoutService.class), reviews);
+            mock(io.forgeloop.control.integrations.github.GithubRunnerCheckoutService.class), reviews,
+            scans);
+
+    @Test void authenticatesRunnerBeforeClaimingRepositoryScan() {
+        io.forgeloop.control.domain.Runner runner = mock(io.forgeloop.control.domain.Runner.class);
+        org.mockito.Mockito.when(runners.authenticated("runner-1", "runner-credential")).thenReturn(runner);
+        controller.claimRepositoryScan("runner-1", "runner-credential");
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(scans).claim(runner);
+    }
+
+    @Test void authenticatesRunnerBeforeCompletingRepositoryScan() {
+        io.forgeloop.control.domain.Runner runner = mock(io.forgeloop.control.domain.Runner.class);
+        org.mockito.Mockito.when(runners.authenticated("runner-1", "runner-credential")).thenReturn(runner);
+        var result = new io.forgeloop.control.application.RepositoryScanResultInput(false, null, null, null,
+                0, 0, 0, false, "safe", List.of());
+        controller.completeRepositoryScan("scan-1", "runner-1", "runner-credential", result);
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(scans).complete("scan-1", runner, result);
+    }
 
     @Test
     void authenticatesRunnerBeforeClaimingLease() {

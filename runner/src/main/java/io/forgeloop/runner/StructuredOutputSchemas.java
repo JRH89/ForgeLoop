@@ -31,13 +31,24 @@ public final class StructuredOutputSchemas {
              "properties":{"approved":{"type":"boolean"},"summary":{"type":"string"},"criteria":{"type":"array","items":{"type":"object","additionalProperties":false,
                "properties":{"statement":{"type":"string"},"status":{"type":"string","enum":["PASS","FAIL"]},"evidence":{"type":"string"}},
                "required":["statement","status","evidence"]}}},
-             "required":["approved","summary","criteria"]}
+            "required":["approved","summary","criteria"]}
+            """);
+    private static final JsonNode REPOSITORY_SCAN = parse("""
+            {"type":"object","additionalProperties":false,
+             "properties":{"findings":{"type":"array","maxItems":12,"items":{"type":"object","additionalProperties":false,
+               "properties":{"severity":{"type":"string","enum":["CRITICAL","HIGH","MEDIUM","LOW"]},
+                 "title":{"type":"string"},"description":{"type":"string"},"impact":{"type":"string"},
+                 "evidence":{"type":"string"},"affectedFiles":{"type":"array","maxItems":10,"items":{"type":"string"}},
+                 "acceptanceCriteria":{"type":"array","maxItems":6,"items":{"type":"string"}}},
+               "required":["severity","title","description","impact","evidence","affectedFiles","acceptanceCriteria"]}}},
+             "required":["findings"]}
             """);
 
     private StructuredOutputSchemas() { }
     public static JsonNode plan() { return PLAN.deepCopy(); }
     public static JsonNode patch() { return PATCH.deepCopy(); }
     public static JsonNode review() { return REVIEW.deepCopy(); }
+    public static JsonNode repositoryScan() { return REPOSITORY_SCAN.deepCopy(); }
     private static JsonNode parse(String schema) {
         try { return JSON.readTree(schema); }
         catch (Exception invalid) { throw new ExceptionInInitializerError(invalid); }

@@ -50,6 +50,7 @@ import RunnerSetup from "./RunnerSetup";
 import RunnerPairingPage from "./RunnerPairingPage";
 import RunnerDownloads from "./RunnerDownloads";
 import TeamPage from "./TeamPage";
+import RepositoryScans from "./repositories/RepositoryScans";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
 import "./styles.css";
@@ -106,6 +107,7 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
                   {item.requiredGates.join(", ")}
                 </small>
                 <IntakeSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
+                <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
               </div>
               <span className="status complete">
                 Policy v{item.policyRevision}

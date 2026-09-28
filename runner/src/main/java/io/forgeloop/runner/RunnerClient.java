@@ -45,6 +45,44 @@ public final class RunnerClient {
             throw new ControlPlaneFailure("Invalid heartbeat acknowledgement",true);
         return response;
     }
+    /** Claims only scans explicitly requested by an administrator in this runner's organization. */
+    public RepositoryScanGrant claimRepositoryScan(RunnerIdentity identity) throws Exception {
+        String response = post("mutation($runnerId:ID!,$credential:String!){claimRepositoryScan(runnerId:$runnerId,credential:$credential){id repository baseBranch token}}",
+                JSON.writeValueAsString(java.util.Map.of("runnerId", identity.runnerId(), "credential", identity.credential())));
+        JsonNode grant = JSON.readTree(response).path("data").path("claimRepositoryScan");
+        if (grant.isMissingNode()) throw new ControlPlaneFailure("Repository scan claim response was malformed", true);
+        if (grant.isNull()) return null;
+        if (!grant.path("id").isTextual() || !grant.path("repository").isTextual()
+                || !grant.path("baseBranch").isTextual() || !grant.path("token").isTextual())
+            throw new ControlPlaneFailure("Invalid repository scan grant", true);
+        return new RepositoryScanGrant(grant.path("id").asText(), grant.path("repository").asText(),
+                grant.path("baseBranch").asText(), grant.path("token").asText());
+    }
+    /** Reports bounded findings and usage metadata, never source or the provider prompt. */
+    public void completeRepositoryScan(RunnerIdentity identity, RepositoryScanGrant grant, RepositoryScanResult result) throws Exception {
+        ProviderUsageEvidence usage = result.usage();
+        java.util.Map<String,Object> input = new java.util.LinkedHashMap<>();
+        input.put("passed", true); input.put("commitSha", result.commitSha()); input.put("provider", usage.provider());
+        input.put("model", usage.model()); input.put("inputTokens", usage.inputTokens()); input.put("outputTokens", usage.outputTokens());
+        input.put("estimatedCostMicros", usage.estimatedCostMicros()); input.put("costKnown", usage.costKnown());
+        input.put("failureSummary", null); input.put("findings", result.findings());
+        completeRepositoryScan(identity, grant.id(), input);
+    }
+    /** Completes a failed scan with an intentionally generic public summary. */
+    public void failRepositoryScan(RunnerIdentity identity, RepositoryScanGrant grant) throws Exception {
+        java.util.Map<String,Object> input = new java.util.LinkedHashMap<>();
+        input.put("passed", false); input.put("commitSha", null); input.put("provider", null); input.put("model", null);
+        input.put("inputTokens", 0); input.put("outputTokens", 0); input.put("estimatedCostMicros", 0);
+        input.put("costKnown", false); input.put("failureSummary", "The runner could not complete the scan."); input.put("findings", List.of());
+        completeRepositoryScan(identity, grant.id(), input);
+    }
+    private void completeRepositoryScan(RunnerIdentity identity, String scanId, java.util.Map<String,Object> input) throws Exception {
+        java.util.Map<String,Object> variables = new java.util.LinkedHashMap<>();
+        variables.put("scanId", scanId); variables.put("runnerId", identity.runnerId());
+        variables.put("credential", identity.credential()); variables.put("input", input);
+        post("mutation($scanId:ID!,$runnerId:ID!,$credential:String!,$input:RepositoryScanResultInput!){completeRepositoryScan(scanId:$scanId,runnerId:$runnerId,credential:$credential,input:$input){id status}}",
+                JSON.writeValueAsString(variables));
+    }
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {

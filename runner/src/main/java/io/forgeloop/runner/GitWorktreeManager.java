@@ -46,6 +46,12 @@ public final class GitWorktreeManager {
         return output(worktree, List.of("git", "rev-parse", "HEAD"));
     }
 
+    /** Returns the immutable commit identity for read-only snapshot reporting. */
+    public String headSha(Path worktree) throws IOException, InterruptedException {
+        if (!Files.exists(worktree.resolve(".git"))) throw new IllegalArgumentException("Repository must be a local Git worktree");
+        return output(worktree, List.of("git", "rev-parse", "HEAD"));
+    }
+
     /** Integrates only server-declared commit identities, without invoking a shell. */
     public String integrate(Path worktree, List<String> commitShas) throws IOException, InterruptedException {
         if (!Files.exists(worktree.resolve(".git")) || commitShas == null || commitShas.isEmpty()

@@ -33,10 +33,10 @@ public class RepositoryConnectionService {
   }
   @Transactional(readOnly = true)
   public List<RepositoryConnection> list() { return connections.findByOrganizationId(operators.organizationId()); }
-  @Transactional public RepositoryConnection configureIntake(String repository, String requiredAssignee) {
+  @Transactional public RepositoryConnection configureIntake(String repository, boolean requireAssignee, String requiredAssignee) {
     operators.requireAdministrator();
     RepositoryConnection connection = requireEnabled(repository);
-    connection.configureRequiredAssignee(requiredAssignee);
+    connection.configureAssignmentPolicy(requireAssignee, requiredAssignee);
     audit.record("REPOSITORY_INTAKE_UPDATED", "REPOSITORY_CONNECTION", connection.getId(), "revision=" + connection.getPolicyRevision());
     return connection;
   }
