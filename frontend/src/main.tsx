@@ -918,9 +918,9 @@ function App() {
               <span className="nav-icon" aria-hidden="true"><GitBranch size={17} strokeWidth={1.9} /></span> Repositories
             </button>
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
-            {operator?.role === 'ADMIN' && <button className={page === 'Team' ? 'active' : ''} onClick={() => setPage('Team')}><span className="nav-icon" aria-hidden="true"><Users size={17} strokeWidth={1.9}/></span> Team</button>}
             <GuideNavigation active={page === 'Guide'} onSelect={id => { setGuideTarget({ id }); setPage('Guide'); }}/>
             <button className={page === "GettingStarted" ? "active" : ""} onClick={() => setPage("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
+            {operator?.role === 'ADMIN' && <button className={page === 'Team' ? 'active' : ''} onClick={() => setPage('Team')}><span className="nav-icon" aria-hidden="true"><Users size={17} strokeWidth={1.9}/></span> Team</button>}
             <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support</a>
             <a className="logout mobile-signout" href="/logout">Sign out</a>
           </nav>
