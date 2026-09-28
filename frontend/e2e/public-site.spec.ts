@@ -206,17 +206,27 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
     const layout=await page.locator('.landing-hero').evaluate(el=>{
       const css=getComputedStyle(el),hero=el.getBoundingClientRect();
       const eyebrow=el.querySelector('.eyebrow')!.getBoundingClientRect();
+      const heading=el.querySelector('h1')!,headingBox=heading.getBoundingClientRect();
+      const description=el.querySelector(':scope > p:not(.eyebrow)')!,descriptionBox=description.getBoundingClientRect();
       const actions=el.querySelector('.landing-actions')!.getBoundingClientRect();
       const top=parseFloat(css.paddingTop),bottom=parseFloat(css.paddingBottom);
       return {
         padding:[css.paddingTop,css.paddingBottom],display:css.display,direction:css.flexDirection,
         alignment:css.justifyContent,minHeight:parseFloat(css.minHeight),viewportHeight:innerHeight,
         headerHeight:document.querySelector('.public-nav')!.getBoundingClientRect().height,
+        headlineGap:descriptionBox.top-headingBox.bottom,
+        headingMarginBottom:getComputedStyle(heading).marginBottom,
+        descriptionMarginTop:getComputedStyle(description).marginTop,
+        actionMarginTop:getComputedStyle(el.querySelector('.landing-actions')!).marginTop,
         contentCenter:(eyebrow.top+actions.bottom)/2,
         contentAreaCenter:(hero.top+top+hero.bottom-bottom)/2,
       };
     });
     expect(layout.padding).toEqual(width<=1000?['24px','40px']:['110px','85px']);
+    expect(layout.actionMarginTop).toBe(width<=760?'16px':'32px');
+    expect(layout.headingMarginBottom).toBe(width<=760?'13px':'26px');
+    expect(layout.descriptionMarginTop).toBe(width<=760?'8px':'16px');
+    if(width<=760)expect(layout.headlineGap).toBe(21);
     if(width<=760){
       const footer=await page.locator('.public-footer').boundingBox();
       const note=await page.locator('.footer-note').boundingBox();
