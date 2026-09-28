@@ -14,11 +14,23 @@ it('gives support tickets a decorative icon matching the sidebar navigation', as
   expect(support.querySelector('svg')).toHaveAttribute('width', '17');
 });
 
+it('shows a workspace selector for a GitHub account in two organizations', async () => {
+  vi.stubGlobal('fetch', controlPlane({ myOrganizationMemberships: [
+    { id: 'm1', organizationId: 'local-development', organizationName: 'My workspace', subject: 'operator', role: 'ADMIN', accepted: true },
+    { id: 'm2', organizationId: 'other', organizationName: 'Shared workspace', subject: 'operator', role: 'VIEWER', accepted: true },
+  ] }));
+  render(<App />);
+  const selectors = await screen.findAllByRole('combobox', { name: 'Workspace' });
+  expect(selectors).toHaveLength(2); // Desktop header and mobile navigation share the same options.
+  expect(selectors[0]).toHaveValue('local-development');
+  expect(screen.getAllByRole('option', { name: 'Shared workspace · viewer' })).toHaveLength(2);
+});
+
 function controlPlane(data: Record<string, unknown>) {
   return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
     const query = (JSON.parse(String(init.body)) as { query: string }).query;
     if (query.includes('currentOperator')) return { ok: true, json: async () => ({ data: { currentOperator: { subject: 'operator', organizationId: 'local-development', role: 'ADMIN' } } }) };
-    if (query.includes('myOrganizationMemberships')) return { ok: true, json: async () => ({ data: { myOrganizationMemberships: [] } }) };
+    if (query.includes('myOrganizationMemberships')) return { ok: true, json: async () => ({ data: { myOrganizationMemberships: data.myOrganizationMemberships ?? [] } }) };
     if (query.includes('repositoryConnections')) return { ok: true, json: async () => ({ data: { repositoryConnections: data.repositoryConnections ?? [] } }) };
     if (query.includes('runAnalytics')) return { ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) };
     if (query.includes('organizationPolicy')) return { ok: true, json: async () => ({ data: { organizationPolicy: { organizationId: 'local-development', maxRunBudgetUsd: 100, maxParallelTasks: 4, allowedProviders: ['anthropic'], requireHumanApproval: true, autoMergeEnabled: false, revision: 2 }, harnessDefinitions: [{ id: 'h1', organizationId: 'local-development', name: 'FULL_STACK', description: 'Plan, implement, verify, and review', allowedRoles: ['PLANNER', 'BACKEND', 'FRONTEND', 'REVIEW'], defaultAttemptBudget: 2, enabled: true, revision: 1 }], localMcpConfigurations: [] } }) };
