@@ -11,8 +11,8 @@ production-ready.
 | Slice | Outcome | GitHub issue | Pull request | State |
 | --- | --- | --- | --- | --- |
 | 1 | Reliable isolated PostgreSQL restore drill | [#47](https://github.com/JRH89/ForgeLoop/issues/47) | [#53](https://github.com/JRH89/ForgeLoop/pull/53) | Merged |
-| 2 | GitHub self-signup and administrator-managed invitations | [#48](https://github.com/JRH89/ForgeLoop/issues/48) | [#54](https://github.com/JRH89/ForgeLoop/pull/54) | In review |
-| 3 | Trustworthy, guided runner installation | [#49](https://github.com/JRH89/ForgeLoop/issues/49) | Pending | Planned |
+| 2 | GitHub self-signup and administrator-managed invitations | [#48](https://github.com/JRH89/ForgeLoop/issues/48) | [#54](https://github.com/JRH89/ForgeLoop/pull/54) | Merged |
+| 3 | Trustworthy, guided runner installation | [#49](https://github.com/JRH89/ForgeLoop/issues/49) | [#55](https://github.com/JRH89/ForgeLoop/pull/55) | In review |
 | 4 | Safe desktop runner update experience | [#50](https://github.com/JRH89/ForgeLoop/issues/50) | Pending | Planned |
 | 5 | Clear GitHub issue handoff and intake diagnosis | [#51](https://github.com/JRH89/ForgeLoop/issues/51) | Pending | Planned |
 | 6 | Recoverable guest support tracking | [#52](https://github.com/JRH89/ForgeLoop/issues/52) | Pending | Planned |
