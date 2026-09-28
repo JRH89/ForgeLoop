@@ -203,22 +203,31 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
   }
   for(const width of [320,390,430,760,768,1000,1440]){
     await page.setViewportSize({width,height:1000});
-    const padding=await page.locator('.landing-hero').evaluate(el=>{
-      const css=getComputedStyle(el);return [css.paddingTop,css.paddingBottom];
+    const layout=await page.locator('.landing-hero').evaluate(el=>{
+      const css=getComputedStyle(el),hero=el.getBoundingClientRect();
+      const eyebrow=el.querySelector('.eyebrow')!.getBoundingClientRect();
+      const actions=el.querySelector('.landing-actions')!.getBoundingClientRect();
+      const top=parseFloat(css.paddingTop),bottom=parseFloat(css.paddingBottom);
+      return {
+        padding:[css.paddingTop,css.paddingBottom],display:css.display,direction:css.flexDirection,
+        alignment:css.justifyContent,minHeight:parseFloat(css.minHeight),viewportHeight:innerHeight,
+        headerHeight:document.querySelector('.public-nav')!.getBoundingClientRect().height,
+        contentCenter:(eyebrow.top+actions.bottom)/2,
+        contentAreaCenter:(hero.top+top+hero.bottom-bottom)/2,
+      };
     });
-    expect(padding).toEqual(width<=1000?['24px','65px']:['110px','85px']);
+    expect(layout.padding).toEqual(width<=1000?['24px','40px']:['110px','85px']);
     if(width<=760){
       const footer=await page.locator('.public-footer').boundingBox();
       const note=await page.locator('.footer-note').boundingBox();
       expect(Math.round(footer!.y+footer!.height-note!.y-note!.height)).toBe(20);
     }
     if(width<=1000){
-      // Measure the visible gap, not just padding, to catch margin/layout regressions.
-      const header=await page.locator('.public-nav').boundingBox();
-      const eyebrow=await page.locator('.landing-hero .eyebrow').boundingBox();
-      const gap=eyebrow!.y-(header!.y+header!.height);
-      expect(gap).toBeGreaterThanOrEqual(24);
-      expect(gap).toBeLessThanOrEqual(40);
+      expect(layout.display).toBe('flex');
+      expect(layout.direction).toBe('column');
+      expect(layout.alignment).toBe('center');
+      expect(layout.minHeight).toBeGreaterThanOrEqual(layout.viewportHeight-layout.headerHeight-1);
+      expect(Math.abs(layout.contentCenter-layout.contentAreaCenter)).toBeLessThanOrEqual(20);
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     }
   }
