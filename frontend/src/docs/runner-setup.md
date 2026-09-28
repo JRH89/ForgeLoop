@@ -109,10 +109,15 @@ the download page discovers explicitly published GitHub Releases automatically
 and displays their version, platform, release notes and optional SHA-256 checks.
 
 The new desktop app includes Java and guides you through **Connect → Provider →
-Run**. Connect opens GitHub sign-in and an administrator approval page; compare
-the fingerprint in both windows. No enrollment token is copied. Choose a model,
-save your API key in your operating system's secure storage, check Git/Docker,
-and explicitly start work. The Provider step looks up public base token rates
+Run**. In Connect, **Check requirements** verifies Git and that Docker can reach
+a Linux-container engine. If a tool is missing or stopped, the app explains the
+next step and opens the official Git and Docker installation guide for Windows,
+macOS, or Linux. Connect checks again before creating browser approval; Start
+checks once more immediately before work can be claimed. No enrollment token is
+copied. Connect opens GitHub sign-in and an administrator approval page; compare
+the fingerprint in both windows. Choose a model, save your API key in your
+operating system's secure storage, and explicitly start work. The Provider step
+looks up public base token rates
 for the selected provider and model without using your API key. It shows the
 lookup date and published source; use manual prices for account-specific terms.
 If no verified rate is available or the catalog cannot be reached, save the
@@ -134,6 +139,10 @@ Use **Pause after current work** before closing or updating. Optional sign-in
 startup can spend API credits and requires Docker and an unlocked keyring.
 Windows uses DPAPI, macOS uses Keychain, and Linux requires libsecret tools and
 an unlocked desktop keyring. Headless Linux servers should use the CLI below.
+Current desktop installers are unsigned previews; Windows or macOS may show
+publisher warnings, and macOS packages are not notarized. Use them only where
+your device policy permits. SHA-256 verifies download integrity but does not
+establish publisher identity.
 
 #### Connection recovery (desktop preview 1.0.2)
 
