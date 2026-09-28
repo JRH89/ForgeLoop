@@ -20,6 +20,7 @@ class DesktopWindowTest {
             try{
                 app=new DesktopRunner(directory,false);JFrame frame=app.window();assertTrue(frame.isVisible());
                 assertEquals("ForgeLoop Runner",frame.getTitle());assertFalse(find(frame,"Start runner").isEnabled());assertTrue(find(frame,"Connect in browser").isEnabled());
+                assertTrue(find(frame,"Check requirements").isShowing());assertTrue(hasText(frame,"Git"));assertTrue(hasText(frame,"Docker Engine"));
                 BufferedImage screenshot=new BufferedImage(frame.getWidth(),frame.getHeight(),BufferedImage.TYPE_INT_RGB);Graphics2D graphics=screenshot.createGraphics();frame.paintAll(graphics);graphics.dispose();
                 Path output=Path.of("target","desktop-setup.png");Files.createDirectories(output.getParent());ImageIO.write(screenshot,"png",output.toFile());
                 JTabbedPane tabs=findTabs(frame);
