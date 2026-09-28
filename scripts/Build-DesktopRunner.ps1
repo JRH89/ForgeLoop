@@ -26,7 +26,7 @@ $runtime=Join-Path $output 'runtime'
 if ($LASTEXITCODE -ne 0) { throw 'Runtime build failed' }
 # Apple's CFBundleVersion requires a positive first component. Installer revision
 # is independent of the runner protocol version and is not a production-readiness claim.
-$arguments=@('--type',$PackageType,'--name','ForgeLoop Runner','--app-version',$PackageVersion,'--vendor','Hooker Hill Studios','--description','Self-hosted ForgeLoop runner (development preview)','--input',$inputDirectory,'--main-jar','runner.jar','--main-class','io.forgeloop.runner.DesktopRunner','--runtime-image',$runtime,'--dest',(Join-Path $output 'packages'))
+$arguments=@('--type',$PackageType,'--name','ForgeLoop Runner','--app-version',$PackageVersion,'--java-options',"-Dforgeloop.desktop.version=$PackageVersion",'--vendor','Hooker Hill Studios','--description','Self-hosted ForgeLoop runner (development preview)','--input',$inputDirectory,'--main-jar','runner.jar','--main-class','io.forgeloop.runner.DesktopRunner','--runtime-image',$runtime,'--dest',(Join-Path $output 'packages'))
 $arguments+=@('--icon',$icon)
 if ($PackageType -eq 'msi') { $arguments+=@('--win-per-user-install','--win-menu','--win-shortcut','--win-dir-chooser') }
 if ($PackageType -eq 'dmg') { $arguments+=@('--mac-package-identifier','io.forgeloop.runner') }

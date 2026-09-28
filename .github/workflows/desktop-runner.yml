@@ -48,11 +48,14 @@ jobs:
         shell: pwsh
         run: |
           $root = 'artifacts/desktop-runner/packages/ForgeLoop Runner'
-          if ($IsWindows) { $java = "$root/runtime/bin/java.exe"; $jar = "$root/app/runner.jar" }
-          elseif ($IsMacOS) { $java = "$root.app/Contents/runtime/Contents/Home/bin/java"; $jar = "$root.app/Contents/app/runner.jar" }
-          else { $java = "$root/lib/runtime/bin/java"; $jar = "$root/lib/app/runner.jar" }
-          & $java -cp $jar io.forgeloop.runner.DesktopRunner --version
+          if ($IsWindows) { $launcher = "$root/ForgeLoop Runner.exe" }
+          elseif ($IsMacOS) { $launcher = "$root.app/Contents/MacOS/ForgeLoop Runner" }
+          else { $launcher = "$root/bin/ForgeLoop Runner" }
+          if (-not (Test-Path -LiteralPath $launcher)) { throw "Packaged launcher missing: $launcher" }
+          # Exercise jpackage's launcher so this verifies its embedded version option too.
+          $actualVersion = & $launcher --version
           if ($LASTEXITCODE -ne 0) { throw 'Packaged runtime failed' }
+          if ($actualVersion.Trim() -ne $env:PACKAGE_VERSION) { throw "Packaged version mismatch: $actualVersion" }
       - name: Build unsigned native development installer
         shell: pwsh
         run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer -PackageVersion $env:PACKAGE_VERSION
