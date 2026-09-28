@@ -7,7 +7,6 @@ import io.forgeloop.control.domain.RepositoryScanFinding;
 import io.forgeloop.control.domain.RepositoryScanRepository;
 import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.integrations.github.GithubApi;
-import io.forgeloop.control.integrations.github.GithubIssueReceipt;
 import io.forgeloop.control.security.OperatorContext;
 import java.util.List;
 import java.util.Set;
@@ -94,23 +93,6 @@ public class RepositoryScanService {
         return scan;
     }
 
-    /** Creates an issue only after an administrator selects a saved finding; no intake label or assignee is applied. */
-    @Transactional
-    public RepositoryScanFinding createIssue(String scanId, String findingId) {
-        operators.requireAdministrator();
-        RepositoryScan scan = scans.lockByIdAndOrganizationId(scanId, operators.organizationId())
-                .orElseThrow(() -> new IllegalArgumentException("Repository scan not found"));
-        if (!"COMPLETE".equals(scan.getStatus())) throw new IllegalStateException("Only completed scans can publish issues");
-        RepositoryScanFinding finding = scan.getFindings().stream().filter(item -> item.getId().equals(findingId)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Scan finding not found"));
-        if (finding.getIssueUrl() != null) throw new IllegalStateException("A GitHub issue already exists for this finding");
-        String body = issueBody(scan, finding);
-        GithubIssueReceipt receipt = github.createIssue(requireEnabled(scan.getRepository()).getInstallationId(), scan.getRepository(), finding.getTitle(), body);
-        finding.recordGithubIssue(receipt.number(), receipt.url());
-        audit.record("REPOSITORY_SCAN_ISSUE_CREATED", "REPOSITORY_SCAN", scan.getId(), findingId + "|" + receipt.number());
-        return finding;
-    }
-
     private RepositoryConnection requireEnabled(String repository) {
         RepositoryConnection connection = connections.findByRepository(repository)
                 .orElseThrow(() -> new IllegalArgumentException("Repository is not connected"));
@@ -142,14 +124,5 @@ public class RepositoryScanService {
     private static String bounded(String value, int maxLength, String label) {
         if (value == null || value.isBlank() || value.length() > maxLength) throw new IllegalArgumentException("Finding " + label + " is invalid");
         return value.trim();
-    }
-    private static String issueBody(RepositoryScan scan, RepositoryScanFinding finding) {
-        return "## Suggested by ForgeLoop repository scan\n\n"
-                + "**Severity:** " + finding.getSeverity() + "  \n**Repository snapshot:** `" + scan.getCommitSha() + "`\n\n"
-                + "### Description\n" + finding.getDescription() + "\n\n### Impact\n" + finding.getImpact()
-                + "\n\n### Evidence\n" + finding.getEvidence() + "\n\n### Affected files\n"
-                + finding.getAffectedFiles().stream().map(path -> "- `" + path + "`").reduce((a, b) -> a + "\n" + b).orElse("")
-                + "\n\n### Acceptance criteria\n" + finding.getAcceptanceCriteria().stream().map(item -> "- [ ] " + item).reduce((a, b) -> a + "\n" + b).orElse("")
-                + "\n\n---\nCreated only after an administrator reviewed this suggestion. This issue was not labeled or assigned automatically.";
     }
 }

@@ -105,12 +105,15 @@ files even though common secret patterns are redacted.
 
 Scans are manual only; there is no scheduled scan setting. They do not modify
 the checkout, create a delivery run, or publish a GitHub issue automatically.
-Review each proposed description, evidence, affected path, and acceptance
-criterion. **Create GitHub issue** publishes only the selected finding and does
-not apply the intake label or an assignee. To admit it to paid work later, add
-the repository's intake label and satisfy its assignment rule deliberately.
-Only the most recent ten scans per repository are shown. Cost is estimated from
-the runner's configured model price; unknown pricing is shown as N/A.
+Review each finding's evidence, affected paths, and acceptance criteria. To
+prepare a fuller issue, choose **Generate issue draft**. This is a separate,
+additional provider call, and the runner reports its own estimated cost (or
+N/A when pricing is unavailable). The generated title, description, and checks
+remain editable. Only **Approve & create GitHub issue** publishes the reviewed
+draft; **Reject draft** records the decision without creating an issue. Neither
+action applies the intake label or assigns anyone. To admit an approved issue
+to paid work later, add the repository's intake label and satisfy its assignment
+rule deliberately. Only the most recent ten scans per repository are shown.
 
 **What is waiting?** explains persisted approval, failure, budget, and heartbeat
 signals for unarchived runs in the selected repository. Open Runs for detailed
@@ -390,11 +393,13 @@ The guided installer looks up public base rates automatically and writes
 `inputUsdPerMillion` and `outputUsdPerMillion` alongside
 provider/model/maxAttempts only when rates are known or manually overridden.
 For source installations, add both nonnegative numeric fields to each role (or
-a `default` entry) if you want estimates. Example shape using illustrative
-rates, not current vendor prices:
+a `default` entry) if you want estimates. You can assign issue drafting its own
+runner-local provider/model by adding an `ISSUE_SPECIFICATION` entry; otherwise
+it uses `default`. Example shape using illustrative rates, not current vendor
+prices:
 
 ```json
-{"default":{"provider":"anthropic","model":"YOUR_MODEL_ID","maxAttempts":2,"inputUsdPerMillion":3,"outputUsdPerMillion":15}}
+{"default":{"provider":"anthropic","model":"YOUR_MODEL_ID","maxAttempts":2,"inputUsdPerMillion":3,"outputUsdPerMillion":15},"ISSUE_SPECIFICATION":{"provider":"anthropic","model":"YOUR_MODEL_ID","maxAttempts":2,"inputUsdPerMillion":3,"outputUsdPerMillion":15}}
 ```
 
 Override with rates from your actual provider account when they differ. Policy rates override legacy pricing

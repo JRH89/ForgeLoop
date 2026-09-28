@@ -20,6 +20,8 @@ class WorkerRolePolicyTest {
         assertFalse(WorkerRolePolicy.REPOSITORY_SCAN.repositoryWrite());
         assertTrue(WorkerRolePolicy.REPOSITORY_SCAN.tools().contains("repository-read"));
         assertFalse(WorkerRolePolicy.REPOSITORY_SCAN.tools().contains("scoped-file-write"));
+        assertFalse(WorkerRolePolicy.ISSUE_SPECIFICATION.repositoryWrite());
+        assertTrue(WorkerRolePolicy.ISSUE_SPECIFICATION.tools().contains("issue-proposal"));
     }
 
     @Test

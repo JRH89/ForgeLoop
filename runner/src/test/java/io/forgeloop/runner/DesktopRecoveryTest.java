@@ -53,7 +53,7 @@ class DesktopRecoveryTest {
         server.createContext("/graphql",exchange->{
             String request=new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8);
             // Only idle polling is served; no task grants or provider endpoints exist in this fixture.
-            String body=code!=200?"secret-response-body":request.contains("availableRunnerTasks")?"{\"data\":{\"availableRunnerTasks\":[]}}":request.contains("claimRepositoryScan")?"{\"data\":{\"claimRepositoryScan\":null}}":"{\"data\":{\"runnerHeartbeat\":{\"id\":\"test\"}}}";
+            String body=code!=200?"secret-response-body":request.contains("availableRunnerTasks")?"{\"data\":{\"availableRunnerTasks\":[]}}":request.contains("claimRepositoryScan")?"{\"data\":{\"claimRepositoryScan\":null}}":request.contains("claimRepositoryIssueProposal")?"{\"data\":{\"claimRepositoryIssueProposal\":null}}":"{\"data\":{\"runnerHeartbeat\":{\"id\":\"test\"}}}";
             byte[] bytes=body.getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(code,bytes.length);
             try(var out=exchange.getResponseBody()){out.write(bytes);}
         });server.start();return server;

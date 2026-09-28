@@ -13,6 +13,9 @@ import io.forgeloop.control.application.ReviewEvidenceSubmission;
 import io.forgeloop.control.application.RepositoryScanService;
 import io.forgeloop.control.application.RepositoryScanGrant;
 import io.forgeloop.control.application.RepositoryScanResultInput;
+import io.forgeloop.control.application.RepositoryIssueProposalService;
+import io.forgeloop.control.application.RepositoryIssueProposalGrant;
+import io.forgeloop.control.application.RepositoryIssueProposalResultInput;
 import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.ProviderAttempt;
@@ -40,9 +43,10 @@ public class RunnerExecutionController {
     private final GithubRunnerCheckoutService githubCheckout;
     private final ReviewEvidenceService reviews;
     private final RepositoryScanService scans;
+    private final RepositoryIssueProposalService issueProposals;
 
-    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews, RepositoryScanService scans) {
-        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews; this.scans=scans;
+    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews, RepositoryScanService scans, RepositoryIssueProposalService issueProposals) {
+        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews; this.scans=scans; this.issueProposals=issueProposals;
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
@@ -54,6 +58,13 @@ public class RunnerExecutionController {
     @MutationMapping public io.forgeloop.control.domain.RepositoryScan completeRepositoryScan(@Argument String scanId,
             @Argument String runnerId, @Argument String credential, @Argument RepositoryScanResultInput input) {
         return scans.complete(scanId, runners.authenticated(runnerId, credential), input);
+    }
+    @MutationMapping public RepositoryIssueProposalGrant claimRepositoryIssueProposal(@Argument String runnerId, @Argument String credential) {
+        return issueProposals.claim(runners.authenticated(runnerId, credential));
+    }
+    @MutationMapping public io.forgeloop.control.domain.RepositoryIssueProposal completeRepositoryIssueProposal(@Argument String proposalId,
+            @Argument String runnerId, @Argument String credential, @Argument RepositoryIssueProposalResultInput input) {
+        return issueProposals.complete(proposalId, runners.authenticated(runnerId, credential), input);
     }
     @MutationMapping public LeaseGrant claimTaskLease(@Argument String taskId, @Argument String runnerId, @Argument String credential) {
         runners.authenticated(runnerId, credential); return leases.claim(taskId, runnerId);

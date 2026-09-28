@@ -7,7 +7,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.util.ArrayList;
+import java.util.List;
 
 /** A bounded actionable suggestion; no raw repository file contents are retained. */
 @Entity
@@ -25,6 +30,8 @@ public class RepositoryScanFinding {
     @Column(nullable = false) private int severityOrder;
     private Integer issueNumber;
     @Column(length = 500) private String issueUrl;
+    @OneToMany(mappedBy = "finding", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("createdAt ASC") private List<RepositoryIssueProposal> issueProposals = new ArrayList<>();
 
     protected RepositoryScanFinding() { }
     public RepositoryScanFinding(String severity, String title, String description, String impact, String evidence,
@@ -39,6 +46,7 @@ public class RepositoryScanFinding {
         this.severityOrder = switch (severity) { case "CRITICAL" -> 0; case "HIGH" -> 1; case "MEDIUM" -> 2; default -> 3; };
     }
     RepositoryScanFinding attachTo(RepositoryScan scan) { this.scan = scan; return this; }
+    public RepositoryScan getScan() { return scan; }
     public void recordGithubIssue(int number, String url) {
         if (issueUrl != null) throw new IllegalStateException("A GitHub issue was already created for this finding");
         if (number < 1 || url == null || !url.startsWith("https://github.com/")) throw new IllegalArgumentException("GitHub issue receipt is invalid");
@@ -55,4 +63,6 @@ public class RepositoryScanFinding {
     public java.util.List<String> getAcceptanceCriteria() { return java.util.Arrays.stream(acceptanceCriteria.split("\\n")).filter(value -> !value.isBlank()).toList(); }
     public Integer getIssueNumber() { return issueNumber; }
     public String getIssueUrl() { return issueUrl; }
+    /** The most recent opt-in generation attempt is the actionable view; earlier attempts remain persisted. */
+    public RepositoryIssueProposal getProposal() { return issueProposals.isEmpty() ? null : issueProposals.getLast(); }
 }

@@ -381,10 +381,14 @@ public final class RunnerMain {
                 if(pauseFile!=null && Files.exists(Path.of(pauseFile))) return;
                 List<RunnerTask> available;
                 RepositoryScanGrant scan = null;
+                RepositoryIssueProposalGrant issueProposal = null;
                 try {
                     client.heartbeat(identity);
                     available = client.availableTasks(identity);
-                    if (available.isEmpty()) scan = client.claimRepositoryScan(identity);
+                    if (available.isEmpty()) {
+                        scan = client.claimRepositoryScan(identity);
+                        if (scan == null) issueProposal = client.claimRepositoryIssueProposal(identity);
+                    }
                     if(failedPolls>0)System.out.println("Control-plane connection restored.");
                     failedPolls = 0;
                     status.publish(available.isEmpty()?WorkerStatus.Phase.IDLE:WorkerStatus.Phase.WORKING,0);
@@ -408,6 +412,12 @@ public final class RunnerMain {
                         idlePolls = 0;
                         status.publish(WorkerStatus.Phase.WORKING, 0);
                         executeRepositoryScan(client, identity, scan, arguments);
+                        continue;
+                    }
+                    if (issueProposal != null) {
+                        idlePolls = 0;
+                        status.publish(WorkerStatus.Phase.WORKING, 0);
+                        executeRepositoryIssueProposal(client, identity, issueProposal, arguments);
                         continue;
                     }
                     idlePolls++;
@@ -457,6 +467,30 @@ public final class RunnerMain {
                 catch (Exception cleanupFailure) { System.err.println("Repository scan worktree cleanup failed: " + cleanupFailure.getClass().getSimpleName()); }
             }
         }
+    }
+
+    /** Generates an editable proposal from stored scan evidence without repository writes or issue publication. */
+    private static void executeRepositoryIssueProposal(RunnerClient client, RunnerIdentity identity,
+                                                       RepositoryIssueProposalGrant grant, String[] arguments) {
+        try {
+            ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("ISSUE_SPECIFICATION");
+            RepositoryIssueProposalResult result = new RepositoryIssueProposalWorker().execute(policy,
+                    new ProviderClientFactory().create(policy), grant);
+            client.completeRepositoryIssueProposal(identity, grant, result);
+            System.out.println("Issue proposal generated: " + grant.repository() + ", cost="
+                    + (result.usage().costKnown() ? result.usage().estimatedCostMicros() + " micros" : "N/A"));
+        } catch (IssueProposalOutputFailure invalid) {
+            reportIssueProposalFailure(client, identity, grant, invalid.usage());
+        } catch (Exception failure) {
+            reportIssueProposalFailure(client, identity, grant, null);
+        }
+    }
+
+    private static void reportIssueProposalFailure(RunnerClient client, RunnerIdentity identity,
+                                                  RepositoryIssueProposalGrant grant, ProviderUsageEvidence usage) {
+        try { client.failRepositoryIssueProposal(identity, grant, usage); }
+        catch (Exception reportFailure) { System.err.println("Could not report issue proposal failure: " + reportFailure.getClass().getSimpleName()); }
+        System.err.println("Issue proposal failed: " + grant.repository());
     }
 
     /** Backoff stays responsive to an explicit desktop pause, without interrupting active tasks. */
