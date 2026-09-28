@@ -63,9 +63,17 @@ Provider keys use Windows DPAPI, macOS Keychain, or Linux Secret Service. There
 is no plaintext fallback. Do not share the identity file or copy this state into
 a second active installation. Administrators/root can still inspect processes.
 
-Pause before editing settings or upgrading. Reopen after replacing the app;
-the existing identity and settings remain. **Downloads / updates** opens the
-deployment's release page; it does not silently replace or execute a binary.
+Pause before editing settings or upgrading. **Check for updates** reads the
+deployment's public release feed, compares the installed package version, and
+shows the matching platform download, release notes, and SHA-256 digest. The
+feed is the same five-minute cached GitHub Releases feed used by the website;
+the app validates the published tag, complete platform set, GitHub asset URL,
+and digest before displaying it. An incomplete, mismatched, or unavailable feed
+produces an error instead of a guessed package. The app never downloads or runs
+an installer. While work is active, it hides the handoff button; pause, wait for
+the worker to stop, then open the downloads page. Close ForgeLoop Runner before
+running the installer. Reopen after replacing the app; the existing identity
+and settings remain. SHA-256 checks file integrity, not publisher identity.
 Do not reconnect an existing identity
 to a different ForgeLoop address. The current preview does not migrate CLI or
 Docker identities. Uninstallation must retain state unless the user explicitly

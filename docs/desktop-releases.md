@@ -35,6 +35,12 @@ fallback; otherwise users get the GitHub Releases link and CLI package.
 No website rebuild is needed for subsequent releases. Refreshing the downloads
 page discovers releases after the shared cache expires. Updates are manual:
 pause, finish work, close, install, reopen. There is no automatic installer launch.
+The desktop app's **Check for updates** uses this same feed, compares its
+embedded package version, and displays its platform asset URL and checksum. It
+rejects incomplete releases, wrong-version assets, non-GitHub URLs, and missing
+or malformed digests. If work is active, it withholds the handoff to the
+downloads page. Users still install packages themselves after pausing and
+closing the app.
 
 ## Verification
 

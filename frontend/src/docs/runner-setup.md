@@ -101,7 +101,7 @@ credentials are separate. Connecting a repository does not install a runner.
 
 ### Desktop setup (development preview)
 
-Preview installer 1.0.3 includes the ForgeLoop favicon for the native launcher
+Desktop preview packages include the ForgeLoop favicon for the native launcher
 and operating-system shortcuts. To replace an older Java-branded shortcut,
 pause work, close the app, and install the newer package. Saved runner state
 stays outside the installation directory. CI packages are unsigned previews;
@@ -134,6 +134,14 @@ show **Previously connected runner**; do not re-enroll just to change that label
 **Export safe diagnostics** saves runtime/status information, not credentials or
 raw task logs. Log history is session-only. Keep **Start work at sign-in** off
 when you do not want automatic API spending.
+
+**Check for updates** compares this package's installed version with the latest
+complete GitHub release and shows your platform's package URL, release notes,
+and SHA-256. Use **Open downloads page** to review the release on the website;
+the app never downloads or launches an installer. The handoff stays unavailable
+while work is active. Pause, wait for the runner to stop, open the downloads page,
+then close the app before installing. Compare all 64 SHA-256 characters after
+download; a matching checksum confirms file integrity, not publisher identity.
 
 Use **Pause after current work** before closing or updating. Optional sign-in
 startup can spend API credits and requires Docker and an unlocked keyring.

@@ -80,7 +80,7 @@ public final class DesktopRunner {
         providerForm.add(new JLabel("Price estimate"));providerForm.add(priceStatus);providerForm.add(new JLabel("Account-specific rates?"));providerForm.add(advanced);providerForm.add(login);providerForm.add(save);
         JPanel providerStep=new JPanel(new BorderLayout(12,12));providerStep.add(providerForm,BorderLayout.NORTH);providerStep.add(prices,BorderLayout.CENTER);
         JPanel controls=new JPanel(new GridLayout(0,2,12,12));controls.add(check);controls.add(new JLabel("Git and Docker are required; Java is bundled."));controls.add(start);controls.add(pause);
-        JButton updates=new JButton("Downloads / updates");updates.addActionListener(e->{URI uri=URI.create(endpoint.getText().trim());background(()->{PairingRequest.validateEndpoint(uri);Desktop.getDesktop().browse(uri.resolve("/app/runner-downloads"));});});controls.add(updates);controls.add(new JLabel("Pause before installing updates; local state is retained."));
+        JButton updates=new JButton("Check for updates");updates.addActionListener(e->background(this::checkUpdates));controls.add(updates);controls.add(new JLabel("View version and checksum; installer never launches here."));
         JButton diagnostics=new JButton("Export safe diagnostics");controls.add(diagnostics);controls.add(new JLabel("No API keys, credentials, or task logs included"));
         diagnostics.addActionListener(e->{JFileChooser chooser=new JFileChooser();chooser.setSelectedFile(new java.io.File("forgeloop-diagnostics.txt"));if(chooser.showSaveDialog(frame)==JFileChooser.APPROVE_OPTION){Path target=chooser.getSelectedFile().toPath();if(Files.exists(target)&&JOptionPane.showConfirmDialog(frame,"Replace the existing diagnostics file?","Confirm replacement",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION)return;String report=DesktopDiagnostics.summary(directory,configuration,worker.running());background(()->{DesktopFiles.writeAtomic(target.toAbsolutePath(),report.getBytes(java.nio.charset.StandardCharsets.UTF_8));log("Safe diagnostics exported. No secret material or raw logs were included.");});}});
         logs.setEditable(false);logs.setLineWrap(true);logs.setWrapStyleWord(true);
@@ -134,6 +134,41 @@ public final class DesktopRunner {
         });
     }
     private static String wrapped(String text){return "<html><div style='width:390px'>"+text.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")+"</div></html>";}
+    private void checkUpdates()throws Exception{
+        URI origin=URI.create(endpoint.getText().trim());
+        DesktopReleaseCatalog.Release release=DesktopReleaseFeedClient.fetch(origin,DesktopReleaseCatalog.Target.current());
+        SwingUtilities.invokeAndWait(()->showUpdateDialog(origin,release));
+    }
+    /** All Swing dialogs and clipboard actions stay on the event-dispatch thread. */
+    private void showUpdateDialog(URI origin,DesktopReleaseCatalog.Release release){
+        String installed=DesktopVersion.current();
+        String comparison=installed.equals("development")?"This development build has no published installer version."
+                :DesktopReleaseCatalog.compareVersions(installed,release.version())<0?"A newer version is available."
+                :DesktopReleaseCatalog.compareVersions(installed,release.version())==0?"You are up to date."
+                :"The installed package is newer than the latest version in the public feed.";
+        boolean workActive=worker.running();
+        String report="ForgeLoop Runner update check\n\n"
+                +"Status: "+comparison+"\n"
+                +"Installed version: "+installed+"\n"
+                +"Latest version: "+release.version()+(release.preview()?" (preview)":" (stable)")+"\n"
+                +"Platform package: "+release.filename()+"\n"
+                +"SHA-256: "+release.sha256()+"\n"
+                +"Release notes: "+release.releaseUrl()+"\n"
+                +"Package source: "+release.packageUrl()+"\n\n"
+                +"Compare the full SHA-256 after downloading. The desktop app will not download or launch an installer.\n"
+                +(workActive?"Pause after current work and wait for the runner to stop before opening the installer page.\n"
+                        :"To update, open the downloads page, pause work, wait for it to stop, close ForgeLoop Runner, then run the downloaded installer.\n")
+                +"Runner identity, API keys, and settings stay in the private data folder.";
+        JTextArea details=new JTextArea(report,16,76);details.setEditable(false);details.setLineWrap(true);details.setWrapStyleWord(true);details.setCaretPosition(0);
+        Object[] options=workActive?new Object[]{"Copy SHA-256","Close"}:new Object[]{"Open downloads page","Copy SHA-256","Close"};
+        int selected=JOptionPane.showOptionDialog(frame,new JScrollPane(details),"Runner updates",
+                JOptionPane.DEFAULT_OPTION,JOptionPane.INFORMATION_MESSAGE,null,options,options[options.length-1]);
+        if(!workActive&&selected==0){try{Desktop.getDesktop().browse(origin.resolve("/app/runner-downloads"));}catch(Exception failure){log("Could not open the downloads page. Use: "+origin.resolve("/app/runner-downloads"));}}
+        else if((workActive&&selected==0)||(!workActive&&selected==1)){
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new java.awt.datatransfer.StringSelection(release.sha256()),null);
+            JOptionPane.showMessageDialog(frame,"SHA-256 copied. Compare all 64 characters.","Checksum copied",JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
     private static JPanel step(JPanel content){
         JPanel body=new JPanel(new BorderLayout());body.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));body.add(content,BorderLayout.NORTH);
         JScrollPane scroll=new JScrollPane(body,JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -221,7 +256,7 @@ public final class DesktopRunner {
     @FunctionalInterface private interface Work{void run()throws Exception;}
     public static void main(String[] args)throws Exception{
         if(args.length==1&&args[0].equals("--self-test")){DesktopRuntimeCheck.verify();return;}
-        if(args.length==1&&args[0].equals("--version")){System.out.println("ForgeLoop Runner Desktop 0.1.0");return;}
+        if(args.length==1&&args[0].equals("--version")){System.out.println(DesktopVersion.current());return;}
         Path directory=DesktopFiles.directory();FileChannel channel=FileChannel.open(directory.resolve("desktop.lock"),StandardOpenOption.CREATE,StandardOpenOption.WRITE);FileLock lock=channel.tryLock();
         if(lock==null){channel.close();JOptionPane.showMessageDialog(null,"ForgeLoop Runner is already open.");return;}
         Runtime.getRuntime().addShutdownHook(new Thread(()->{try{lock.release();channel.close();}catch(Exception ignored){}}));

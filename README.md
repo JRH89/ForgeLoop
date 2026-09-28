@@ -27,6 +27,7 @@ The named tunnel serves the public landing page and GitHub-authenticated dashboa
 - [ ] Signed, verified Windows/macOS/Linux desktop installer with browser pairing and local runner controls (in development).
 - [x] Desktop preview: browser approval, native OS key storage, bundled-runtime package builds, setup-window tests, and real worker start/pause tests on Windows, macOS and Linux CI.
 - [x] Desktop setup preflight: OS-specific Git/Docker install guides, distinct missing/stopped/wrong-container-mode explanations, and checks before pairing or claiming paid work.
+- [x] Safe desktop update check: compare the installed package version against a complete published release, validate the matching platform URL and SHA-256, and provide a pause-before-download handoff without launching an installer.
 - [x] Desktop onboarding polish: dark theme, restored-state indicators, local key/connection checks, pairing recovery, and safe diagnostics export (no model calls).
 - [x] Native launcher branding: preview 1.0.3 uses the ForgeLoop favicon in Windows/macOS/Linux packages; installed icon resources and Windows state-preserving upgrade are CI-tested.
 - [x] Desktop preview release pipeline: verified native packages, GitHub Releases, SHA-256 checksums, and automatic public website download discovery. See [publishing and updates](docs/desktop-releases.md); publisher signing remains open.
