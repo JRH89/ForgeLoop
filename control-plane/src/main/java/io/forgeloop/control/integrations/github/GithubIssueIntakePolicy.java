@@ -17,7 +17,9 @@ public final class GithubIssueIntakePolicy {
         if (issue.path("labels").findValuesAsText("name").stream().noneMatch(connection::acceptsIssueLabel))
             reasons.add("Add the required label: " + connection.getIssueLabel());
         if (!connection.acceptsAssignees(issue.path("assignees").findValuesAsText("login")))
-            reasons.add("Assign the issue to: " + connection.getRequiredAssignee());
+            reasons.add(connection.getRequiredAssignee() == null
+                    ? "Assign the issue to a GitHub user before intake."
+                    : "Assign the issue to: " + connection.getRequiredAssignee());
         if (issue.path("body").asText("").isBlank()) reasons.add("Add a description and acceptance criteria to the issue body.");
         return List.copyOf(reasons);
     }

@@ -65,6 +65,13 @@ public class GithubHttpApi implements GithubApi, GithubIssueReader {
         JsonNode response = request(installationId, "POST", "/repos/" + repository + "/pulls", Map.of("title", title, "head", head, "base", base, "body", body, "draft", draft));
         return response.path("number").asLong();
     }
+    @Override public GithubIssueReceipt createIssue(long installationId, String repository, String title, String body) {
+        JsonNode response = request(installationId, "POST", "/repos/" + repository + "/issues", Map.of("title", title, "body", body));
+        int number = response.path("number").asInt();
+        String url = response.path("html_url").asText();
+        if (number < 1 || !url.startsWith("https://github.com/")) throw new IllegalStateException("GitHub issue receipt was invalid");
+        return new GithubIssueReceipt(number, url);
+    }
     @Override public boolean checksPass(long installationId, String repository, String headSha) {
         JsonNode checks = request(installationId, "GET", "/repos/" + repository + "/commits/" + headSha + "/check-runs?filter=latest&per_page=100", Map.of());
         if (checks.path("total_count").asInt() == 0) return false;

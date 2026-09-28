@@ -41,9 +41,9 @@ export function runExplanation(run: FeatureRun, runners: Runner[], now = Date.no
   return 'Runner contact is recent. Open Runs for live task events, dependencies, leases, and verification results; contact alone does not guarantee work is executing.';
 }
 
-export function newIssueUrl(repository: string, issueLabel: string, requiredAssignee?: string): string | undefined {
+export function newIssueUrl(repository: string, issueLabel: string, requiredAssignee?: string, requireAssignee = Boolean(requiredAssignee)): string | undefined {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) return undefined;
-  const assignee = requiredAssignee ? `Required assignee: \`${requiredAssignee}\`.` : 'No assignee is required.';
+  const assignee = requiredAssignee ? `Required assignee: \`${requiredAssignee}\`.` : requireAssignee ? 'An assignee is required; any valid GitHub assignee is accepted.' : 'No assignee is required.';
   const body = `## Requested change\nDescribe one small, concrete change.\n\n## Acceptance criteria\n- [ ] Describe the observable result.\n- [ ] Describe the tests that should pass.\n\n## Constraints\nDescribe what must not change.\n\n## ForgeLoop intake handoff\nRequired label: \`${issueLabel}\`. ${assignee}\nDo not add the required label or assignment until this issue is ready for ForgeLoop to process. An eligible issue can start provider work and incur API charges when a runner is active.`;
   // Intentionally prefill title/body only; GitHub labels or assignees could activate paid intake.
   const params = new URLSearchParams({ title: 'Describe the change', body });

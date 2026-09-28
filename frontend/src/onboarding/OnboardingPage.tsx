@@ -37,7 +37,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
   const repository = snapshot?.repositories.find(item => item.repository === selected) ?? snapshot?.repositories[0];
   const warnings = snapshot && repository ? configurationWarnings(repository, snapshot.config) : [];
   const recent = snapshot ? recentRunners(snapshot.runners, snapshot.at) : [];
-  const issueUrl = repository && newIssueUrl(repository.repository, repository.issueLabel, repository.requiredAssignee);
+  const issueUrl = repository && newIssueUrl(repository.repository, repository.issueLabel, repository.requiredAssignee, repository.requireAssignee);
   const admin = operator.role === 'ADMIN';
   return <section className="onboarding">
     <h1>Getting started</h1>
@@ -64,7 +64,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
           <a href="/app/runner-downloads">Download desktop runner</a> <button onClick={() => navigate('Configuration')}>Manage runners</button>
         </li>
         <li><h2>Review intake and safety settings</h2>
-          {repository ? <><p>Required label: <code>{repository.issueLabel}</code> · {repository.requiredAssignee ? <>Required assignee: <code>{repository.requiredAssignee}</code></> : 'No assignee required; the label controls intake.'}</p>
+          {repository ? <><p>Required label: <code>{repository.issueLabel}</code> · {repository.requireAssignee ? <>Required assignee: {repository.requiredAssignee ? <code>{repository.requiredAssignee}</code> : 'any assigned user'}</> : 'No assignee required; the label controls intake.'}</p>
             <p>Repository budget: ${repository.maxBudgetUsd} · Organization limit: ${snapshot.config.policy.maxRunBudgetUsd} · Human approval: {snapshot.config.policy.requireHumanApproval ? 'required' : 'not required'} · Auto-merge: {snapshot.config.policy.autoMergeEnabled ? 'enabled' : 'disabled'}</p>
             {warnings.length ? <ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul> : <p>Saved harness and intake configuration checks pass. This does not verify provider funding or the repository build environment.</p>}
             <p>Verification gates: {repository.requiredGates.join(', ') || 'None configured; review your verification policy before using real work.'}</p></> : <p>Select a connected repository first.</p>}
@@ -72,7 +72,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
         </li>
         <li><h2>Create and follow your first issue</h2>
           <p>Start with one small change and explicit acceptance criteria. The GitHub draft includes a safe title and checklist, but does not apply the intake label or assignee.</p>
-          {repository && <p>An issue enters intake when it has the required label <code>{repository.issueLabel}</code>{repository.requiredAssignee ? <> and assignee <code>{repository.requiredAssignee}</code></> : null}. Add whichever is missing only when you intend to activate this work. A running worker can make paid provider calls as soon as an issue becomes eligible.</p>}
+          {repository && <p>An issue enters intake when it has the required label <code>{repository.issueLabel}</code>{repository.requireAssignee ? <> and {repository.requiredAssignee ? <>assignee <code>{repository.requiredAssignee}</code></> : 'any GitHub assignee'}</> : null}. Add whichever is missing only when you intend to activate this work. A running worker can make paid provider calls as soon as an issue becomes eligible.</p>}
           {issueUrl && <a href={issueUrl} target="_blank" rel="noreferrer">Draft a safe issue on GitHub</a>}
           {repository?.enabled && <IssueCheck key={repository.repository} repository={repository.repository} />}
           <p>Intake handles opened, labeled, assigned, and reopened issue events. Editing the description alone does not trigger intake. If an eligible issue has no run, check GitHub App webhook deliveries; do not repeatedly create issues or replay work.</p>

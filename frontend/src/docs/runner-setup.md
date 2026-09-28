@@ -69,7 +69,7 @@ organization-scoped repository, runner, policy, and run metadata every 10 second
    matching browser fingerprint, and save provider settings locally. Use **Check
    saved key locally** and **Check saved connection**. Neither calls a model.
 4. **Review intake and safety settings.** Check the exact issue label, optional
-   required assignee, budgets, harness, verification gates, human approval, and
+   assignment gate (any assignee or one exact login), budgets, harness, verification gates, human approval, and
    auto-merge policy. Administrators change intake in Repositories and execution
    settings in Harness & policy.
 5. **Create and follow your first issue.** Use the safe GitHub draft to start a
@@ -89,6 +89,28 @@ does not prove webhook delivery or that a run has started.
 Intake handles opened, labeled, assigned, and reopened events; a description edit
 alone is not an intake trigger. If rules pass but no run appears, inspect the
 GitHub App's webhook deliveries before retrying anything.
+
+### Manually scan a repository for issue proposals
+
+An organization administrator can use **Analyze repository** in a connected
+repository's card. Confirm the scan after reviewing the notice: it sends a
+bounded, secret-redacted source context from the selected default-branch commit
+to the provider configured on the runner, and that provider may charge for the
+request. The runner builds context locally and submits it directly to the
+configured model provider; repository source is not sent to the ForgeLoop
+control plane. The control plane stores the commit identity, generated findings,
+and usage metadata, not the source context. Provider data handling still
+applies, so review your provider's terms and keep credentials out of committed
+files even though common secret patterns are redacted.
+
+Scans are manual only; there is no scheduled scan setting. They do not modify
+the checkout, create a delivery run, or publish a GitHub issue automatically.
+Review each proposed description, evidence, affected path, and acceptance
+criterion. **Create GitHub issue** publishes only the selected finding and does
+not apply the intake label or an assignee. To admit it to paid work later, add
+the repository's intake label and satisfy its assignment rule deliberately.
+Only the most recent ten scans per repository are shown. Cost is estimated from
+the runner's configured model price; unknown pricing is shown as N/A.
 
 **What is waiting?** explains persisted approval, failure, budget, and heartbeat
 signals for unarchived runs in the selected repository. Open Runs for detailed
@@ -384,10 +406,11 @@ rates reduce budget accuracy. Future work needs a configured price to report cos
 
 ### Assignment-gated intake
 
-In **Repositories**, set **Required GitHub assignee** to a login without `@`.
-Both the intake label and that assignee must be present before a new issue starts.
-Leave it blank to use label-only intake. Choose a login GitHub lets you assign in
-that repository; the setting does not make an arbitrary App bot assignable.
+In **Repositories**, turn on **Wait until an issue is assigned** to require an
+assignment before a new issue starts. Leave the specific assignee blank to
+accept any GitHub assignee, or enter a login without `@` to require that person.
+Both the intake label and the assignment rule must be met. Choose a login GitHub
+lets you assign in that repository; the setting does not make an arbitrary App bot assignable.
 Assigning a labeled issue or labeling an assigned issue both trigger evaluation.
 It applies to future intake, not cancellation of existing work. Manual submissions
 remain explicit operator requests and do not use this GitHub-only gate.

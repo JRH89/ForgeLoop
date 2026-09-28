@@ -11,7 +11,8 @@ public enum WorkerRolePolicy {
     INDEPENDENT_TEST(true, Set.of("repository-read", "scoped-file-write", "git-commit")),
     INTEGRATION(false, Set.of("repository-read", "git-integrate")),
     REPAIR(true, Set.of("repository-read", "scoped-file-write", "git-commit", "failure-evidence-read")),
-    REVIEW(false, Set.of("repository-read", "diff-read", "evidence-read"));
+    REVIEW(false, Set.of("repository-read", "diff-read", "evidence-read")),
+    REPOSITORY_SCAN(false, Set.of("repository-read", "issue-proposal"));
 
     private final boolean repositoryWrite;
     private final Set<String> tools;

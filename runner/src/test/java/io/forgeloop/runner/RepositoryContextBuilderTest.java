@@ -40,4 +40,20 @@ class RepositoryContextBuilderTest {
         assertFalse(context.contains("private metadata"));
         assertFalse(context.contains("worktree-metadata"));
     }
+
+    @Test void scanContextRedactsCredentialsAndSkipsGeneratedAndSecretFiles() throws Exception {
+        Files.createDirectories(temporaryDirectory.resolve(".git"));
+        Files.createDirectories(temporaryDirectory.resolve("node_modules/pkg"));
+        Files.createDirectories(temporaryDirectory.resolve("src"));
+        Files.writeString(temporaryDirectory.resolve("node_modules/pkg/index.js"), "must not be included");
+        Files.writeString(temporaryDirectory.resolve("src/config.properties"), "api_key=sk-abcdefghijklmnopqrstuvwxyz012345\nfeature=true");
+        Files.writeString(temporaryDirectory.resolve("private.pem"), "private bytes");
+        String context = new RepositoryContextBuilder().build(temporaryDirectory, List.of(), 8 * 1024);
+        assertFalse(context.contains("must not be included"));
+        assertFalse(context.contains("sk-abcdefghijklmnopqrstuvwxyz012345"));
+        assertFalse(context.contains("private bytes"));
+        assertTrue(context.contains("[REDACTED]"));
+        assertTrue(context.contains("feature=true"));
+        assertTrue(context.length() <= 8 * 1024);
+    }
 }

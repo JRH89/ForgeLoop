@@ -16,11 +16,19 @@ public final class RepositoryContextBuilder {
     private static final int MAX_FILES = 400;
     private static final int MAX_FILE_CHARS = 16 * 1024;
     private static final int MAX_CONTEXT_CHARS = 96 * 1024;
+    private static final Set<String> GENERATED_DIRECTORIES = Set.of(".git", ".gradle", ".idea", ".next", ".venv", "build", "coverage", "dist", "node_modules", "out", "target", "vendor");
+    private static final Set<String> SENSITIVE_SUFFIXES = Set.of(".key", ".pem", ".p12", ".pfx", ".keystore");
     private static final Set<String> TEXT_EXTENSIONS = Set.of(
             "css", "graphql", "graphqls", "html", "java", "js", "json", "jsx", "md", "properties",
             "scss", "sql", "toml", "ts", "tsx", "txt", "xml", "yaml", "yml");
 
     public String build(Path repository, List<String> preferredPrefixes) throws IOException {
+        return build(repository, preferredPrefixes, MAX_CONTEXT_CHARS);
+    }
+
+    /** Allows read-only scans to use a stricter prompt-size ceiling than normal planning context. */
+    public String build(Path repository, List<String> preferredPrefixes, int maxContextChars) throws IOException {
+        if (maxContextChars < 1024 || maxContextChars > MAX_CONTEXT_CHARS) throw new IllegalArgumentException("Repository context size limit is invalid");
         Path root = repository.toAbsolutePath().normalize();
         if (!Files.exists(root.resolve(".git"))) throw new IllegalArgumentException("Repository context requires a Git worktree");
         List<String> prefixes = preferredPrefixes == null ? List.of() : preferredPrefixes.stream()
@@ -30,19 +38,29 @@ public final class RepositoryContextBuilder {
         // is too late: background Git maintenance can remove lock files mid-walk.
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
-                return !directory.equals(root) && directory.getFileName().toString().equals(".git")
+                return !directory.equals(root) && GENERATED_DIRECTORIES.contains(directory.getFileName().toString())
                         ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
             }
             @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                if (attributes.isRegularFile() && !file.getFileName().toString().equals(".git")) candidates.add(file);
+                String name = file.getFileName().toString();
+                if (attributes.isRegularFile() && !name.equals(".git") && !name.equalsIgnoreCase(".env")
+                        && SENSITIVE_SUFFIXES.stream().noneMatch(suffix -> name.toLowerCase().endsWith(suffix))) candidates.add(file);
                 return FileVisitResult.CONTINUE;
             }
         });
-        List<Path> files = candidates.stream()
+        List<Path> candidatesInOrder = candidates.stream()
                 .sorted(Comparator.comparingInt((Path path) -> preferred(root, path, prefixes) ? 0 : 1)
                         .thenComparing(path -> relative(root, path))).limit(MAX_FILES).toList();
         StringBuilder context = new StringBuilder("Repository manifest:\n");
-        files.forEach(path -> context.append("- ").append(relative(root, path)).append('\n'));
+        List<Path> files = new ArrayList<>();
+        // Reserve room for source text so unusual long paths cannot defeat the prompt ceiling.
+        int manifestLimit = Math.min(maxContextChars / 3, 24 * 1024);
+        for (Path path : candidatesInOrder) {
+            String entry = "- " + relative(root, path) + "\n";
+            if (context.length() + entry.length() > manifestLimit) break;
+            context.append(entry);
+            files.add(path);
+        }
         for (Path file : files) {
             if (!textFile(file) || Files.size(file) > MAX_FILE_CHARS) continue;
             String content;
@@ -51,8 +69,9 @@ public final class RepositoryContextBuilder {
             } catch (java.nio.charset.MalformedInputException binaryContent) {
                 continue;
             }
+            content = EvidenceRedactor.redact(content);
             String section = "\n--- " + relative(root, file) + " ---\n" + content + "\n";
-            if (context.length() + section.length() > MAX_CONTEXT_CHARS) continue;
+            if (context.length() + section.length() > maxContextChars) continue;
             context.append(section);
         }
         return context.toString();
