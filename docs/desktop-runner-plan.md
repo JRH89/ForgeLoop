@@ -65,6 +65,20 @@ the generated favicon, and unit tests validate all native icon containers/sizes.
 Install the newer preview to update an existing shortcut; private runner state
 is preserved. Packages remain unsigned development previews.
 
+## Safe desktop update handoff (1.0.4)
+
+- [x] Embed the package version in the native launcher and report it through
+  `--version` so the desktop can compare against the published catalog.
+- [x] Validate release tags, completeness across all supported platforms,
+  package source URLs, asset version, and SHA-256 before showing a local update.
+- [x] Show installed/latest versions, release notes, platform asset and checksum;
+  disable the download handoff while a worker is active.
+- [x] Keep installers manual: the desktop app never downloads or launches one.
+  Pause and finish work, close ForgeLoop Runner, then install from the website.
+- [x] Add catalog/tamper/version tests and package-matrix version verification.
+- [ ] Signed in-app installation remains dependent on publisher credentials and
+  operating-system trust validation documented in the public release gate above.
+
 ## Connection-recovery follow-up (1.0.2)
 
 - [x] Secret-free atomic worker status snapshots instead of inferring health from a live process.
