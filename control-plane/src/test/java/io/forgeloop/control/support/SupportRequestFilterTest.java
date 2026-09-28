@@ -19,4 +19,8 @@ class SupportRequestFilterTest {
         var filter=new SupportRequestFilter();
         for(int i=0;i<11;i++){var r=request();r.addHeader("X-Forwarded-For","1.2.3."+i);var response=new MockHttpServletResponse();filter.doFilter(r,response,(a,b)->{});assertEquals(i<10?200:429,response.getStatus());}
     }
+    @Test void rateLimitsRecoveryEmailsMoreTightlyPerPeer()throws Exception{
+        var filter=new SupportRequestFilter();
+        for(int i=0;i<6;i++){var r=request();r.setRequestURI("/api/support/tickets/recovery");var response=new MockHttpServletResponse();filter.doFilter(r,response,(a,b)->{});assertEquals(i<5?200:429,response.getStatus());}
+    }
 }

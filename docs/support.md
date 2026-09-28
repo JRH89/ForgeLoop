@@ -17,13 +17,24 @@ the key remains in the URL fragment so refreshing still works.
 Signed-in customers also find tickets they submitted while signed in under
 **My tickets** (`/support#mine`). Ownership is the immutable authenticated
 identity, not the submitted email. Signing in later does not automatically
-claim guest tickets. Lost guest links cannot be recovered by entering an email;
-submit a new request with the old reference for a staff-assisted follow-up.
+claim guest tickets. If recovery is enabled, a guest ticket can be reclaimed
+only by redeeming a one-time verification link sent to its submitted email;
+ticket reference or email alone never grants access.
 
-There are **no email notifications or automatic email recovery** in this
-release. Return to the saved link to check replies. Threads and inboxes refresh
-every 15 seconds while visible. No support action starts a runner or paid model
-call. Support response times are not guaranteed.
+Ticket receipts and replies are not sent by email. If guest-link recovery is
+enabled for the deployment, open **Support** and use **Recover a guest ticket**
+with the ticket reference and submitted email. The same confirmation appears
+whether those details match or not. A matching guest ticket receives a
+single-use verification link that expires after 30 minutes. Opening it verifies
+the submitted email, creates a replacement private link, and invalidates both
+the previous ticket link and any older recovery links. A ticket can send at
+most three recovery messages per hour; the support API also applies a stricter
+per-peer request limit. The email page requires a deliberate confirmation click,
+so link-preview scanners do not consume the token. Signed-in tickets are not
+recovered through this flow.
+Return to the private link to check replies. Threads and inboxes refresh every
+15 seconds while visible. No support action starts a runner or paid model call.
+Support response times are not guaranteed.
 
 ## Service owner / administrators
 
@@ -61,11 +72,37 @@ events; open a follow-up when full.
 
 ## Operations and security
 
-Flyway V28 adds `support_ticket` and `support_message`; it does not alter run
-data. Existing PostgreSQL backup/restore procedures include both tables. Take a
-verified backup before upgrading. Support contains personal information: limit
+Flyway V28 adds `support_ticket` and `support_message`; V30 adds the nullable
+email-verification timestamp and `support_recovery` table. These migrations do
+not alter run data. Existing PostgreSQL backup/restore procedures include the
+support tables. Take a verified backup before upgrading. Support contains personal information: limit
 database/backup access and define the deployment's retention policy. No automatic
-deletion, retention schedule, attachment storage, or email provider is configured.
+deletion, retention schedule, or attachment storage is configured. Old recovery
+records are purged opportunistically after 30 days when a valid recovery request
+is processed.
+
+### Enable guest recovery email
+
+Recovery is **disabled by default**. Before enabling it, configure a dedicated
+SMTP sender (with TLS and provider-side sending limits), set a canonical HTTPS
+`FORGELOOP_PUBLIC_BASE_URL`, and verify the From address with the mail provider.
+Inject `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`,
+`SPRING_MAIL_PASSWORD`, `FORGELOOP_SUPPORT_EMAIL_FROM`, and
+`FORGELOOP_PUBLIC_BASE_URL` from the deployment's secret manager/environment.
+Then set `FORGELOOP_SUPPORT_RECOVERY_ENABLED=true` and restart the control plane.
+The portal exposes the form only when all required configuration is present.
+
+Recovery email contains no ticket subject or conversation content. Its token is
+high entropy, stored only as a SHA-256 digest, delivered only after the recovery
+record commits, and never written to application logs. The link carries the
+token in a URL fragment; browser code submits it in a same-origin POST body.
+Tokens are single-use and expire after 30 minutes. Successful redemption marks
+the requester's email verified and rotates the ticket capability, immediately
+revoking the old link. SMTP delivery failures are logged without the address or
+token; they do not reveal ticket existence to the requester. Monitor those
+errors and test the complete request/verify flow with a controlled mailbox
+before enabling recovery in production. No message or secret is sent through
+the ticket itself.
 
 `/support` and its API responses are `no-store` and `noindex`; the portal is not
 in the sitemap. Private keys use URL fragments and a request header, never query
@@ -76,8 +113,10 @@ Every API operation checks ticket ownership, capability, or staff authorization.
 Same-origin custom headers and Origin/Fetch Metadata checks protect writes;
 cross-origin CORS access is not enabled. JSON bodies are capped at 32 KiB by both
 Nginx and the application. Individual messages are limited to 8,000 characters.
-A honeypot and process-local per-peer minute limits (10 submissions, 30 other
-writes, 240 reads) reduce abuse. These are not a distributed anti-abuse service:
+A honeypot and process-local per-peer minute limits (10 submissions, 5 recovery
+email requests, 10 recovery confirmations, 30 other writes, 240 reads) reduce
+abuse. Recovery also allows at most three emails per ticket in a rolling hour.
+These are not a distributed anti-abuse service:
 proxy peers may share a limit, and replicas have independent counters. Configure
 trusted edge rate limits/WAF controls before high-volume public operation. Do
 not blindly trust client-supplied forwarding headers for abuse identity.
@@ -92,5 +131,11 @@ not blindly trust client-supplied forwarding headers for abuse identity.
   CI enables them only in its disposable Compose stack.
 - Backend tests cover guest capabilities, identity isolation, staff authorization,
   private notes, statuses, stale writes, input validation, pagination, and request
-  bounds. Browser tests cover submission, cross-browser tracking, refresh,
-  replies, denied access, mobile layout, and accessibility.
+  bounds. Recovery tests cover generic responses, guest-only eligibility, per-ticket
+  throttling, token supersession/expiry/replay, address verification, capability
+  rotation, and after-commit delivery. Frontend tests cover the recovery request
+  and deliberate one-time-link redemption. Browser tests cover submission,
+  cross-browser tracking, refresh, replies, denied access, mobile layout, and
+  accessibility. A real SMTP delivery check still requires deployment mail
+  credentials and a controlled mailbox; do not enable recovery before that smoke
+  test succeeds.

@@ -3,6 +3,17 @@ server:
   forward-headers-strategy: native
 spring:
   application: { name: forgeloop-control-plane }
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SPRING_MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${SPRING_MAIL_SMTP_STARTTLS:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:forgeloop-control;MODE=PostgreSQL;DB_CLOSE_DELAY=-1}
     username: ${SPRING_DATASOURCE_USERNAME:sa}
@@ -35,6 +46,10 @@ management:
 forgeloop:
   support:
     admin-organization-id: "${FORGELOOP_SUPPORT_ADMIN_ORGANIZATION_ID:${FORGELOOP_GITHUB_DEFAULT_ORGANIZATION_ID:local-development}}"
+    recovery:
+      enabled: "${FORGELOOP_SUPPORT_RECOVERY_ENABLED:false}"
+      public-base-url: "${FORGELOOP_PUBLIC_BASE_URL:}"
+      from: "${FORGELOOP_SUPPORT_EMAIL_FROM:}"
   security:
     mode: "${FORGELOOP_SECURITY_MODE:production}"
     development-organization-id: "${FORGELOOP_DEVELOPMENT_ORGANIZATION_ID:local-development}"

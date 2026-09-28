@@ -28,6 +28,20 @@ class SupportControllerTest extends SupportServiceTest {
             .andExpect(status().isFound()).andExpect(header().string("Location","/oauth2/authorization/github")).andReturn();
         assertEquals("/support#admin",result.getRequest().getSession().getAttribute("SUPPORT_RETURN"));
     }
+    @Test void recoveryRequestsReturnIdenticalAcceptedResponsesWithoutEnumeratingTickets() throws Exception {
+        var guest=service.create(request());
+        var mvc=MockMvcBuilders.standaloneSetup(new SupportController(service,identity)).addFilters(new SupportRequestFilter()).build();
+        String response=mvc.perform(post("/api/support/tickets/recovery").header("X-ForgeLoop-Support","1").contentType("application/json")
+                .content("{\"ticketId\":\""+guest.detail().ticket().id()+"\",\"email\":\"customer@example.com\"}"))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        mvc.perform(post("/api/support/tickets/recovery").header("X-ForgeLoop-Support","1").contentType("application/json")
+                .content("{\"ticketId\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\"email\":\"customer@example.com\"}"))
+                .andExpect(status().isAccepted()).andExpect(content().string(response));
+        mvc.perform(post("/api/support/tickets/recovery").header("X-ForgeLoop-Support","1").contentType("application/json")
+                .content("{\"ticketId\":\""+guest.detail().ticket().id()+"\",\"email\":\"other@example.com\"}"))
+                .andExpect(status().isAccepted()).andExpect(content().string(response));
+        verify(recoveryDelivery, times(1)).sendRecovery(eq("customer@example.com"),any());
+    }
     @Test void ownerAndStaffHttpFlowsKeepNotesOutOfCustomerResponses() throws Exception {
         when(identity.subject()).thenReturn("github:customer");when(identity.requireSubject()).thenReturn("github:customer");
         var receipt=service.create(request());String id=receipt.detail().ticket().id();
