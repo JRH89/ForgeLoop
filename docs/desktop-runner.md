@@ -7,24 +7,40 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
 ## First connection
 
 1. Install the native package built for your OS and architecture. Java is bundled.
-2. Install Git and Docker separately if necessary; start Docker in Linux-container
-   mode. Linux desktop key storage additionally needs `secret-tool` (libsecret
-   tools) and an unlocked Secret Service keyring. Headless users retain the CLI.
-3. Open ForgeLoop Runner. Enter your ForgeLoop address and a recognizable name.
-   Select **Connect in browser**. Compare the displayed fingerprint in both apps.
-4. Sign in with GitHub if necessary, then explicitly approve as an organization
+2. Open ForgeLoop Runner and select **Check requirements**. The app checks Git
+   and the Docker engine separately, then shows the official install guide for
+   your operating system. Docker must report Linux containers. On Windows,
+   switch Docker Desktop out of Windows-container mode if prompted. Linux desktop
+   key storage additionally needs `secret-tool` (libsecret tools) and an unlocked
+   Secret Service keyring. Headless users retain the CLI.
+3. Install missing tools, start Docker, and check requirements again. Git must
+   answer its version check; Docker must connect to a ready Linux-container engine.
+   Neither check contacts ForgeLoop or a model provider.
+4. Enter your ForgeLoop address and a recognizable name. Select
+   **Connect in browser**. Pairing checks Git and Docker again before creating an
+   approval request. Compare the displayed fingerprint in both apps.
+5. Sign in with GitHub if necessary, then explicitly approve as an organization
    administrator. The sign-in link opens a separate tab so the pairing request
    remains available. Return to the original tab to approve. Approval expires
    after five minutes; the desktop waits up to ten minutes for approval.
-5. On the Provider step select the provider, model, and API key. The app looks
+6. On the Provider step select the provider, model, and API key. The app looks
    up public base text-token rates automatically, without using your API key.
    Review the displayed source and lookup date. Use **manual prices** for
    account-specific terms; an unknown or offline model can be saved with N/A
    cost estimates. Save to advance to the Run step.
-6. Check Git and Docker. Click **Start runner** and confirm potential API charges.
+7. On the Run step, check requirements once more if anything changed. Click
+   **Start runner** and confirm potential API charges. Start repeats the checks
+   immediately before any work is claimed.
 
 No enrollment token needs copying. The local pairing secret never enters a URL.
 Connecting, saving settings, and checking prerequisites do not call a model.
+Use the platform links in the Connect step for the official [Git downloads](https://git-scm.com/downloads)
+and [Docker Desktop installation instructions](https://docs.docker.com/desktop/setup/install/).
+Direct links: [Git for Windows](https://git-scm.com/download/win),
+[Git for macOS](https://git-scm.com/download/mac), [Git for Linux](https://git-scm.com/download/linux),
+[Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/),
+[Docker Desktop for macOS](https://docs.docker.com/desktop/setup/install/mac-install/),
+and [Docker Desktop for Linux](https://docs.docker.com/desktop/setup/install/linux/).
 
 The pairing page itself loads without login so the fingerprint remains in the
 original tab while GitHub sign-in opens separately. Approval still requires an

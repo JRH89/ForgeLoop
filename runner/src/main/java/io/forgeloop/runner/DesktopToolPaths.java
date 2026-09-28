@@ -10,7 +10,12 @@ public final class DesktopToolPaths {
         var directories=new LinkedHashSet<String>();
         String existing=System.getenv("PATH");if(existing!=null)directories.addAll(Arrays.asList(existing.split(java.util.regex.Pattern.quote(File.pathSeparator))));
         if(com.sun.jna.Platform.isMac()){directories.add("/usr/local/bin");directories.add("/opt/homebrew/bin");directories.add("/Applications/Docker.app/Contents/Resources/bin");directories.add(Path.of(System.getProperty("user.home"),".docker","bin").toString());}
-        else if(com.sun.jna.Platform.isWindows()){String programs=System.getenv("ProgramFiles");if(programs!=null){directories.add(Path.of(programs,"Git","cmd").toString());directories.add(Path.of(programs,"Docker","Docker","resources","bin").toString());}}
+        else if(com.sun.jna.Platform.isWindows()){
+            String programs=System.getenv("ProgramFiles");
+            if(programs!=null){directories.add(Path.of(programs,"Git","cmd").toString());directories.add(Path.of(programs,"Docker","Docker","resources","bin").toString());}
+            String local=System.getenv("LOCALAPPDATA");
+            if(local!=null){directories.add(Path.of(local,"Programs","Git","cmd").toString());directories.add(Path.of(local,"Programs","DockerDesktop","resources","bin").toString());}
+        }
         else {directories.add("/usr/local/bin");directories.add("/usr/bin");directories.add("/bin");}
         directories.removeIf(String::isBlank);return String.join(File.pathSeparator,directories);
     }

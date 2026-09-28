@@ -20,6 +20,10 @@ fallback. Existing runners must not be re-enrolled or migrated implicitly.
   automatic website discovery, and public downloads with explicit unsigned labeling.
 - [x] Guide and automated verification: first-install walkthrough and recovery coverage;
   distinguish tested operating systems from merely buildable packages.
+- [x] OS-specific desktop preflight: Git version and Docker Linux-engine checks,
+  platform installation guides, actionable stopped-engine/container-mode states,
+  and rechecks before pairing and paid work. Prerequisite state tests run in each
+  Windows/macOS/Linux package-matrix job.
 - [ ] Public release: signing/notarization, publication approval, signed install/update
   validation and real login/reboot startup validation on supported operating systems.
 

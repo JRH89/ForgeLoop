@@ -27,6 +27,7 @@ public final class DesktopRunner {
     private final JLabel status=new JLabel("Not started. Setup does not spend API credits.");
     private final JLabel fingerprint=new JLabel(" ");
     private final JLabel connectionStatus=new JLabel("Not connected yet"),keyStatus=new JLabel("No saved provider settings");
+    private final JLabel gitPrerequisite=new JLabel("Not checked"),dockerPrerequisite=new JLabel("Not checked");
     private final JLabel priceStatus=new JLabel("Open Provider to check public model pricing.");
     private final ModelPriceCatalog priceCatalog=new ModelPriceCatalog();
     private volatile ModelPriceCatalog.Quote selectedQuote;
@@ -52,12 +53,20 @@ public final class DesktopRunner {
         name.setEditable(!Files.exists(directory.resolve("identity")));
         refreshSavedStatus();
         login.setSelected(configuration!=null&&configuration.startAtLogin());
-        JPanel connection=new JPanel(new GridLayout(0,2,12,12));
-        field(connection,"ForgeLoop address",endpoint);field(connection,"Runner name",name);connection.add(connect);connection.add(fingerprint);
-        connection.add(connectionStatus);connection.add(new JLabel("No enrollment token to copy."));
-        connection.add(reopen);connection.add(cancelPairing);reopen.setEnabled(false);cancelPairing.setEnabled(false);
-        JButton checkConnection=new JButton("Check saved connection");connection.add(checkConnection);connection.add(new JLabel("Heartbeat only - does not claim work"));
+        JPanel connectionFields=new JPanel(new GridLayout(0,2,12,12));
+        field(connectionFields,"ForgeLoop address",endpoint);field(connectionFields,"Runner name",name);connectionFields.add(connect);connectionFields.add(fingerprint);
+        connectionFields.add(connectionStatus);connectionFields.add(new JLabel("No enrollment token to copy."));
+        connectionFields.add(reopen);connectionFields.add(cancelPairing);reopen.setEnabled(false);cancelPairing.setEnabled(false);
+        JButton checkConnection=new JButton("Check saved connection");connectionFields.add(checkConnection);connectionFields.add(new JLabel("Heartbeat only - does not claim work"));
         checkConnection.addActionListener(e->background(()->{if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");client(URI.create(endpoint.getText().trim())).heartbeat(new RunnerIdentityStore().load(directory.resolve("identity")));log("Connection verified. No task was claimed and no provider call was made.");SwingUtilities.invokeLater(()->connectionStatus.setText("Connected - heartbeat verified"));}));
+        JPanel prerequisitePanel=new JPanel(new GridLayout(0,2,8,8));
+        prerequisitePanel.setBorder(BorderFactory.createTitledBorder("Before connecting: Git and Docker with Linux containers are required"));
+        prerequisitePanel.add(new JLabel("Git"));prerequisitePanel.add(prerequisiteRow(gitPrerequisite,guideButton("Install Git",DesktopPrerequisites.gitGuide())));
+        prerequisitePanel.add(new JLabel("Docker Engine"));prerequisitePanel.add(prerequisiteRow(dockerPrerequisite,guideButton("Install Docker",DesktopPrerequisites.dockerGuide())));
+        JButton checkPrerequisites=new JButton("Check requirements");
+        prerequisitePanel.add(checkPrerequisites);prerequisitePanel.add(new JLabel("Checks this computer only; no API calls"));
+        checkPrerequisites.addActionListener(e->background(()->updatePrerequisites(DesktopPrerequisites.check())));
+        JPanel connection=new JPanel(new BorderLayout(12,16));connection.add(prerequisitePanel,BorderLayout.NORTH);connection.add(connectionFields,BorderLayout.CENTER);
         reopen.addActionListener(e->{if(approvalPage!=null)try{Desktop.getDesktop().browse(approvalPage);}catch(Exception failure){log("Could not open your browser. Check your default browser settings.");}});
         cancelPairing.addActionListener(e->{pairingCancelled.set(true);cancelPairing.setEnabled(false);log("Cancelling connection. Please wait for the current request to finish.");});
         JPanel providerForm=new JPanel(new GridLayout(0,2,12,12));
@@ -84,7 +93,7 @@ public final class DesktopRunner {
         DesktopTheme.primary(connect);DesktopTheme.primary(save);DesktopTheme.primary(start);
         if(configuration!=null)log("Saved settings restored. Your API key stays hidden; leave its field blank to keep it.");
         if(Files.exists(directory.resolve("identity")))log("Existing connection restored. You do not need to connect again.");
-        connect.addActionListener(e->pair());save.addActionListener(e->save());check.addActionListener(e->background(()->{prerequisites();log("Git and Docker are ready.");}));
+        connect.addActionListener(e->pair());save.addActionListener(e->save());check.addActionListener(e->background(()->updatePrerequisites(DesktopPrerequisites.check())));
         start.addActionListener(e->{if(JOptionPane.showConfirmDialog(frame,"Start processing eligible issues? Model API calls can incur charges.","Start paid work",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION)background(()->{if(configuration==null)throw new IllegalStateException("Save provider settings first");if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");startWorker();log("Runner started.");});});
         pause.addActionListener(e->background(()->{worker.pause();log("Pause requested. Current work will finish before the worker stops.");}));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
@@ -110,6 +119,21 @@ public final class DesktopRunner {
     private static void field(JPanel panel,String label,JComponent component){JLabel text=new JLabel(label);text.setLabelFor(component);panel.add(text);panel.add(component);}
     /** Keep expanded pricing and controls reachable on small or scaled displays. */
     private static JPanel stretchStep(JPanel content){JPanel panel=new JPanel(new BorderLayout());panel.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));panel.add(content,BorderLayout.CENTER);return panel;}
+    private JButton guideButton(String label,URI guide){
+        JButton button=new JButton(label);
+        button.addActionListener(event->{try{Desktop.getDesktop().browse(guide);}catch(Exception failure){JOptionPane.showMessageDialog(frame,"Open this official guide in your browser:\n"+guide,"Installation guide",JOptionPane.INFORMATION_MESSAGE);}});
+        return button;
+    }
+    private static JPanel prerequisiteRow(JLabel detail,JButton guide){
+        JPanel row=new JPanel(new BorderLayout(8,0));row.add(detail,BorderLayout.CENTER);row.add(guide,BorderLayout.EAST);return row;
+    }
+    private void updatePrerequisites(DesktopPrerequisites.Report report){
+        SwingUtilities.invokeLater(()->{
+            gitPrerequisite.setText(wrapped(report.git().detail()));dockerPrerequisite.setText(wrapped(report.docker().detail()));
+            log(report.summary());
+        });
+    }
+    private static String wrapped(String text){return "<html><div style='width:390px'>"+text.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")+"</div></html>";}
     private static JPanel step(JPanel content){
         JPanel body=new JPanel(new BorderLayout());body.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));body.add(content,BorderLayout.NORTH);
         JScrollPane scroll=new JScrollPane(body,JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -129,7 +153,13 @@ public final class DesktopRunner {
     private void pair(){
         String address=endpoint.getText().trim(),runnerName=name.getText().trim();
         pairingCancelled.set(false);
-        background(()->{try{URI uri=URI.create(address);PairingRequest request=new PairingRequest();URI approval=request.approvalUri(uri,runnerName);approvalPage=approval;SwingUtilities.invokeLater(()->{fingerprint.setText("Match: "+request.fingerprint());connectionStatus.setText("Waiting for browser approval");reopen.setEnabled(true);cancelPairing.setEnabled(true);});Desktop.getDesktop().browse(approval);RunnerClient client=client(uri);
+        background(()->{try{
+            DesktopPrerequisites.Report prerequisites=DesktopPrerequisites.check();updatePrerequisites(prerequisites);
+            if(!prerequisites.ready()){
+                SwingUtilities.invokeLater(()->JOptionPane.showMessageDialog(frame,prerequisites.summary()+" Install or start the required tools, then select Check requirements.","Runner requirements",JOptionPane.WARNING_MESSAGE));
+                return;
+            }
+            URI uri=URI.create(address);PairingRequest request=new PairingRequest();URI approval=request.approvalUri(uri,runnerName);approvalPage=approval;SwingUtilities.invokeLater(()->{fingerprint.setText("Match: "+request.fingerprint());connectionStatus.setText("Waiting for browser approval");reopen.setEnabled(true);cancelPairing.setEnabled(true);});Desktop.getDesktop().browse(approval);RunnerClient client=client(uri);
             RunnerIdentity identity=new DesktopPairing().await(()->client.exchangePairing(request.verifier()),pairingCancelled::get,Duration.ofMinutes(10));
             if(identity!=null){DesktopFiles.writeAtomic(directory.resolve("endpoint"),address.getBytes(java.nio.charset.StandardCharsets.UTF_8));DesktopFiles.writeAtomic(directory.resolve("runner-name"),runnerName.getBytes(java.nio.charset.StandardCharsets.UTF_8));new RunnerIdentityStore().save(directory.resolve("identity"),identity);DesktopFiles.protect(directory.resolve("identity"));SwingUtilities.invokeLater(()->{endpoint.setEditable(false);name.setEditable(false);refreshSavedStatus();steps.setSelectedIndex(1);});log("Connected. Save your provider settings, then explicitly start when ready.");return;}
             log(pairingCancelled.get()?"Connection cancelled. Click Connect in browser for a fresh request.":"Pairing timed out. Click Connect in browser for a fresh request; close the old browser tab.");
@@ -185,10 +215,7 @@ public final class DesktopRunner {
         save.setEnabled(false);
         debounce.restart();
     }
-    private void startWorker()throws Exception{if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");prerequisites();DesktopFiles.writeAtomic(directory.resolve("provider-policy.json"),JSON.writeValueAsBytes(configuration.policy()));worker.start(configuration,new DesktopSecretStore(directory,configuration.provider()).load(),this::log);}
-    private static void prerequisites()throws Exception{
-        for(String[] command:new String[][]{{"git","--version"},{"docker","info","--format","{{.OSType}}"}}){String tool=command[0];command[0]=DesktopToolPaths.executable(tool);Process process=new ProcessBuilder(command).redirectErrorStream(true).start();if(!process.waitFor(15,java.util.concurrent.TimeUnit.SECONDS)){process.destroyForcibly();throw new IllegalStateException("Git/Docker check timed out; start Docker and retry");}String result=new String(process.getInputStream().readNBytes(8192));if(process.exitValue()!=0||(tool.equals("docker")&&!result.trim().equals("linux")))throw new IllegalStateException("Install Git and start Docker with Linux containers, then check again");}
-    }
+    private void startWorker()throws Exception{if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");DesktopPrerequisites.requireReady();DesktopFiles.writeAtomic(directory.resolve("provider-policy.json"),JSON.writeValueAsBytes(configuration.policy()));worker.start(configuration,new DesktopSecretStore(directory,configuration.provider()).load(),this::log);}
     private void background(Work work){if(!busy.compareAndSet(false,true))return;Thread.ofVirtual().start(()->{try{work.run();}catch(Exception error){SwingUtilities.invokeLater(()->steps.setSelectedIndex(2));log("Action failed: "+(error instanceof IllegalArgumentException||error instanceof IllegalStateException?error.getMessage():error.getClass().getSimpleName()+"; check prerequisites and connectivity"));}finally{busy.set(false);}});}
     private void log(String message){SwingUtilities.invokeLater(()->{if(logs.getDocument().getLength()>24000)logs.setText("");logs.append(message+"\n");logs.setCaretPosition(logs.getDocument().getLength());});}
     @FunctionalInterface private interface Work{void run()throws Exception;}
