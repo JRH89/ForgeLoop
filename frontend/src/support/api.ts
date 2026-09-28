@@ -1,5 +1,5 @@
-export type Session={authenticated:boolean;administrator:boolean};
-export type Ticket={id:string;name:string;email:string;subject:string;category:string;status:string;createdAt:string;updatedAt:string;version:number};
+export type Session={authenticated:boolean;administrator:boolean;recoveryAvailable:boolean};
+export type Ticket={id:string;name:string;email:string;subject:string;category:string;status:string;emailVerifiedAt:string|null;createdAt:string;updatedAt:string;version:number};
 export type Message={id:string;authorKind:string;body:string;internalNote:boolean;createdAt:string};
 export type Detail={ticket:Ticket;messages:Message[]};
 export type TicketPage={tickets:Ticket[];hasMore:boolean;page:number};

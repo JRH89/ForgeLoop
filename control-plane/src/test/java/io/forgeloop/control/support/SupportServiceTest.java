@@ -12,11 +12,12 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.web.server.ResponseStatusException;
 
 class SupportServiceTest {
-    SupportIdentity identity;SupportService service;SupportRepository repository;JdbcTemplate db;
+    SupportIdentity identity;SupportRecoveryDelivery recoveryDelivery;SupportService service;SupportRepository repository;JdbcTemplate db;
     @BeforeEach void setup(){
         var source=new DriverManagerDataSource("jdbc:h2:mem:support-"+UUID.randomUUID()+";MODE=PostgreSQL;DB_CLOSE_DELAY=-1","sa","");
-        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V28__customer_support.sql")).execute(source);
-        db=new JdbcTemplate(source);repository=new SupportRepository(db);identity=mock(SupportIdentity.class);service=new SupportService(repository,identity);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V28__customer_support.sql"),new ClassPathResource("db/migration/V30__guest_support_recovery.sql")).execute(source);
+        db=new JdbcTemplate(source);repository=spy(new SupportRepository(db));identity=mock(SupportIdentity.class);recoveryDelivery=mock(SupportRecoveryDelivery.class);
+        when(recoveryDelivery.available()).thenReturn(true);service=new SupportService(repository,identity,recoveryDelivery);
     }
     SupportService.Create request(){return new SupportService.Create("Customer","customer@example.com","Runner will not connect","BUG","Expected a connection; received an error.","");}
     @Test void guestGetsUnstoredCapabilityAndPersistentThread(){
@@ -71,6 +72,69 @@ class SupportServiceTest {
         assertThrows(ResponseStatusException.class,()->service.create(new SupportService.Create("A","a@b.com","B","BUG","x".repeat(8001),"")));
         assertThrows(ResponseStatusException.class,()->service.list(true,"INVALID","",0));
         assertThrows(ResponseStatusException.class,()->service.list(true,"","",-1));
+    }
+    @Test void emailRecoveryVerifiesAddressRotatesCapabilityAndCannotBeReplayed(){
+        var receipt=service.create(request());String id=receipt.detail().ticket().id();
+        var capture=org.mockito.ArgumentCaptor.forClass(String.class);
+        service.requestRecovery(new SupportService.RecoveryRequest(id,"CUSTOMER@example.com"));
+        verify(recoveryDelivery).sendRecovery(eq("customer@example.com"),capture.capture());
+        String proof=capture.getValue();assertEquals(64,proof.length());
+
+        clearInvocations(repository);
+        var replacement=service.confirmRecovery(proof);
+        var lockOrder=inOrder(repository);
+        lockOrder.verify(repository).findRecovery(SupportService.digest(proof),false);
+        lockOrder.verify(repository).find(id,true);
+        lockOrder.verify(repository).findRecovery(SupportService.digest(proof),true);
+        assertNotEquals(receipt.trackingKey(),replacement.trackingKey());
+        assertNotNull(replacement.detail().ticket().emailVerifiedAt());
+        assertNotNull(service.get(id,replacement.trackingKey(),false));
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->service.get(id,receipt.trackingKey(),false)).getStatusCode().value());
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->service.confirmRecovery(proof)).getStatusCode().value());
+    }
+    @Test void recoveryIsEnumerationResistantRateLimitedAndLimitedToGuestTickets(){
+        var guest=service.create(request());String guestId=guest.detail().ticket().id();
+        service.requestRecovery(new SupportService.RecoveryRequest(guestId,"wrong@example.com"));
+        service.requestRecovery(new SupportService.RecoveryRequest("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","customer@example.com"));
+        verify(recoveryDelivery,never()).sendRecovery(any(),any());
+
+        service.requestRecovery(new SupportService.RecoveryRequest(guestId,"customer@example.com"));
+        service.requestRecovery(new SupportService.RecoveryRequest(guestId,"customer@example.com"));
+        service.requestRecovery(new SupportService.RecoveryRequest(guestId,"customer@example.com"));
+        service.requestRecovery(new SupportService.RecoveryRequest(guestId,"customer@example.com"));
+        verify(recoveryDelivery,times(3)).sendRecovery(eq("customer@example.com"),any());
+
+        when(identity.subject()).thenReturn("github:customer");
+        var owned=service.create(request());
+        service.requestRecovery(new SupportService.RecoveryRequest(owned.detail().ticket().id(),"customer@example.com"));
+        verify(recoveryDelivery,times(3)).sendRecovery(eq("customer@example.com"),any());
+    }
+    @Test void expiredProofAndSupersededProofCannotRotateAccess(){
+        var receipt=service.create(request());String id=receipt.detail().ticket().id();
+        var first=org.mockito.ArgumentCaptor.forClass(String.class);
+        service.requestRecovery(new SupportService.RecoveryRequest(id,"customer@example.com"));
+        verify(recoveryDelivery).sendRecovery(eq("customer@example.com"),first.capture());
+        service.requestRecovery(new SupportService.RecoveryRequest(id,"customer@example.com"));
+        String oldProof=first.getValue();
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->service.confirmRecovery(oldProof)).getStatusCode().value());
+
+        var second=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(recoveryDelivery,times(2)).sendRecovery(eq("customer@example.com"),second.capture());
+        String activeProof=second.getAllValues().getLast();
+        db.update("UPDATE support_recovery SET expires_at=? WHERE token_hash=?",java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)),SupportService.digest(activeProof));
+        assertEquals(404,assertThrows(ResponseStatusException.class,()->service.confirmRecovery(activeProof)).getStatusCode().value());
+        assertNotNull(service.get(id,receipt.trackingKey(),false));
+    }
+    @Test void recoveryEmailIsSentOnlyAfterTheDatabaseTransactionCommits(){
+        var receipt=service.create(request());
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try{
+            service.requestRecovery(new SupportService.RecoveryRequest(receipt.detail().ticket().id(),"customer@example.com"));
+            verify(recoveryDelivery,never()).sendRecovery(any(),any());
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(recoveryDelivery).sendRecovery(eq("customer@example.com"),any());
+        }finally{org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();}
     }
     @Test void nullStatusIsBadRequestAndReopenReservesRoomForAuditEvent(){
         var receipt=service.create(request());String id=receipt.detail().ticket().id();

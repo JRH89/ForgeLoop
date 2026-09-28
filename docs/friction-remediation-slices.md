@@ -14,8 +14,8 @@ production-ready.
 | 2 | GitHub self-signup and administrator-managed invitations | [#48](https://github.com/JRH89/ForgeLoop/issues/48) | [#54](https://github.com/JRH89/ForgeLoop/pull/54) | Merged |
 | 3 | Trustworthy, guided runner installation | [#49](https://github.com/JRH89/ForgeLoop/issues/49) | [#55](https://github.com/JRH89/ForgeLoop/pull/55) | Merged |
 | 4 | Safe desktop runner update experience | [#50](https://github.com/JRH89/ForgeLoop/issues/50) | [#56](https://github.com/JRH89/ForgeLoop/pull/56) | Merged |
-| 5 | Clear GitHub issue handoff and intake diagnosis | [#51](https://github.com/JRH89/ForgeLoop/issues/51) | [#57](https://github.com/JRH89/ForgeLoop/pull/57) | In review |
-| 6 | Recoverable guest support tracking | [#52](https://github.com/JRH89/ForgeLoop/issues/52) | Pending | Planned |
+| 5 | Clear GitHub issue handoff and intake diagnosis | [#51](https://github.com/JRH89/ForgeLoop/issues/51) | [#57](https://github.com/JRH89/ForgeLoop/pull/57) | Merged |
+| 6 | Recoverable guest support tracking | [#52](https://github.com/JRH89/ForgeLoop/issues/52) | [#58](https://github.com/JRH89/ForgeLoop/pull/58) | In review |
 
 ## Slice 1 — Reliable isolated PostgreSQL restore drill
 

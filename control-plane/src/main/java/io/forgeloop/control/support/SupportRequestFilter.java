@@ -24,12 +24,16 @@ public class SupportRequestFilter extends OncePerRequestFilter {
             reject(response,403,"Use the same-origin support form");return;
         }
         long minute=Instant.now().getEpochSecond()/60;
-        boolean create=request.getMethod().equals("POST")&&request.getRequestURI().equals("/api/support/tickets");
-        String key=request.getRemoteAddr()+":"+(create?"create":request.getMethod().equals("GET")?"read":"write");
+        String path=request.getRequestURI();
+        boolean create=request.getMethod().equals("POST")&&path.equals("/api/support/tickets");
+        boolean recoveryStart=request.getMethod().equals("POST")&&path.equals("/api/support/tickets/recovery");
+        boolean recoveryConfirm=request.getMethod().equals("POST")&&path.equals("/api/support/tickets/recovery/confirm");
+        String key=request.getRemoteAddr()+":"+(create?"create":recoveryStart?"recovery-start":recoveryConfirm?"recovery-confirm":request.getMethod().equals("GET")?"read":"write");
         requests.entrySet().removeIf(entry->entry.getValue().minute()!=minute);
         if(requests.size()>=10000&&!requests.containsKey(key)){reject(response,429,"Support is busy. Try again shortly.");return;}
         Window window=requests.compute(key,(k,old)->new Window(minute,old==null||old.minute()!=minute?1:old.count()+1));
-        if(window.count()>(create?10:request.getMethod().equals("GET")?240:30)){
+        int limit=create?10:recoveryStart?5:recoveryConfirm?10:request.getMethod().equals("GET")?240:30;
+        if(window.count()>limit){
             response.setHeader("Retry-After","60");reject(response,429,"Too many support requests. Try again in a minute.");return;
         }
         if(request.getMethod().equals("POST")||request.getMethod().equals("PATCH")){
