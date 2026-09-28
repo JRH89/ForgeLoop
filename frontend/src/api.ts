@@ -26,6 +26,23 @@ export type GithubPublication = { repository: string; branch: string; headSha?: 
 export type RunnerEvent = { id: string; taskId: string; runnerId: string; sequenceNumber: number; level: string; eventType: string; message: string; occurredAt: string };
 export type HumanEscalation = { id: string; taskId?: string; reason: string; severity: string; status: string; summary: string; createdAt: string; acknowledgedAt?: string; acknowledgedBy?: string };
 export type OperatorSession = { subject: string; organizationId: string; role: 'ADMIN' | 'OPERATOR' | 'VIEWER' };
+export type OrganizationMember = { id: string; organizationId: string; organizationName: string; subject: string; githubLogin?: string; role: OperatorSession['role']; accepted: boolean };
+const memberFields = 'id organizationId organizationName subject githubLogin role accepted';
+export function loadMyOrganizations(): Promise<OrganizationMember[]> {
+  return request<{myOrganizationMemberships?:OrganizationMember[]}>(`query{myOrganizationMemberships{${memberFields}}}`).then(data => data.myOrganizationMemberships ?? []);
+}
+export function selectOrganization(organizationId: string): Promise<OperatorSession> {
+  return request<{selectOrganization:OperatorSession}>('mutation($organizationId:String!){selectOrganization(organizationId:$organizationId){subject organizationId role}}',{organizationId}).then(data => data.selectOrganization);
+}
+export function loadOrganizationMembers(organizationId: string): Promise<OrganizationMember[]> {
+  return request<{organizationMemberships: OrganizationMember[]}>(`query($organizationId:String!){organizationMemberships(organizationId:$organizationId){${memberFields}}}`, {organizationId}).then(data => data.organizationMemberships);
+}
+export function inviteGithubUser(organizationId: string, login: string, role: OperatorSession['role']): Promise<OrganizationMember> {
+  return request<{inviteGithubUser: OrganizationMember}>(`mutation($organizationId:String!,$login:String!,$role:OperatorRole!){inviteGithubUser(organizationId:$organizationId,login:$login,role:$role){${memberFields}}}`, {organizationId,login,role}).then(data => data.inviteGithubUser);
+}
+export function revokeOrganizationMember(organizationId: string, membershipId: string): Promise<boolean> {
+  return request<{revokeOrganizationMembership:boolean}>('mutation($organizationId:String!,$membershipId:ID!){revokeOrganizationMembership(organizationId:$organizationId,membershipId:$membershipId)}', {organizationId,membershipId}).then(data => data.revokeOrganizationMembership);
+}
 export type SubmitFeature = { repository: string; sourceRef: string; title: string; specification: string; budgetUsd: number };
 export type RepositoryConnection = { requiredAssignee?: string; id: string; repository: string; installationId: number; enabled: boolean; defaultBranch: string; issueLabel: string; harnessProfile: string; requiredGates: string[]; maxBudgetUsd: number; policyRevision: number };
 export type ConnectRepository = Omit<RepositoryConnection, 'id' | 'enabled' | 'policyRevision'>;

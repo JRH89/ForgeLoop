@@ -18,6 +18,7 @@ function controlPlane(data: Record<string, unknown>) {
   return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
     const query = (JSON.parse(String(init.body)) as { query: string }).query;
     if (query.includes('currentOperator')) return { ok: true, json: async () => ({ data: { currentOperator: { subject: 'operator', organizationId: 'local-development', role: 'ADMIN' } } }) };
+    if (query.includes('myOrganizationMemberships')) return { ok: true, json: async () => ({ data: { myOrganizationMemberships: [] } }) };
     if (query.includes('repositoryConnections')) return { ok: true, json: async () => ({ data: { repositoryConnections: data.repositoryConnections ?? [] } }) };
     if (query.includes('runAnalytics')) return { ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) };
     if (query.includes('organizationPolicy')) return { ok: true, json: async () => ({ data: { organizationPolicy: { organizationId: 'local-development', maxRunBudgetUsd: 100, maxParallelTasks: 4, allowedProviders: ['anthropic'], requireHumanApproval: true, autoMergeEnabled: false, revision: 2 }, harnessDefinitions: [{ id: 'h1', organizationId: 'local-development', name: 'FULL_STACK', description: 'Plan, implement, verify, and review', allowedRoles: ['PLANNER', 'BACKEND', 'FRONTEND', 'REVIEW'], defaultAttemptBudget: 2, enabled: true, revision: 1 }], localMcpConfigurations: [] } }) };
@@ -96,7 +97,8 @@ it('keeps viewers read-only', async () => {
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { repositoryConnections: [] } }) })
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { featureRuns: [] } }) })
     .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { currentOperator: { subject: 'viewer', organizationId: 'acme', role: 'VIEWER' } } }) })
-    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) });
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { runAnalytics: { totalRuns: 0, activeRuns: 0, deliveredRuns: 0, providerRequests: 0, inputTokens: 0, outputTokens: 0, knownCostMicros: 0, costCoverage: 1, modelComparisons: [], harnessComparisons: [] } } }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { myOrganizationMemberships: [] } }) });
   vi.stubGlobal('fetch', fetch);
   render(<App />);
   expect(await screen.findByText('Intake queue')).toBeInTheDocument();

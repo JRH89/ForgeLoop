@@ -25,7 +25,15 @@ type RepositoryConnection { id: ID!, repository: String!, installationId: Float!
 type VerificationPolicy { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int!, required: Boolean!, criterionCoverage: String! }
 type Runner { id: ID!, organizationId: String!, name: String!, version: String!, capabilities: [String!]!, registeredAt: String!, lastHeartbeatAt: String!, enabled: Boolean! }
 type RunnerEnrollment { runner: Runner!, credential: String! }
-type OrganizationMembership { id: ID!, subject: String!, role: OperatorRole! }
+type OrganizationMembership { id: ID!, organizationId: String!, organizationName: String!, subject: String!, githubLogin: String, role: OperatorRole!, accepted: Boolean! }
+
+extend type Mutation {
+  inviteGithubUser(organizationId: String!, login: String!, role: OperatorRole!): OrganizationMembership!
+  revokeOrganizationMembership(organizationId: String!, membershipId: ID!): Boolean!
+  selectOrganization(organizationId: String!): OperatorSession!
+}
+
+extend type Query { myOrganizationMemberships: [OrganizationMembership!]! }
 type OperatorSession { subject: String!, organizationId: String!, role: OperatorRole! }
 type AuditLedgerEntry { id: ID!, actor: String!, action: String!, resourceType: String!, resourceId: String!, payloadDigest: String!, occurredAt: String! }
 type GithubPublication { id: ID!, featureRunId: ID!, repository: String!, branch: String!, idempotencyKey: String!, headSha: String, checkRunId: Float, pullRequestNumber: Float, pullRequestState: String!, deliveredAt: String, autoMergeRequested: Boolean!, mergedAt: String, mergeSha: String }

@@ -21,6 +21,7 @@ public class ControlPlaneController {
   @QueryMapping public List<RepositoryConnection> repositoryConnections() { return connections.list(); }
   @QueryMapping public List<Runner> runners(@Argument String organizationId) { operators.requireOrganization(organizationId); return runners.list(organizationId); }
   @QueryMapping public List<OrganizationMembership> organizationMemberships(@Argument String organizationId) { return organizations.memberships(organizationId); }
+  @QueryMapping public List<OrganizationMembership> myOrganizationMemberships() { return operators.myMemberships(); }
   /** The run lookup establishes tenant access before its audit history is returned. */
   @QueryMapping public List<AuditLedgerEntry> featureRunAuditEvents(@Argument String runId) { runs.get(runId); return audit.events("FEATURE_RUN", runId); }
   @QueryMapping public List<VerificationEvidence> featureRunEvidence(@Argument String runId) { runs.get(runId); return evidence.findByTask_Run_IdOrderByRecordedAtAsc(runId); }
@@ -39,6 +40,9 @@ public class ControlPlaneController {
   @MutationMapping public RunnerEnrollment registerRunner(@Argument RegisterRunnerInput input) { return runners.register(new RunnerRegistration(input.token(), input.name(), input.version(), input.capabilities())); }
   @MutationMapping public Runner runnerHeartbeat(@Argument String runnerId, @Argument String credential) { return runners.heartbeat(runnerId, credential); }
   @MutationMapping public OrganizationMembership grantOrganizationMembership(@Argument String organizationId, @Argument String subject, @Argument OperatorRole role) { return organizations.grantMembership(organizationId, subject, role); }
+  @MutationMapping public OrganizationMembership inviteGithubUser(@Argument String organizationId, @Argument String login, @Argument OperatorRole role) { return organizations.inviteGithubUser(organizationId, login, role); }
+  @MutationMapping public boolean revokeOrganizationMembership(@Argument String organizationId, @Argument String membershipId) { return organizations.revokeMembership(organizationId, membershipId); }
+  @MutationMapping public OperatorSession selectOrganization(@Argument String organizationId) { operators.selectOrganization(organizationId); return currentOperator(); }
   @MutationMapping public FeatureRun overrideVerificationGate(@Argument String runId, @Argument String gate, @Argument String reason) { operators.requireAdministrator(); return runs.overrideGate(runId, gate, reason); }
   @MutationMapping public FeatureRun cancelFeatureRun(@Argument String runId, @Argument String confirmation) { operators.requireOperator(); if(!"CANCEL".equals(confirmation))throw new IllegalArgumentException("Cancellation confirmation must equal CANCEL"); return runs.cancel(runId); }
   @MutationMapping public DeliveryTask retryFeatureTask(@Argument String taskId, @Argument String reason, @Argument String confirmation) { operators.requireOperator(); if(!"RETRY".equals(confirmation))throw new IllegalArgumentException("Retry confirmation must equal RETRY"); return runs.retry(taskId, reason); }
