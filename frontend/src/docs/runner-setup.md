@@ -395,9 +395,13 @@ remain explicit operator requests and do not use this GitHub-only gate.
 ### Clear the intake queue and follow progress
 
 Use **Archive** on terminal runs, or cancel active work first. **Show archived runs**
-lets you inspect them and **Restore** puts them back. Archiving keeps evidence,
-audit records, costs, and GitHub issue deduplication; it never deletes GitHub work.
-Permanent destruction is deliberately not the queue-cleanup action.
+lets you inspect them; the recycle icon restores a run to the queue. The trash icon
+permanently deletes an archived run after confirmation. This removes its ForgeLoop
+run, task, and evidence records; the security audit log and GitHub activity remain,
+and uploaded artifact bytes follow their configured retention. Archiving itself is
+reversible and preserves evidence, costs, and GitHub issue deduplication. Because
+deletion removes the run record, a later eligible GitHub issue event can create a
+fresh run for that issue.
 
 The queue and selected run refresh every two seconds while visible, with slower
 background polling and error backoff. The status line shows the last successful

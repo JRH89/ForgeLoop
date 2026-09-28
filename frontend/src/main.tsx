@@ -12,7 +12,7 @@ import OnboardingPage from './onboarding/OnboardingPage';
 import UsagePage from './usage/UsagePage';
 import './console-navigation.css';
 import './support/console-link.css';
-import { BarChart3, GitBranch, LifeBuoy, ListChecks, Menu, X, SlidersHorizontal, Users } from "lucide-react";
+import { Archive, BarChart3, GitBranch, LifeBuoy, ListChecks, Menu, Recycle, Trash2, X, SlidersHorizontal, Users } from "lucide-react";
 import GuideNavigation from "./GuideNavigation";
 import {
   approveFeatureRun,
@@ -22,6 +22,7 @@ import {
   configureOrganizationPolicy,
   createHarnessDefinition,
   createLocalMcpConfiguration,
+  deleteRun,
   loadOperator,
   loadMyOrganizations,
   loadRunAnalytics,
@@ -726,6 +727,17 @@ function RunsPage({
     catch(reason){setRefreshError(reason instanceof Error?reason.message:'Archive failed');}
     finally{setArchiveBusy('');}
   }
+  async function deleteArchived(item:FeatureRun) {
+    const confirmation=`Permanently delete archived run ${item.sourceRef}? Its ForgeLoop run, task, and evidence records will be removed. The audit log and GitHub activity remain; uploaded artifact bytes follow their configured retention. A later eligible GitHub issue event may create a fresh run.`;
+    if(!window.confirm(confirmation))return;
+    setArchiveBusy(item.id);
+    try {
+      if(!await deleteRun(item.id))throw new Error('Run was not deleted');
+      setRuns(current=>current.filter(run=>run.id!==item.id));
+      if(selected===item.id)setSelected(undefined);
+    } catch(reason) { setRefreshError(reason instanceof Error?reason.message:'Delete failed'); }
+    finally { setArchiveBusy(''); }
+  }
   if (creating)
     return (
       <>
@@ -781,7 +793,10 @@ function RunsPage({
                       <td data-label="Progress"><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
                       <td data-label="Cost" title={costSummary(item)}>{costSummary(item, true)}</td>
                       <td data-label="Started"><time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time></td>
-                      <td data-label="Queue">{operator.role!=='VIEWER'&&(item.archived||terminal.has(displayedRunState(item)))?<button disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}>{item.archived?'Restore':'Archive'}</button>:<small>Cancel active work before archiving</small>}</td>
+                      <td data-label="Queue">{operator.role!=='VIEWER'&&(item.archived||terminal.has(displayedRunState(item)))?item.archived?<div className="queue-actions">
+                        <button className="queue-icon-button" aria-label={`Restore ${item.sourceRef}`} title="Restore run to intake queue" disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}><Recycle size={16} aria-hidden="true"/></button>
+                        <button className="queue-icon-button danger" aria-label={`Delete ${item.sourceRef}`} title="Permanently delete archived run" disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void deleteArchived(item);}}><Trash2 size={16} aria-hidden="true"/></button>
+                      </div>:<button className="queue-action-button" disabled={archiveBusy===item.id} onKeyDown={event=>event.stopPropagation()} onClick={event=>{event.stopPropagation();void archive(item);}}><Archive size={14} aria-hidden="true"/>Archive</button>:<small>Cancel active work before archiving</small>}</td>
                     </tr>
                   );
                 })}

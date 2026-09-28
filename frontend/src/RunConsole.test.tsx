@@ -28,7 +28,13 @@ it('shows a workspace selector for a GitHub account in two organizations', async
 
 function controlPlane(data: Record<string, unknown>) {
   return vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
-    const query = (JSON.parse(String(init.body)) as { query: string }).query;
+    const body=JSON.parse(String(init.body)) as {query:string;variables?:Record<string,unknown>};
+    const query=body.query;
+    if(query.includes('deleteFeatureRun')){
+      const id=body.variables?.runId;
+      data.featureRuns=(data.featureRuns as Array<{id:string}>|undefined??[]).filter(run=>run.id!==id);
+      return {ok:true,json:async()=>({data:{deleteFeatureRun:true}})};
+    }
     if (query.includes('currentOperator')) return { ok: true, json: async () => ({ data: { currentOperator: { subject: 'operator', organizationId: 'local-development', role: 'ADMIN' } } }) };
     if (query.includes('myOrganizationMemberships')) return { ok: true, json: async () => ({ data: { myOrganizationMemberships: data.myOrganizationMemberships ?? [] } }) };
     if (query.includes('repositoryConnections')) return { ok: true, json: async () => ({ data: { repositoryConnections: data.repositoryConnections ?? [] } }) };
@@ -51,7 +57,46 @@ it('separates archived runs and shows missing prices rather than zero cost',asyn
   fireEvent.click(screen.getByLabelText('Show archived runs'));
   expect(screen.getByText('Retained archive')).toBeInTheDocument();
   expect(screen.getByTitle('No usage recorded')).toHaveTextContent('N/A');
-  expect(screen.getByRole('button',{name:'Restore'})).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Restore issue-2'}).querySelector('svg')).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Delete issue-2'}).querySelector('svg')).toBeInTheDocument();
+});
+
+it('renders the archive action as a styled, icon-led dashboard button',async()=>{
+  vi.stubGlobal('fetch',controlPlane({featureRuns:[
+    {id:'complete',title:'Completed delivery',sourceRef:'issue-3',repository:'org/repo',state:'COMPLETE',createdAt:new Date().toISOString(),archived:false,tasks:[]}
+  ]}));
+  render(<App/>);
+  const archive=await screen.findByRole('button',{name:'Archive'});
+  expect(archive).toHaveClass('queue-action-button');
+  expect(archive.querySelector('svg')).toBeInTheDocument();
+});
+
+it('permanently deletes archived runs only after confirmation',async()=>{
+  const data:Record<string,unknown>={featureRuns:[{id:'archive',title:'Retained archive',sourceRef:'issue-2',repository:'org/repo',state:'CANCELLED',createdAt:new Date().toISOString(),archived:true,tasks:[]}]};
+  const confirm=vi.fn(()=>true),fetch=controlPlane(data);
+  vi.stubGlobal('confirm',confirm);
+  vi.stubGlobal('fetch',fetch);
+  render(<App/>);
+  fireEvent.click(await screen.findByLabelText('Show archived runs'));
+  expect(await screen.findByText('Retained archive')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Delete issue-2'}));
+  await waitFor(()=>expect(screen.queryByText('Retained archive')).not.toBeInTheDocument());
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Permanently delete archived run issue-2'));
+  const deleteRequest=fetch.mock.calls.map(([,init])=>JSON.parse(String(init.body)) as {query:string}).find(body=>body.query.includes('deleteFeatureRun'));
+  expect(deleteRequest?.query).toContain('deleteFeatureRun(runId:$runId)');
+});
+
+it('leaves an archived run untouched when deletion is cancelled',async()=>{
+  const data:Record<string,unknown>={featureRuns:[{id:'archive',title:'Retained archive',sourceRef:'issue-2',repository:'org/repo',state:'CANCELLED',createdAt:new Date().toISOString(),archived:true,tasks:[]}]};
+  const confirm=vi.fn(()=>false),fetch=controlPlane(data);
+  vi.stubGlobal('confirm',confirm);
+  vi.stubGlobal('fetch',fetch);
+  render(<App/>);
+  fireEvent.click(await screen.findByLabelText('Show archived runs'));
+  fireEvent.click(await screen.findByRole('button',{name:'Delete issue-2'}));
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(screen.getByText('Retained archive')).toBeInTheDocument();
+  expect(fetch.mock.calls.some(([,init])=>JSON.parse(String(init.body)).query.includes('deleteFeatureRun'))).toBe(false);
 });
 
 it('refreshes the queue without selecting a run',async()=>{
