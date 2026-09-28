@@ -41,7 +41,7 @@ The `Supply-chain evidence` workflow scans dependencies, secrets, configuration,
 
 Managed PostgreSQL must have encrypted point-in-time recovery and cross-failure-domain snapshots. At least quarterly, restore a snapshot into an isolated account/project, run Flyway validation and application smoke tests, and record recovery-point and recovery-time evidence. A backup is not considered usable until a restore succeeds.
 
-For a local, destructive-to-the-temporary-target-only rehearsal, run `./scripts/Test-PostgresRestore.ps1` while the Compose database is healthy. The script makes a custom-format dump, restores it into a new tmpfs-backed PostgreSQL 18 container, validates the latest successful Flyway version and repository table, prints the result, then deletes the temporary container and dump. It never writes to the source database. Hosted production evidence is still required before launch.
+For a local, destructive-to-the-temporary-target-only rehearsal, run `./scripts/Test-PostgresRestore.ps1` while the Compose database is healthy. The script makes a custom-format dump, waits for the isolated PostgreSQL 18 container's final server (not its temporary initialization server), restores into tmpfs, validates the latest successful Flyway version and repository table, prints the result, then deletes the temporary container and dump. It never writes to the source database. Hosted production evidence is still required before launch.
 
 ## Service objectives and alerts
 

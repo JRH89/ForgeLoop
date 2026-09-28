@@ -73,6 +73,9 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: docker compose up --build --wait
+      - name: Verify PostgreSQL final-server readiness logic
+        shell: pwsh
+        run: ./scripts/Test-PostgresFinalServer.ps1
       - name: Restore database into an isolated container
         shell: pwsh
         run: ./scripts/Test-PostgresRestore.ps1

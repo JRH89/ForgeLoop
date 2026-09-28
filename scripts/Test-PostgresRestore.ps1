@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'Wait-PostgresFinalServer.ps1')
 $sourceContainer = "$ComposeProject-postgres-1"
 $drillContainer = "$ComposeProject-restore-drill-$([guid]::NewGuid().ToString('N'))"
 $backupPath = Join-Path ([System.IO.Path]::GetTempPath()) "forgeloop-restore-$([guid]::NewGuid().ToString('N')).dump"
@@ -29,13 +30,7 @@ try {
         postgres:18-alpine *> $null
     if ($LASTEXITCODE -ne 0) { throw "Could not start restore target." }
 
-    $ready = $false
-    foreach ($attempt in 1..30) {
-        docker exec $drillContainer pg_isready --username=$Username --dbname=$Database *> $null
-        if ($LASTEXITCODE -eq 0) { $ready = $true; break }
-        Start-Sleep -Seconds 1
-    }
-    if (-not $ready) { throw "Restore target did not become ready." }
+    Wait-PostgresFinalServer -Container $drillContainer -Database $Database -Username $Username
 
     docker cp $backupPath "${drillContainer}:${containerBackup}"
     if ($LASTEXITCODE -ne 0) { throw "Could not copy the backup into the restore target." }
