@@ -12,6 +12,7 @@ import io.forgeloop.control.domain.RepositoryConnectionRepository;
 import io.forgeloop.control.domain.RepositoryScan;
 import io.forgeloop.control.domain.RepositoryScanFinding;
 import io.forgeloop.control.domain.RepositoryScanRepository;
+import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.integrations.github.GithubApi;
 import io.forgeloop.control.integrations.github.GithubIssueReceipt;
 import io.forgeloop.control.security.OperatorContext;
@@ -27,7 +28,8 @@ class RepositoryScanServiceTest {
     private final OperatorContext operators = Mockito.mock(OperatorContext.class);
     private final GithubApi github = Mockito.mock(GithubApi.class);
     private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class);
-    private final RepositoryScanService service = new RepositoryScanService(scans, connections, operators, github, audit);
+    private final ProviderActivityService providerActivities = Mockito.mock(ProviderActivityService.class);
+    private final RepositoryScanService service = new RepositoryScanService(scans, connections, operators, github, audit, providerActivities);
 
     @Test void manualScanRequestRequiresAdministratorAndStoresOrganizationScope() {
         when(operators.organizationId()).thenReturn("org-1");
@@ -69,6 +71,21 @@ class RepositoryScanServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.createIssue("scan-1", "finding-1"));
 
         verify(github, never()).createIssue(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString());
+    }
+
+    @Test void successfulRunnerScanRecordsOneMetadataOnlyProviderActivity() {
+        RepositoryScan scan = new RepositoryScan("org-1", "acme/project", "main", "admin-1");
+        ReflectionTestUtils.setField(scan, "id", "scan-1");
+        scan.claim("runner-1");
+        when(scans.lockById("scan-1")).thenReturn(Optional.of(scan));
+        Runner runner = new Runner("org-1", "customer-runner", "0.1.0", List.of("git", "provider"), "a".repeat(64));
+        ReflectionTestUtils.setField(runner, "id", "runner-1");
+        RepositoryScanResultInput result = new RepositoryScanResultInput(true, "a".repeat(40), "openai", "gpt-test",
+                25, 10, 100, true, null, List.of());
+
+        service.complete("scan-1", runner, result);
+
+        verify(providerActivities).record("org-1", "REPOSITORY_SCAN", "acme/project", "scan-1", "openai", "gpt-test", 25, 10, 100, true);
     }
 
     private static RepositoryConnection repository(String organizationId) {
