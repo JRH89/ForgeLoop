@@ -97,5 +97,7 @@
 .public-site .landing-hero{padding-top:110px!important;padding-bottom:85px!important;min-height:630px}
 /* Keep the first message close to mobile navigation; retain the desktop composition. */
 @media(max-width:1000px){.public-site .landing-hero{padding-top:24px!important;padding-bottom:65px!important;min-height:0}}
+/* Center the landing copy in the mobile first-screen area below the sticky nav. */
+@media(max-width:1000px){.public-site .landing-hero{display:flex;flex-direction:column;justify-content:center;min-height:calc(100vh - 76px);min-height:calc(100svh - 76px);padding-block:24px 40px!important}}
 /* Avoid stacking paragraph margins onto the mobile footer's closing padding. */
 @media(max-width:760px){.public-site .public-footer{padding-bottom:20px}.public-site .footer-note{margin-bottom:0}}
