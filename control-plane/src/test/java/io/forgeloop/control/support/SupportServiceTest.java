@@ -16,7 +16,7 @@ class SupportServiceTest {
     @BeforeEach void setup(){
         var source=new DriverManagerDataSource("jdbc:h2:mem:support-"+UUID.randomUUID()+";MODE=PostgreSQL;DB_CLOSE_DELAY=-1","sa","");
         new ResourceDatabasePopulator(new ClassPathResource("db/migration/V28__customer_support.sql"),new ClassPathResource("db/migration/V30__guest_support_recovery.sql")).execute(source);
-        db=new JdbcTemplate(source);repository=new SupportRepository(db);identity=mock(SupportIdentity.class);recoveryDelivery=mock(SupportRecoveryDelivery.class);
+        db=new JdbcTemplate(source);repository=spy(new SupportRepository(db));identity=mock(SupportIdentity.class);recoveryDelivery=mock(SupportRecoveryDelivery.class);
         when(recoveryDelivery.available()).thenReturn(true);service=new SupportService(repository,identity,recoveryDelivery);
     }
     SupportService.Create request(){return new SupportService.Create("Customer","customer@example.com","Runner will not connect","BUG","Expected a connection; received an error.","");}
@@ -80,7 +80,12 @@ class SupportServiceTest {
         verify(recoveryDelivery).sendRecovery(eq("customer@example.com"),capture.capture());
         String proof=capture.getValue();assertEquals(64,proof.length());
 
+        clearInvocations(repository);
         var replacement=service.confirmRecovery(proof);
+        var lockOrder=inOrder(repository);
+        lockOrder.verify(repository).findRecovery(SupportService.digest(proof),false);
+        lockOrder.verify(repository).find(id,true);
+        lockOrder.verify(repository).findRecovery(SupportService.digest(proof),true);
         assertNotEquals(receipt.trackingKey(),replacement.trackingKey());
         assertNotNull(replacement.detail().ticket().emailVerifiedAt());
         assertNotNull(service.get(id,replacement.trackingKey(),false));

@@ -74,9 +74,14 @@ public class SupportService {
     @Transactional public Receipt confirmRecovery(String token) {
         if(token==null||!token.matches("[a-f0-9]{64}"))throw recoveryInvalid();
         Instant now=Instant.now();
-        var recovery=repository.findRecovery(digest(token),true).orElseThrow(SupportService::recoveryInvalid);
+        String tokenHash=digest(token);
+        // Lock ticket rows before recovery rows everywhere; requests use this order too.
+        var candidate=repository.findRecovery(tokenHash,false).orElseThrow(SupportService::recoveryInvalid);
+        var ticket=find(candidate.ticketId(),true);
+        // Re-read after acquiring the ticket lock so a concurrent rotation is observed.
+        var recovery=repository.findRecovery(tokenHash,true)
+                .filter(value->value.ticketId().equals(ticket.id())).orElseThrow(SupportService::recoveryInvalid);
         if(recovery.consumedAt()!=null||!recovery.expiresAt().isAfter(now))throw recoveryInvalid();
-        var ticket=find(recovery.ticketId(),true);
         if(ticket.owner()!=null)throw recoveryInvalid();
         String replacement=randomKey();
         repository.expirePendingRecoveries(ticket.id(),now);
