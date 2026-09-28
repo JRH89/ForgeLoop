@@ -47,7 +47,14 @@ public final class StructuredOutputSchemas {
             {"type":"object","additionalProperties":false,
              "properties":{"title":{"type":"string","maxLength":200},"body":{"type":"string","maxLength":12000},
                "acceptanceCriteria":{"type":"array","minItems":1,"maxItems":10,"items":{"type":"string","maxLength":400}}},
-             "required":["title","body","acceptanceCriteria"]}
+            "required":["title","body","acceptanceCriteria"]}
+            """);
+    private static final JsonNode ISSUE_CHAT = parse("""
+            {"type":"object","additionalProperties":false,
+             "properties":{"assistantMessage":{"type":"string","maxLength":2000},
+               "title":{"type":"string","maxLength":200},"body":{"type":"string","maxLength":12000},
+               "acceptanceCriteria":{"type":"array","minItems":1,"maxItems":10,"items":{"type":"string","maxLength":400}}},
+             "required":["assistantMessage","title","body","acceptanceCriteria"]}
             """);
 
     private StructuredOutputSchemas() { }
@@ -56,6 +63,7 @@ public final class StructuredOutputSchemas {
     public static JsonNode review() { return REVIEW.deepCopy(); }
     public static JsonNode repositoryScan() { return REPOSITORY_SCAN.deepCopy(); }
     public static JsonNode repositoryIssueProposal() { return REPOSITORY_ISSUE_PROPOSAL.deepCopy(); }
+    public static JsonNode issueChat() { return ISSUE_CHAT.deepCopy(); }
     private static JsonNode parse(String schema) {
         try { return JSON.readTree(schema); }
         catch (Exception invalid) { throw new ExceptionInInitializerError(invalid); }

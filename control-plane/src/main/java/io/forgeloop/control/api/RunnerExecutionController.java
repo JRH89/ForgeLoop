@@ -16,6 +16,9 @@ import io.forgeloop.control.application.RepositoryScanResultInput;
 import io.forgeloop.control.application.RepositoryIssueProposalService;
 import io.forgeloop.control.application.RepositoryIssueProposalGrant;
 import io.forgeloop.control.application.RepositoryIssueProposalResultInput;
+import io.forgeloop.control.application.IssueConversationService;
+import io.forgeloop.control.application.IssueChatTurnGrant;
+import io.forgeloop.control.application.IssueChatTurnResultInput;
 import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.ProviderAttempt;
@@ -44,9 +47,10 @@ public class RunnerExecutionController {
     private final ReviewEvidenceService reviews;
     private final RepositoryScanService scans;
     private final RepositoryIssueProposalService issueProposals;
+    private final IssueConversationService issueConversations;
 
-    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews, RepositoryScanService scans, RepositoryIssueProposalService issueProposals) {
-        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews; this.scans=scans; this.issueProposals=issueProposals;
+    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews, RepositoryScanService scans, RepositoryIssueProposalService issueProposals, IssueConversationService issueConversations) {
+        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews; this.scans=scans; this.issueProposals=issueProposals; this.issueConversations=issueConversations;
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
@@ -65,6 +69,13 @@ public class RunnerExecutionController {
     @MutationMapping public io.forgeloop.control.domain.RepositoryIssueProposal completeRepositoryIssueProposal(@Argument String proposalId,
             @Argument String runnerId, @Argument String credential, @Argument RepositoryIssueProposalResultInput input) {
         return issueProposals.complete(proposalId, runners.authenticated(runnerId, credential), input);
+    }
+    @MutationMapping public IssueChatTurnGrant claimIssueChatTurn(@Argument String runnerId, @Argument String credential) {
+        return issueConversations.claim(runners.authenticated(runnerId, credential));
+    }
+    @MutationMapping public io.forgeloop.control.application.IssueConversationView completeIssueChatTurn(@Argument String conversationId,
+            @Argument String runnerId, @Argument String credential, @Argument IssueChatTurnResultInput input) {
+        return issueConversations.complete(conversationId, runners.authenticated(runnerId, credential), input);
     }
     @MutationMapping public LeaseGrant claimTaskLease(@Argument String taskId, @Argument String runnerId, @Argument String credential) {
         runners.authenticated(runnerId, credential); return leases.claim(taskId, runnerId);

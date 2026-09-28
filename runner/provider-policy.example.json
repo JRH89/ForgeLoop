@@ -43,5 +43,10 @@
     "provider": "anthropic",
     "model": "claude-sonnet-5",
     "maxAttempts": 2
+  },
+  "AI_CHAT": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
   }
 }

@@ -43,6 +43,8 @@ The runner automatically clones authorized repositories using lease-bound GitHub
 
 Repository scan findings can be expanded into an issue draft with the optional `ISSUE_SPECIFICATION` provider-policy entry. The follow-up call receives only the scan's bounded finding evidence, affected paths, and commit identity, not another checkout or arbitrary repository files. Its token/cost metadata is recorded separately from the scan. The runner only returns a draft; an organization administrator must review, edit, and approve it before ForgeLoop creates a GitHub issue.
 
+The dashboard's **Issue chat** uses the runner's `AI_CHAT` provider-policy role (or falls back to `default`) to turn a short conversation into an editable issue draft. Chat turns receive only the bounded conversation text; they do not receive a repository checkout, GitHub installation token, or repository-write capability. An administrator must review and explicitly create the GitHub issue. It is created without a label or assignee, so the repository's normal issue-intake policy still controls when delivery can begin.
+
 Planner and writing prompts include a bounded runner-local repository manifest and text-only source context. Authorized paths are prioritized, Git metadata and binary contents are excluded, individual files and total context are capped, and the server independently enforces the fixed capability for every role. The model cannot invent a new runner capability or expand its write scope.
 
 ## Provider boundary

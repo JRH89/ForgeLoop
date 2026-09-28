@@ -103,6 +103,40 @@ public final class RunnerClient {
         putUsage(input, usage);
         completeRepositoryIssueProposal(identity, grant.id(), input);
     }
+    /** Claims one bounded chat turn. The grant contains text only and cannot authorize source execution. */
+    public IssueChatTurnGrant claimIssueChatTurn(RunnerIdentity identity) throws Exception {
+        String response = post("mutation($runnerId:ID!,$credential:String!){claimIssueChatTurn(runnerId:$runnerId,credential:$credential){id repository draftTitle draftBody acceptanceCriteria messages{role content}}}",
+                JSON.writeValueAsString(java.util.Map.of("runnerId", identity.runnerId(), "credential", identity.credential())));
+        JsonNode grant = JSON.readTree(response).path("data").path("claimIssueChatTurn");
+        if (grant.isMissingNode()) throw new ControlPlaneFailure("Issue chat claim response was malformed", true);
+        return grant.isNull() ? null : JSON.treeToValue(grant, IssueChatTurnGrant.class);
+    }
+    /** Reports only the reviewed-draft candidate and provider usage; issue creation stays a browser approval. */
+    public void completeIssueChatTurn(RunnerIdentity identity, IssueChatTurnGrant grant, IssueChatResult result) throws Exception {
+        java.util.Map<String,Object> input = new java.util.LinkedHashMap<>();
+        input.put("passed", true);
+        input.put("assistantMessage", result.assistantMessage());
+        input.put("title", result.specification().title());
+        input.put("body", result.specification().body());
+        input.put("acceptanceCriteria", result.specification().acceptanceCriteria());
+        putUsage(input, result.usage());
+        completeIssueChatTurn(identity, grant.id(), input);
+    }
+    public void failIssueChatTurn(RunnerIdentity identity, IssueChatTurnGrant grant, ProviderUsageEvidence usage) throws Exception {
+        java.util.Map<String,Object> input = new java.util.LinkedHashMap<>();
+        input.put("passed", false); input.put("assistantMessage", null); input.put("title", null); input.put("body", null);
+        input.put("acceptanceCriteria", null); putUsage(input, usage);
+        completeIssueChatTurn(identity, grant.id(), input);
+    }
+    private void completeIssueChatTurn(RunnerIdentity identity, String conversationId, java.util.Map<String,Object> input) throws Exception {
+        java.util.Map<String,Object> variables = new java.util.LinkedHashMap<>();
+        variables.put("conversationId", conversationId); variables.put("runnerId", identity.runnerId());
+        variables.put("credential", identity.credential()); variables.put("input", input);
+        String response = post("mutation($conversationId:ID!,$runnerId:ID!,$credential:String!,$input:IssueChatTurnResultInput!){completeIssueChatTurn(conversationId:$conversationId,runnerId:$runnerId,credential:$credential,input:$input){id status}}",
+                JSON.writeValueAsString(variables));
+        if (!JSON.readTree(response).path("data").path("completeIssueChatTurn").path("id").asText().equals(conversationId))
+            throw new ControlPlaneFailure("Issue chat completion was not acknowledged", true);
+    }
     private static void putUsage(java.util.Map<String,Object> input, ProviderUsageEvidence usage) {
         input.put("provider", usage == null ? null : usage.provider());
         input.put("model", usage == null ? null : usage.model());

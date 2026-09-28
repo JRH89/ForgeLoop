@@ -40,7 +40,8 @@ panels; wide code or Markdown tables may scroll inside their own evidence area.
 
 **Usage & costs** replaces Analytics. Filter by repository and the last 7, 30,
 or 90 UTC calendar days to see daily estimated spending, cost by model, token
-usage, pricing coverage, harness comparison, and individual run costs. Costs are
+usage, pricing coverage, harness comparison, and costs for delivery runs,
+repository scans, issue drafting, and AI chat. Costs are
 grouped by the provider telemetry's recording time, not the run creation date.
 Archived runs remain included. The all-time delivery overview is explicitly
 separate and does not change with these filters.
@@ -114,6 +115,26 @@ draft; **Reject draft** records the decision without creating an issue. Neither
 action applies the intake label or assigns anyone. To admit an approved issue
 to paid work later, add the repository's intake label and satisfy its assignment
 rule deliberately. Only the most recent ten scans per repository are shown.
+
+### Draft an issue with AI chat
+
+Open **Issue chat**, choose a connected repository, and describe the change. Each
+message triggers a separate provider call on your enrolled runner and may incur
+charges. Messages and drafts are saved in the organization workspace, so do not
+include passwords, API keys, or other secrets. The `AI_CHAT` provider-policy
+role is used when configured; otherwise the runner's `default` provider/model
+is used. The runner receives only bounded
+conversation text and returns an editable title, description, and acceptance
+criteria. It gets no repository checkout or GitHub installation token and cannot
+modify code or create an issue.
+
+Review the draft, edit it if needed, and explicitly choose **Review and create
+GitHub issue**. An administrator is required. The issue is created without an
+intake label or assignee; normal repository intake rules still decide when a run
+starts. The chat tracks the linked run, verification gates and evidence, and PR
+as they appear. Use **Open this run in Runs** to review evidence and approve a
+verified delivery; the configured merge policy applies after GitHub checks pass.
+Provider usage is listed as **AI chat** on Usage & costs.
 
 **What is waiting?** explains persisted approval, failure, budget, and heartbeat
 signals for unarchived runs in the selected repository. Open Runs for detailed

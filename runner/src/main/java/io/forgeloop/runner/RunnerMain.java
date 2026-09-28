@@ -382,12 +382,14 @@ public final class RunnerMain {
                 List<RunnerTask> available;
                 RepositoryScanGrant scan = null;
                 RepositoryIssueProposalGrant issueProposal = null;
+                IssueChatTurnGrant issueChatTurn = null;
                 try {
                     client.heartbeat(identity);
                     available = client.availableTasks(identity);
                     if (available.isEmpty()) {
                         scan = client.claimRepositoryScan(identity);
                         if (scan == null) issueProposal = client.claimRepositoryIssueProposal(identity);
+                        if (scan == null && issueProposal == null) issueChatTurn = client.claimIssueChatTurn(identity);
                     }
                     if(failedPolls>0)System.out.println("Control-plane connection restored.");
                     failedPolls = 0;
@@ -418,6 +420,12 @@ public final class RunnerMain {
                         idlePolls = 0;
                         status.publish(WorkerStatus.Phase.WORKING, 0);
                         executeRepositoryIssueProposal(client, identity, issueProposal, arguments);
+                        continue;
+                    }
+                    if (issueChatTurn != null) {
+                        idlePolls = 0;
+                        status.publish(WorkerStatus.Phase.WORKING, 0);
+                        executeIssueChatTurn(client, identity, issueChatTurn, arguments);
                         continue;
                     }
                     idlePolls++;
@@ -491,6 +499,28 @@ public final class RunnerMain {
         try { client.failRepositoryIssueProposal(identity, grant, usage); }
         catch (Exception reportFailure) { System.err.println("Could not report issue proposal failure: " + reportFailure.getClass().getSimpleName()); }
         System.err.println("Issue proposal failed: " + grant.repository());
+    }
+
+    /** Handles text-only issue drafting locally; it never checks out code or receives a GitHub credential. */
+    private static void executeIssueChatTurn(RunnerClient client, RunnerIdentity identity, IssueChatTurnGrant grant, String[] arguments) {
+        try {
+            ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("AI_CHAT");
+            IssueChatResult result = new IssueChatWorker().execute(policy, new ProviderClientFactory().create(policy), grant);
+            client.completeIssueChatTurn(identity, grant, result);
+            System.out.println("Issue chat draft updated: " + grant.repository() + ", cost="
+                    + (result.usage().costKnown() ? result.usage().estimatedCostMicros() + " micros" : "N/A"));
+        } catch (IssueChatOutputFailure invalid) {
+            reportIssueChatFailure(client, identity, grant, invalid.usage());
+        } catch (Exception failure) {
+            reportIssueChatFailure(client, identity, grant, null);
+        }
+    }
+
+    private static void reportIssueChatFailure(RunnerClient client, RunnerIdentity identity, IssueChatTurnGrant grant,
+                                               ProviderUsageEvidence usage) {
+        try { client.failIssueChatTurn(identity, grant, usage); }
+        catch (Exception reportFailure) { System.err.println("Could not report issue chat failure: " + reportFailure.getClass().getSimpleName()); }
+        System.err.println("Issue chat failed: " + grant.repository());
     }
 
     /** Backoff stays responsive to an explicit desktop pause, without interrupting active tasks. */

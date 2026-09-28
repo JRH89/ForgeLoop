@@ -13,7 +13,8 @@ public enum WorkerRolePolicy {
     REPAIR(true, Set.of("repository-read", "scoped-file-write", "git-commit", "failure-evidence-read")),
     REVIEW(false, Set.of("repository-read", "diff-read", "evidence-read")),
     REPOSITORY_SCAN(false, Set.of("repository-read", "issue-proposal")),
-    ISSUE_SPECIFICATION(false, Set.of("issue-proposal"));
+    ISSUE_SPECIFICATION(false, Set.of("issue-proposal")),
+    AI_CHAT(false, Set.of());
 
     private final boolean repositoryWrite;
     private final Set<String> tools;

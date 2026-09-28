@@ -13,7 +13,7 @@ import UsagePage from './usage/UsagePage';
 import AccountPage from './account/AccountPage';
 import './console-navigation.css';
 import './support/console-link.css';
-import { Archive, BarChart3, GitBranch, ListChecks, Menu, Recycle, Trash2, X, SlidersHorizontal, Users, UserRound } from "lucide-react";
+import { Archive, BarChart3, GitBranch, ListChecks, Menu, Recycle, Trash2, X, SlidersHorizontal, Users, UserRound, MessageCircle } from "lucide-react";
 import GuideNavigation from "./GuideNavigation";
 import {
   approveFeatureRun,
@@ -52,6 +52,7 @@ import RunnerPairingPage from "./RunnerPairingPage";
 import RunnerDownloads from "./RunnerDownloads";
 import TeamPage from "./TeamPage";
 import RepositoryScans from "./repositories/RepositoryScans";
+import IssueChatPage from "./issue-chat/IssueChatPage";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
 import "./styles.css";
@@ -674,7 +675,7 @@ function RunsPage({
   operator: OperatorSession;
   setRuns: Dispatch<SetStateAction<FeatureRun[]>>;
 }) {
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<string | undefined>(() => new URLSearchParams(window.location.hash.slice(1)).get("run") || undefined);
   const [operations, setOperations] = useState<RunOperations>({
     evidence: [],
     reviews: [],
@@ -855,11 +856,11 @@ function App() {
     document.addEventListener('keydown', escape); document.addEventListener('pointerdown', outside);
     return () => { document.removeEventListener('keydown', escape); document.removeEventListener('pointerdown', outside); };
   }, [mobileMenuOpen]);
-  type ConsolePage = "Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted" | "Team" | "Account";
-  const locationPage = (): ConsolePage => new URLSearchParams(window.location.hash.slice(1)).has('account') ? 'Account' : 'Runs';
+  type ConsolePage = "Runs" | "IssueChat" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted" | "Team" | "Account";
+  const locationPage = (): ConsolePage => { const route = new URLSearchParams(window.location.hash.slice(1)); return route.has('account') ? 'Account' : route.has('chat') ? 'IssueChat' : 'Runs'; };
   const [page, setPage] = useState<ConsolePage>(locationPage);
   const navigate = (next: ConsolePage) => {
-    window.history.pushState(null, '', next === 'Account' ? '/app#account=1' : '/app');
+    window.history.pushState(null, '', next === 'Account' ? '/app#account=1' : next === 'IssueChat' ? '/app#chat' : '/app');
     setPage(next);
   };
   useEffect(() => {
@@ -940,6 +941,7 @@ function App() {
             >
               <span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Runs
             </button>
+            <button className={page === "IssueChat" ? "active" : ""} onClick={() => navigate("IssueChat")}><span className="nav-icon" aria-hidden="true"><MessageCircle size={17} strokeWidth={1.9} /></span> Issue chat</button>
             <button className={page === "Analytics" ? "active" : ""} onClick={() => navigate("Analytics")}><span className="nav-icon" aria-hidden="true"><BarChart3 size={17} strokeWidth={1.9} /></span> Usage &amp; costs</button>
             <button
               className={page === "Repositories" ? "active" : ""}
@@ -973,6 +975,8 @@ function App() {
             /></>
           ) : page === "GettingStarted" ? (
             <OnboardingPage operator={operator} navigate={setPage} />
+          ) : page === "IssueChat" ? (
+            <IssueChatPage repositories={repositories} operator={operator} onRepositories={() => navigate('Repositories')}/>
           ) : page === "Repositories" ? (
             <RepositoryPage items={repositories} operator={operator} onSaved={updated=>setRepositories(current=>current.map(item=>item.id===updated.id?updated:item))}/>
           ) : page === "Configuration" ? (

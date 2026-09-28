@@ -23,10 +23,11 @@ class RunnerExecutionControllerTest {
     private final io.forgeloop.control.application.ReviewEvidenceService reviews = mock(io.forgeloop.control.application.ReviewEvidenceService.class);
     private final io.forgeloop.control.application.RepositoryScanService scans = mock(io.forgeloop.control.application.RepositoryScanService.class);
     private final io.forgeloop.control.application.RepositoryIssueProposalService issueProposals = mock(io.forgeloop.control.application.RepositoryIssueProposalService.class);
+    private final io.forgeloop.control.application.IssueConversationService issueConversations = mock(io.forgeloop.control.application.IssueConversationService.class);
     private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch,
             mock(io.forgeloop.control.application.TaskPlanningService.class), githubPush,
             mock(io.forgeloop.control.integrations.github.GithubRunnerCheckoutService.class), reviews,
-            scans, issueProposals);
+            scans, issueProposals, issueConversations);
 
     @Test void authenticatesRunnerBeforeClaimingRepositoryScan() {
         io.forgeloop.control.domain.Runner runner = mock(io.forgeloop.control.domain.Runner.class);
@@ -62,6 +63,24 @@ class RunnerExecutionControllerTest {
         controller.completeRepositoryIssueProposal("proposal-1", "runner-1", "runner-credential", input);
         verify(runners).authenticated("runner-1", "runner-credential");
         verify(issueProposals).complete("proposal-1", runner, input);
+    }
+
+    @Test void authenticatesRunnerBeforeClaimingAnIssueChatTurn() {
+        io.forgeloop.control.domain.Runner runner = mock(io.forgeloop.control.domain.Runner.class);
+        org.mockito.Mockito.when(runners.authenticated("runner-1", "runner-credential")).thenReturn(runner);
+        controller.claimIssueChatTurn("runner-1", "runner-credential");
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(issueConversations).claim(runner);
+    }
+
+    @Test void authenticatesRunnerBeforeCompletingAnIssueChatTurn() {
+        io.forgeloop.control.domain.Runner runner = mock(io.forgeloop.control.domain.Runner.class);
+        org.mockito.Mockito.when(runners.authenticated("runner-1", "runner-credential")).thenReturn(runner);
+        var input = new io.forgeloop.control.application.IssueChatTurnResultInput(false, null, null, null, null,
+                null, null, 0, 0, 0, false);
+        controller.completeIssueChatTurn("conversation-1", "runner-1", "runner-credential", input);
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(issueConversations).complete("conversation-1", runner, input);
     }
 
     @Test
