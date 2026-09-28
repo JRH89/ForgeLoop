@@ -36,7 +36,7 @@ function TicketForm({session}:{session:Session|null}){
   </form>;
 }
 
-function TicketThread({id,accessKey,staff}:{id:string;accessKey:string;staff:boolean}){
+function TicketThread({id,accessKey,staff,accountMode}:{id:string;accessKey:string;staff:boolean;accountMode:boolean}){
   const [detail,setDetail]=useState<Detail|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[draft,setDraft]=useState(''),[internal,setInternal]=useState(false),[status,setStatus]=useState('');
   const endpoint=`/${staff?'admin/':''}tickets/${encodeURIComponent(id)}`;
   useEffect(()=>{
@@ -54,9 +54,9 @@ function TicketThread({id,accessKey,staff}:{id:string;accessKey:string;staff:boo
     catch(e){setError((e as Error).message);return false;}finally{setBusy(false);}
   }
   async function reply(event:FormEvent){event.preventDefault();if(detail&&await mutate('/replies',{message:draft,internalNote:internal,version:detail.ticket.version}))setDraft('');}
-  if(!detail)return <section><ErrorMessage message={error}/>{!error&&<p role="status">Loading ticket…</p>}<a href="/support">Back to support</a></section>;
+  if(!detail)return <section><ErrorMessage message={error}/>{!error&&<p role="status">Loading ticket…</p>}<a href={accountMode?'/app#account=1':'/support'}>Back to support</a></section>;
   const ticket=detail.ticket;
-  return <section className="support-thread"><a href={staff?'/support#admin':'/support#mine'}>← Back to tickets</a><h2>{ticket.subject}</h2><p className="support-meta"><strong>{label(ticket.status)}</strong> · {label(ticket.category)} · {ticket.id}</p><p>Opened {time(ticket.createdAt)} · Updated {time(ticket.updatedAt)}</p>{staff&&<p>From {ticket.name} · {ticket.email} <span className="support-hint">({ticket.emailVerifiedAt?`email verified ${time(ticket.emailVerifiedAt)}`:'email not verified'})</span></p>}
+  return <section className="support-thread"><a href={staff?'/support#admin':accountMode?'/app#account=1':'/support#mine'}>← Back to tickets</a><h2>{ticket.subject}</h2><p className="support-meta"><strong>{label(ticket.status)}</strong> · {label(ticket.category)} · {ticket.id}</p><p>Opened {time(ticket.createdAt)} · Updated {time(ticket.updatedAt)}</p>{staff&&<p>From {ticket.name} · {ticket.email} <span className="support-hint">({ticket.emailVerifiedAt?`email verified ${time(ticket.emailVerifiedAt)}`:'email not verified'})</span></p>}
     <p className="support-hint">Updates refresh every 15 seconds while this tab is visible.</p><ErrorMessage message={error}/>
     {staff&&<form className="support-status" onSubmit={e=>{e.preventDefault();if(status)void mutate('',{status,version:ticket.version},'PATCH');}}><label>Ticket status<select value={status||ticket.status} onChange={e=>setStatus(e.target.value)}>{statuses.map(s=><option key={s} value={s}>{label(s)}</option>)}</select></label><button disabled={busy||!status}>Update status</button></form>}
     <ol className="support-messages">{detail.messages.map(message=><li key={message.id} className={message.internalNote?'internal-note':message.authorKind==='SYSTEM'?'system-message':''}><div><strong>{message.internalNote?'Internal staff note':message.authorKind==='SUPPORT'?'Support team':message.authorKind==='SYSTEM'?'Status update':'Requester'}</strong><time dateTime={message.createdAt}>{time(message.createdAt)}</time></div><p>{message.body}</p></li>)}</ol>
@@ -64,37 +64,37 @@ function TicketThread({id,accessKey,staff}:{id:string;accessKey:string;staff:boo
   </section>;
 }
 
-function Inbox({staff}:{staff:boolean}){
+function Inbox({staff,accountMode=false}:{staff:boolean;accountMode?:boolean}){
   const [result,setResult]=useState<TicketPage|null>(null),[error,setError]=useState(''),[status,setStatus]=useState(''),[query,setQuery]=useState(''),[search,setSearch]=useState(''),[page,setPage]=useState(0);
   useEffect(()=>{
     const abort=new AbortController();setResult(null);setError('');
     async function load(){try{setResult(await supportRequest<TicketPage>(`/${staff?'admin/':''}tickets?${new URLSearchParams({status,q:search,page:String(page)})}`,{signal:abort.signal}));}catch(e){if(!abort.signal.aborted)setError((e as Error).message);}}
     void load();const timer=setInterval(()=>{if(!document.hidden)void load();},15000);return()=>{abort.abort();clearInterval(timer);};
   },[staff,status,search,page]);
-  return <section><h2>{staff?'Support admin inbox':'My tickets'}</h2><form className="support-filters" onSubmit={e=>{e.preventDefault();setPage(0);setSearch(query);}}><label>Filter status<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0);}}><option value="">All statuses</option>{statuses.map(s=><option key={s} value={s}>{label(s)}</option>)}</select></label><label>Search tickets<input value={query} onChange={e=>setQuery(e.target.value)} maxLength={160} placeholder="Subject, email, or full ticket ID"/></label><button>Search</button></form><ErrorMessage message={error}/>{!result&&!error&&<p role="status">Loading tickets…</p>}{result?.tickets.length===0&&<p>No tickets match your search.</p>}<ul className="support-ticket-list">{result?.tickets.map(ticket=><li key={ticket.id}><a href={`/support#ticket=${ticket.id}${staff?'&admin=1':''}`}><strong>{ticket.subject}</strong><span>{label(ticket.status)} · {label(ticket.category)}</span><small>{staff?`${ticket.name} · `:''}{time(ticket.updatedAt)}</small></a></li>)}</ul><div className="support-actions support-pagination"><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</button><span>Page {page+1}</span><button disabled={!result?.hasMore} onClick={()=>setPage(p=>p+1)}>Next</button></div></section>;
+  return <section><h2>{staff?'Support admin inbox':'My tickets'}</h2><form className="support-filters" onSubmit={e=>{e.preventDefault();setPage(0);setSearch(query);}}><label>Filter status<select value={status} onChange={e=>{setStatus(e.target.value);setPage(0);}}><option value="">All statuses</option>{statuses.map(s=><option key={s} value={s}>{label(s)}</option>)}</select></label><label>Search tickets<input value={query} onChange={e=>setQuery(e.target.value)} maxLength={160} placeholder="Subject, email, or full ticket ID"/></label><button>Search</button></form><ErrorMessage message={error}/>{!result&&!error&&<p role="status">Loading tickets…</p>}{result?.tickets.length===0&&<p>No tickets match your search.</p>}<ul className="support-ticket-list">{result?.tickets.map(ticket=><li key={ticket.id}><a href={accountMode?`/app#ticket=${encodeURIComponent(ticket.id)}&account=1`:`/support#ticket=${ticket.id}${staff?'&admin=1':''}`}><strong>{ticket.subject}</strong><span>{label(ticket.status)} · {label(ticket.category)}</span><small>{staff?`${ticket.name} · `:''}{time(ticket.updatedAt)}</small></a></li>)}</ul><div className="support-actions support-pagination"><button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</button><span>Page {page+1}</span><button disabled={!result?.hasMore} onClick={()=>setPage(p=>p+1)}>Next</button></div></section>;
 }
 
-export default function SupportApp({contact=false}:{contact?:boolean}){
+export default function SupportApp({contact=false,accountMode=false}:{contact?:boolean;accountMode?:boolean}){
   const [session,setSession]=useState<Session|null>(null),[sessionError,setSessionError]=useState(''),[hash,setHash]=useState(window.location.hash.slice(1)),[tracking,setTracking]=useState(''),[trackingError,setTrackingError]=useState(''),[recoveryReceipt,setRecoveryReceipt]=useState<{detail:Detail;trackingKey:string}|null>(null);
   useEffect(()=>{void supportRequest<Session>('/session').then(setSession).catch(e=>setSessionError(e.message));const change=()=>setHash(window.location.hash.slice(1));window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
   const params=new URLSearchParams(hash),id=params.get('ticket')??'',key=params.get('key')??(id?rememberedKey(id):''),recoveryToken=params.get('recover')??'',staff=hash==='admin'||params.get('admin')==='1';
   useEffect(()=>{
-    if(id&&params.get('key')&&rememberKey(id,key)){history.replaceState(null,'',`/support#ticket=${encodeURIComponent(id)}`);}
+    if(id&&params.get('key')&&rememberKey(id,key)){history.replaceState(null,'',`${window.location.pathname}#ticket=${encodeURIComponent(id)}${accountMode?'&account=1':''}`);}
     // Only remove capabilities from the address bar after retaining them for this tab.
   },[id,key]);
   function openTracking(event:FormEvent){
     event.preventDefault();setTrackingError('');
-    try{const url=new URL(tracking);const values=new URLSearchParams(url.hash.slice(1));if(url.origin!==location.origin||url.pathname!=='/support'||!values.get('ticket')||!values.get('key')?.match(/^[a-f0-9]{64}$/))throw new Error();location.hash=url.hash;}
+    try{const url=new URL(tracking);const values=new URLSearchParams(url.hash.slice(1));if(url.origin!==location.origin||url.pathname!=='/support'||!values.get('ticket')||!values.get('key')?.match(/^[a-f0-9]{64}$/))throw new Error();if(accountMode)values.set('account','1');location.hash=values.toString();}
     catch{setTrackingError('Paste the complete private tracking link you saved when submitting the ticket.');}
   }
   function acceptRecovery(receipt:{detail:Detail;trackingKey:string}){
     const {ticket}=receipt.detail;const stored=rememberKey(ticket.id,receipt.trackingKey);
     const nextHash=`ticket=${encodeURIComponent(ticket.id)}${stored?'':`&key=${encodeURIComponent(receipt.trackingKey)}`}`;
-    setRecoveryReceipt(receipt);history.replaceState(null,'',`/support#${nextHash}`);setHash(nextHash);
+    const accountSuffix=accountMode?'&account=1':'';setRecoveryReceipt(receipt);history.replaceState(null,'',`${window.location.pathname}#${nextHash}${accountSuffix}`);setHash(`${nextHash}${accountSuffix}`);
   }
-  return <div className="support-app"><nav aria-label="Support navigation"><a href="/contact#support">New ticket</a><a href="/support#mine">My tickets</a>{session?.administrator&&<a href="/support#admin">Admin inbox</a>}{session?.authenticated?<a href="/logout">Sign out</a>:<a href="/api/support/login">Sign in with GitHub</a>}</nav><ErrorMessage message={sessionError}/>{sessionError&&<button onClick={()=>window.location.reload()}>Retry connection</button>}
-    {contact?<TicketForm session={session}/>:recoveryToken?<RecoveryConfirmation token={recoveryToken} onComplete={acceptRecovery}/>:id?<>{recoveryReceipt?.detail.ticket.id===id&&<RecoverySuccess receipt={recoveryReceipt}/>}<TicketThread key={`${id}:${staff}`} id={id} accessKey={key} staff={staff}/></>:staff?(session===null?<p>Checking access…</p>:session.administrator?<Inbox staff/>:<section><h2>Support administration</h2><p>A service-owner administrator account is required.</p><a className="primary" href="/api/support/login?admin=true">Sign in as administrator</a></section>):<>
-      {session?.authenticated?<><Inbox staff={false}/>{session.recoveryAvailable&&<RecoveryRequestForm/>}</>:<section><h2>Track your request</h2><p>Use the private link you saved after submitting your ticket. Signed-in users can also view their account’s tickets here.</p>{session?.recoveryAvailable?<RecoveryRequestForm/>:<p className="support-hint">Lost a guest link? Email recovery is not enabled for this deployment. Contact support for help; an email address alone cannot unlock a ticket.</p>}</section>}
+  return <div className={`support-app${accountMode?' support-app-embedded':''}`}>{!accountMode&&<nav aria-label="Support navigation"><a href="/contact#support">New ticket</a><a href="/support#mine">My tickets</a>{session?.administrator&&<a href="/support#admin">Admin inbox</a>}{session?.authenticated?<a href="/logout">Sign out</a>:<a href="/api/support/login">Sign in with GitHub</a>}</nav>}<ErrorMessage message={sessionError}/>{sessionError&&<button onClick={()=>window.location.reload()}>Retry connection</button>}
+    {contact?<TicketForm session={session}/>:recoveryToken?<RecoveryConfirmation token={recoveryToken} onComplete={acceptRecovery}/>:id?<>{recoveryReceipt?.detail.ticket.id===id&&<RecoverySuccess receipt={recoveryReceipt}/>}<TicketThread key={`${id}:${staff}`} id={id} accessKey={key} staff={staff} accountMode={accountMode}/></>:staff?(session===null?<p>Checking access…</p>:session.administrator?<Inbox staff/>:<section><h2>Support administration</h2><p>A service-owner administrator account is required.</p><a className="primary" href="/api/support/login?admin=true">Sign in as administrator</a></section>):<>
+      {session?.authenticated?<><Inbox staff={false} accountMode={accountMode}/>{session.recoveryAvailable&&<RecoveryRequestForm/>}</>:<section><h2>Track your request</h2><p>Use the private link you saved after submitting your ticket. Signed-in users can also view their account’s tickets here.</p>{session?.recoveryAvailable?<RecoveryRequestForm/>:<p className="support-hint">Lost a guest link? Email recovery is not enabled for this deployment. Contact support for help; an email address alone cannot unlock a ticket.</p>}</section>}
       <form className="support-form" onSubmit={openTracking}><label>Open a saved private tracking link<input type="url" value={tracking} onChange={e=>setTracking(e.target.value)} required autoComplete="off"/></label><ErrorMessage message={trackingError}/><button className="primary">Open ticket</button></form>
     </>}
   </div>;

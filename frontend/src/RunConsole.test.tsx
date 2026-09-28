@@ -5,13 +5,14 @@ import App from './main';
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('gives support tickets a decorative icon matching the sidebar navigation', async () => {
+it('places Account in the sidebar with a decorative icon matching the navigation', async () => {
   vi.stubGlobal('fetch', controlPlane({}));
   render(<App />);
-  const support = await screen.findByRole('link', { name: 'Support' });
-  expect(support).toHaveAttribute('href', '/support#mine');
-  expect(support.querySelector('.nav-icon')).toHaveAttribute('aria-hidden', 'true');
-  expect(support.querySelector('svg')).toHaveAttribute('width', '17');
+  const account = await screen.findByRole('button', { name: 'Account' });
+  expect(account).toHaveClass('account-console-link');
+  expect(account.querySelector('.nav-icon')).toHaveAttribute('aria-hidden', 'true');
+  expect(account.querySelector('svg')).toHaveAttribute('width', '17');
+  expect(screen.queryByRole('link', { name: 'Support' })).not.toBeInTheDocument();
 });
 
 it('shows a workspace selector for a GitHub account in two organizations', async () => {

@@ -1,5 +1,5 @@
-/* An external support destination follows the five established console tabs. */
-.support-console-link {
+/* Account is a regular console destination and follows the established sidebar rhythm. */
+.account-console-link {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -9,8 +9,8 @@
   text-decoration: none;
   border-radius: 8px;
 }
-.support-console-link:hover,
-.support-console-link:focus-visible {
+.account-console-link:hover,
+.account-console-link:focus-visible {
   color: var(--text);
   background: var(--raised);
 }

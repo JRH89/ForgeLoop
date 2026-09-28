@@ -38,6 +38,17 @@ test('administrator sees status and private-note controls',async()=>{
   expect(screen.getByLabelText('Private internal note')).toBeInTheDocument();
   expect(screen.getByRole('link',{name:'Admin inbox'})).toBeInTheDocument();
 });
+test('account mode renders the signed-in ticket list without duplicate support navigation',async()=>{
+  history.replaceState(null,'','/app#account=1');
+  vi.stubGlobal('fetch',vi.fn().mockImplementation((url:string)=>url.endsWith('/session')
+    ?response({authenticated:true,administrator:false,recoveryAvailable:false})
+    :response({tickets:[ticket],hasMore:false,page:0})));
+  render(<SupportApp accountMode/>);
+  const link=await screen.findByRole('link',{name:/Help with setup/});
+  expect(link).toHaveAttribute('href',`/app#ticket=${ticket.id}&account=1`);
+  expect(screen.getByRole('heading',{name:'My tickets'})).toBeInTheDocument();
+  expect(screen.queryByRole('navigation',{name:'Support navigation'})).not.toBeInTheDocument();
+});
 test('guest recovery request gets the same non-enumerating confirmation regardless of the supplied reference',async()=>{
   const fetch=vi.fn().mockImplementation((url:string)=>url.endsWith('/session')?response({authenticated:false,administrator:false,recoveryAvailable:true}):response({message:'If a matching guest ticket can be recovered, instructions will be sent to its email address.'}));
   vi.stubGlobal('fetch',fetch);render(<SupportApp/>);
