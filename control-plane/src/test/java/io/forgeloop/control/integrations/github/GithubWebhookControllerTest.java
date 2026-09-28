@@ -50,6 +50,23 @@ class GithubWebhookControllerTest {
     }
 
     @Test
+    void repeatedGitHubDeliveryDoesNotSubmitTheSameIssueTwice() throws Exception {
+        String body = """
+                {"action":"opened","repository":{"full_name":"acme/project"},
+                 "issue":{"number":7,"title":"Improve search","body":"Acceptance criteria","labels":[{"name":"forgeloop"}]}}
+                """;
+        RepositoryConnection connection = new RepositoryConnection("local-development", "acme/project", 1, "main", "forgeloop", "GENERIC", List.of("unit"), 20);
+        when(deliveries.existsByDeliveryId("delivery-duplicate")).thenReturn(false, true);
+        when(connections.findByRepository("acme/project")).thenReturn(java.util.Optional.of(connection));
+
+        assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-duplicate", "issues", signature(body), body).getStatusCode());
+        assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-duplicate", "issues", signature(body), body).getStatusCode());
+
+        verify(deliveries).save(any());
+        verify(runs).submitIssue(any());
+    }
+
+    @Test
     void rejectsUnsignedDeliveryBeforePersistingIt() {
         ResponseEntity<Void> response = controller.receive("delivery-1", "issues", "sha256=bad", "{}");
 

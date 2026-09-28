@@ -72,14 +72,20 @@ organization-scoped repository, runner, policy, and run metadata every 10 second
    required assignee, budgets, harness, verification gates, human approval, and
    auto-merge policy. Administrators change intake in Repositories and execution
    settings in Harness & policy.
-5. **Create and follow your first issue.** Draft a small change with observable
-   acceptance criteria. The draft link does not apply intake labels or assignees.
-   Adding the configured label/assignee can start paid work if a runner is running.
+5. **Create and follow your first issue.** Use the safe GitHub draft to start a
+   small change with observable acceptance criteria. Its title and body are
+   prefilled with the configured intake requirements, but it does not attach the
+   activation label or assign anyone. Add whichever required metadata is missing
+   only when you want the issue to enter intake; an active runner can make paid
+   provider calls as soon as it becomes eligible.
 
 **Check issue intake** reads one existing issue from GitHub only when clicked.
-Enter its issue number to see whether its label, assignee, open state, and body
-meet intake rules. It does not edit the issue, replay webhooks, or submit work.
-Passing this check does not prove webhook delivery or that a run has started.
+Paste its number or canonical `https://github.com/owner/repository/issues/123`
+URL to see whether its label, assignee, open state, and body meet intake rules.
+The URL must belong to the repository selected above; pull-request links and
+other repositories are rejected before a request is sent. The check is read-only:
+it does not edit the issue, replay webhooks, submit work, or call a model. Passing
+does not prove webhook delivery or that a run has started.
 Intake handles opened, labeled, assigned, and reopened events; a description edit
 alone is not an intake trigger. If rules pass but no run appears, inspect the
 GitHub App's webhook deliveries before retrying anything.

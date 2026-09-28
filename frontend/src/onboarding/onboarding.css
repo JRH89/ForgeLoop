@@ -14,6 +14,7 @@
 .onboarding label { display: block; margin-bottom: .5rem; }
 .onboarding select, .onboarding input { max-width: 100%; padding: .65rem; }
 .setup-issue { border-top: 1px solid #253b4f; margin-top: 1rem; padding-top: 1rem; }
+.setup-issue input { display: block; box-sizing: border-box; width: 100%; }
 .setup-runs { padding-left: 1.25rem; }
 .setup-runs li { margin-bottom: 1rem; overflow-wrap: anywhere; }
 .setup-entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem; border: 1px solid #253b4f; border-radius: .75rem; margin-bottom: 1.5rem; }
