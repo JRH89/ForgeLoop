@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { FeatureRun, ProviderAttempt } from '../api';
+import type { FeatureRun, ProviderActivity, ProviderAttempt } from '../api';
 import { usageSummary } from './usage';
 import UsagePage from './UsagePage';
 
@@ -36,10 +36,19 @@ it('does not add unknown costs to dollar totals or lose their tokens', () => {
   expect(summary.models[0]).toMatchObject({ priced: 1, unpriced: 1 });
 });
 
-function mockApi(runs: FeatureRun[]) {
+it('combines run and AI activity costs by date, model, and activity type', () => {
+  const activity: ProviderActivity = { id: 'scan-1', repository: 'acme/app', activityType: 'REPOSITORY_SCAN', provider: 'openai', model: 'gpt-test', inputTokens: 30, outputTokens: 10, estimatedCostMicros: 500_000, costKnown: true, recordedAt: '2026-09-27T02:00:00Z' };
+  const summary = usageSummary([run([attempt()])], 7, '', now, [activity]);
+  expect(summary.total).toMatchObject({ knownMicros: 2_500_000, priced: 2, tokens: 160 });
+  expect(summary.activityTypes.find(item => item.name === 'REPOSITORY_SCAN')).toMatchObject({ knownMicros: 500_000, tokens: 40 });
+  expect(summary.models.find(item => item.name === 'openai / gpt-test')).toMatchObject({ knownMicros: 500_000, priced: 1 });
+  expect(summary.activities[0]).toMatchObject({ activityType: 'REPOSITORY_SCAN', repository: 'acme/app' });
+});
+
+function mockApi(runs: FeatureRun[], activities: ProviderActivity[] = []) {
   vi.stubGlobal('fetch', vi.fn(async (_url, init) => ({ ok: true, json: async () => ({ data: JSON.parse(init.body).query.includes('runAnalytics')
     ? { runAnalytics: { totalRuns: runs.length, activeRuns: 0, deliveredRuns: 1, providerRequests: 2 } }
-    : { featureRuns: runs } }) })));
+    : JSON.parse(init.body).query.includes('providerActivities') ? { providerActivities: activities } : { featureRuns: runs } }) })));
 }
 
 it('shows graphs, unpriced coverage, filters, and the settings action', async () => {
@@ -48,12 +57,21 @@ it('shows graphs, unpriced coverage, filters, and the settings action', async ()
   render(<UsagePage onSettings={onSettings} />);
   expect(await screen.findByRole('img', { name: /Daily estimated cost/ })).toBeInTheDocument();
   expect(screen.getByText('50%')).toBeInTheDocument();
-  expect(screen.getByText(/Historical missing prices/)).toBeInTheDocument();
+  expect(screen.getByText(/Historical estimates are not silently rewritten/)).toBeInTheDocument();
   expect(screen.getByText(/Archived$/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Period (UTC)'), { target: { value: '7' } });
   expect(screen.getByLabelText('Period (UTC)')).toHaveValue('7');
   fireEvent.click(screen.getByRole('button', { name: 'Budget & execution settings' }));
   expect(onSettings).toHaveBeenCalledOnce();
+});
+
+it('shows repository scans in the aggregate activity cost breakdown', async () => {
+  mockApi([], [{ id: 'scan-1', repository: 'acme/app', activityType: 'REPOSITORY_SCAN', provider: 'openai', model: 'gpt-test', inputTokens: 30, outputTokens: 10, estimatedCostMicros: 500_000, costKnown: true, recordedAt: new Date().toISOString() }]);
+  render(<UsagePage onSettings={vi.fn()} />);
+  expect(await screen.findByRole('heading', { name: 'Cost by activity' })).toBeInTheDocument();
+  expect(screen.getAllByText('Repository scans')).toHaveLength(2);
+  expect(screen.getByText('AI activity costs')).toBeInTheDocument();
+  expect(screen.getByText('acme/app · openai / gpt-test')).toBeInTheDocument();
 });
 
 it('shows N/A rather than zero dollars for entirely unpriced usage', async () => {

@@ -28,10 +28,13 @@ public class RepositoryScanService {
     private final OperatorContext operators;
     private final GithubApi github;
     private final AuditLedgerService audit;
+    private final ProviderActivityService providerActivities;
 
     public RepositoryScanService(RepositoryScanRepository scans, RepositoryConnectionRepository connections,
-                                 OperatorContext operators, GithubApi github, AuditLedgerService audit) {
+                                 OperatorContext operators, GithubApi github, AuditLedgerService audit,
+                                 ProviderActivityService providerActivities) {
         this.scans = scans; this.connections = connections; this.operators = operators; this.github = github; this.audit = audit;
+        this.providerActivities = providerActivities;
     }
 
     @Transactional
@@ -84,6 +87,8 @@ public class RepositoryScanService {
             List<RepositoryScanFinding> findings = input.findings().stream().map(RepositoryScanService::validatedFinding).toList();
             scan.complete(runner.getId(), input.commitSha(), input.provider(), input.model(), input.inputTokens(), input.outputTokens(),
                     input.estimatedCostMicros(), input.costKnown(), findings);
+            providerActivities.record(runner.getOrganizationId(), "REPOSITORY_SCAN", scan.getRepository(), scan.getId(),
+                    input.provider(), input.model(), input.inputTokens(), input.outputTokens(), input.estimatedCostMicros(), input.costKnown());
             audit.record("REPOSITORY_SCAN_COMPLETED", "REPOSITORY_SCAN", scan.getId(), "findings=" + findings.size());
         }
         return scan;
