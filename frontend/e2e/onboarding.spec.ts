@@ -43,7 +43,8 @@ for (const width of [390, 1440]) {
     await expect(page.getByText('No enabled runner is enrolled.', { exact: true })).toBeVisible();
     const navigation = page.getByRole('navigation', { name: 'ForgeLoop navigation' });
     if (width === 390) await page.getByRole('button', { name: 'Open navigation' }).click();
-    await expect(navigation.getByRole('button').nth(4)).toHaveText('User guide');
+    await expect(navigation.getByRole('button', { name: 'Issue chat', exact: true })).toBeVisible();
+    await expect(navigation.getByRole('button', { name: 'User guide', exact: true })).toBeVisible();
     if (width === 390) await page.keyboard.press('Escape');
     const draftUrl = new URL((await page.getByRole('link', { name: 'Draft a safe issue on GitHub' }).getAttribute('href')) ?? '');
     expect(draftUrl.searchParams.get('title')).toBe('Describe the change');
