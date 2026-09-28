@@ -12,7 +12,8 @@ public enum WorkerRolePolicy {
     INTEGRATION(false, Set.of("repository-read", "git-integrate")),
     REPAIR(true, Set.of("repository-read", "scoped-file-write", "git-commit", "failure-evidence-read")),
     REVIEW(false, Set.of("repository-read", "diff-read", "evidence-read")),
-    REPOSITORY_SCAN(false, Set.of("repository-read", "issue-proposal"));
+    REPOSITORY_SCAN(false, Set.of("repository-read", "issue-proposal")),
+    ISSUE_SPECIFICATION(false, Set.of("issue-proposal"));
 
     private final boolean repositoryWrite;
     private final Set<String> tools;

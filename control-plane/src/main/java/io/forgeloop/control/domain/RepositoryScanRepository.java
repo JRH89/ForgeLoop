@@ -10,12 +10,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Query;
 
 public interface RepositoryScanRepository extends JpaRepository<RepositoryScan, String> {
-    @EntityGraph(attributePaths = "findings")
+    @EntityGraph(attributePaths = {"findings", "findings.issueProposals"})
     List<RepositoryScan> findTop10ByOrganizationIdAndRepositoryOrderByCreatedAtDesc(String organizationId, String repository);
-    @EntityGraph(attributePaths = "findings")
+    @EntityGraph(attributePaths = {"findings", "findings.issueProposals"})
     Optional<RepositoryScan> findByIdAndOrganizationId(String id, String organizationId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "findings")
+    @EntityGraph(attributePaths = {"findings", "findings.issueProposals"})
     @Query("select s from RepositoryScan s where s.id = :id and s.organizationId = :organizationId")
     Optional<RepositoryScan> lockByIdAndOrganizationId(@Param("id") String id, @Param("organizationId") String organizationId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)

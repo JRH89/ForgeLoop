@@ -41,7 +41,13 @@ public final class StructuredOutputSchemas {
                  "evidence":{"type":"string"},"affectedFiles":{"type":"array","maxItems":10,"items":{"type":"string"}},
                  "acceptanceCriteria":{"type":"array","maxItems":6,"items":{"type":"string"}}},
                "required":["severity","title","description","impact","evidence","affectedFiles","acceptanceCriteria"]}}},
-             "required":["findings"]}
+            "required":["findings"]}
+            """);
+    private static final JsonNode REPOSITORY_ISSUE_PROPOSAL = parse("""
+            {"type":"object","additionalProperties":false,
+             "properties":{"title":{"type":"string","maxLength":200},"body":{"type":"string","maxLength":12000},
+               "acceptanceCriteria":{"type":"array","minItems":1,"maxItems":10,"items":{"type":"string","maxLength":400}}},
+             "required":["title","body","acceptanceCriteria"]}
             """);
 
     private StructuredOutputSchemas() { }
@@ -49,6 +55,7 @@ public final class StructuredOutputSchemas {
     public static JsonNode patch() { return PATCH.deepCopy(); }
     public static JsonNode review() { return REVIEW.deepCopy(); }
     public static JsonNode repositoryScan() { return REPOSITORY_SCAN.deepCopy(); }
+    public static JsonNode repositoryIssueProposal() { return REPOSITORY_ISSUE_PROPOSAL.deepCopy(); }
     private static JsonNode parse(String schema) {
         try { return JSON.readTree(schema); }
         catch (Exception invalid) { throw new ExceptionInInitializerError(invalid); }

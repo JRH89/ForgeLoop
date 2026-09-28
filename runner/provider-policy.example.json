@@ -38,5 +38,10 @@
     "provider": "openai",
     "model": "gpt-5.4",
     "maxAttempts": 2
+  },
+  "ISSUE_SPECIFICATION": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "maxAttempts": 2
   }
 }

@@ -76,6 +76,49 @@ public final class RunnerClient {
         input.put("costKnown", false); input.put("failureSummary", "The runner could not complete the scan."); input.put("findings", List.of());
         completeRepositoryScan(identity, grant.id(), input);
     }
+    /** Claims one additional provider call only when an administrator explicitly queued an issue draft. */
+    public RepositoryIssueProposalGrant claimRepositoryIssueProposal(RunnerIdentity identity) throws Exception {
+        String response = post("mutation($runnerId:ID!,$credential:String!){claimRepositoryIssueProposal(runnerId:$runnerId,credential:$credential){id repository commitSha severity findingTitle description impact evidence affectedFiles acceptanceCriteria}}",
+                JSON.writeValueAsString(java.util.Map.of("runnerId", identity.runnerId(), "credential", identity.credential())));
+        JsonNode grant = JSON.readTree(response).path("data").path("claimRepositoryIssueProposal");
+        if (grant.isMissingNode()) throw new ControlPlaneFailure("Issue proposal claim response was malformed", true);
+        return grant.isNull() ? null : JSON.treeToValue(grant, RepositoryIssueProposalGrant.class);
+    }
+    /** Reports only the generated issue draft and usage metadata; publication requires a separate human mutation. */
+    public void completeRepositoryIssueProposal(RunnerIdentity identity, RepositoryIssueProposalGrant grant,
+                                                RepositoryIssueProposalResult result) throws Exception {
+        java.util.Map<String,Object> input = new java.util.LinkedHashMap<>();
+        input.put("passed", true);
+        input.put("title", result.specification().title());
+        input.put("body", result.specification().body());
+        input.put("acceptanceCriteria", result.specification().acceptanceCriteria());
+        putUsage(input, result.usage());
+        completeRepositoryIssueProposal(identity, grant.id(), input);
+    }
+    /** Returns a generic failure, retaining usage when the provider returned billable but invalid output. */
+    public void failRepositoryIssueProposal(RunnerIdentity identity, RepositoryIssueProposalGrant grant,
+                                            ProviderUsageEvidence usage) throws Exception {
+        java.util.Map<String,Object> input = new java.util.LinkedHashMap<>();
+        input.put("passed", false); input.put("title", null); input.put("body", null); input.put("acceptanceCriteria", null);
+        putUsage(input, usage);
+        completeRepositoryIssueProposal(identity, grant.id(), input);
+    }
+    private static void putUsage(java.util.Map<String,Object> input, ProviderUsageEvidence usage) {
+        input.put("provider", usage == null ? null : usage.provider());
+        input.put("model", usage == null ? null : usage.model());
+        input.put("inputTokens", usage == null ? 0 : usage.inputTokens());
+        input.put("outputTokens", usage == null ? 0 : usage.outputTokens());
+        input.put("estimatedCostMicros", usage == null ? 0 : usage.estimatedCostMicros());
+        input.put("costKnown", usage != null && usage.costKnown());
+    }
+    private void completeRepositoryIssueProposal(RunnerIdentity identity, String proposalId,
+                                                 java.util.Map<String,Object> input) throws Exception {
+        java.util.Map<String,Object> variables = new java.util.LinkedHashMap<>();
+        variables.put("proposalId", proposalId); variables.put("runnerId", identity.runnerId());
+        variables.put("credential", identity.credential()); variables.put("input", input);
+        post("mutation($proposalId:ID!,$runnerId:ID!,$credential:String!,$input:RepositoryIssueProposalResultInput!){completeRepositoryIssueProposal(proposalId:$proposalId,runnerId:$runnerId,credential:$credential,input:$input){id status}}",
+                JSON.writeValueAsString(variables));
+    }
     private void completeRepositoryScan(RunnerIdentity identity, String scanId, java.util.Map<String,Object> input) throws Exception {
         java.util.Map<String,Object> variables = new java.util.LinkedHashMap<>();
         variables.put("scanId", scanId); variables.put("runnerId", identity.runnerId());

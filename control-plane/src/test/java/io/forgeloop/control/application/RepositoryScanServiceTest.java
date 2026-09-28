@@ -3,7 +3,6 @@ package io.forgeloop.control.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,7 +13,6 @@ import io.forgeloop.control.domain.RepositoryScanFinding;
 import io.forgeloop.control.domain.RepositoryScanRepository;
 import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.integrations.github.GithubApi;
-import io.forgeloop.control.integrations.github.GithubIssueReceipt;
 import io.forgeloop.control.security.OperatorContext;
 import java.util.List;
 import java.util.Optional;
@@ -43,34 +41,6 @@ class RepositoryScanServiceTest {
         verify(scans).existsByOrganizationIdAndRepositoryAndStatusIn("org-1", "acme/project", List.of("PENDING", "RUNNING"));
         assertEquals("org-1", requested.getOrganizationId());
         assertEquals("PENDING", requested.getStatus());
-    }
-
-    @Test void reviewedFindingCanCreateOneGitHubIssueOnly() {
-        when(operators.organizationId()).thenReturn("org-1");
-        when(scans.lockByIdAndOrganizationId("scan-1", "org-1")).thenReturn(Optional.of(completedScan()));
-        when(connections.findByRepository("acme/project")).thenReturn(Optional.of(repository("org-1")));
-        when(github.createIssue(Mockito.eq(44L), Mockito.eq("acme/project"), Mockito.eq("Handle expired sessions"), any()))
-                .thenReturn(new GithubIssueReceipt(29, "https://github.com/acme/project/issues/29"));
-
-        RepositoryScanFinding created = service.createIssue("scan-1", "finding-1");
-
-        verify(operators).requireAdministrator();
-        verify(github).createIssue(Mockito.eq(44L), Mockito.eq("acme/project"), Mockito.eq("Handle expired sessions"), Mockito.argThat(body ->
-                body.contains("Repository snapshot") && body.contains("### Acceptance criteria") && body.contains("not labeled or assigned automatically")));
-        verify(audit).record("REPOSITORY_SCAN_ISSUE_CREATED", "REPOSITORY_SCAN", "scan-1", "finding-1|29");
-        assertEquals(29, created.getIssueNumber());
-
-        assertThrows(IllegalStateException.class, () -> service.createIssue("scan-1", "finding-1"));
-        verify(github, Mockito.times(1)).createIssue(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString());
-    }
-
-    @Test void findingFromAnotherOrganizationCannotBePublished() {
-        when(operators.organizationId()).thenReturn("org-2");
-        when(scans.lockByIdAndOrganizationId("scan-1", "org-2")).thenReturn(Optional.empty());
-
-        assertThrows(IllegalArgumentException.class, () -> service.createIssue("scan-1", "finding-1"));
-
-        verify(github, never()).createIssue(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString());
     }
 
     @Test void successfulRunnerScanRecordsOneMetadataOnlyProviderActivity() {

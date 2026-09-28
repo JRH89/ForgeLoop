@@ -21,6 +21,7 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Integrates only the commit SHAs declared by an eligible integration task; conflicts fail the lease and enter the bounded repair policy.
 * Pushes an integrated commit directly with a lease-bound, short-lived GitHub installation token and exact `--force-with-lease` protection; source content does not transit the control plane.
 * Runs a read-only independent reviewer against the bounded integrated diff and records criterion-level, checksummed review evidence before verification begins.
+* Generates an issue specification only after an administrator explicitly requests the extra provider call; draft output is reviewable, editable, and cannot publish to GitHub.
 * Polls continuously with bounded parallelism, heartbeats, task-scoped lease files, and worktree cleanup.
 * Runs as a non-root container image.
 
@@ -39,6 +40,8 @@ docker build -t forgeloop-runner:local runner
 Registration tokens and runner credentials are secrets. Provide registration tokens through a secure local secret mechanism; do not put them in source control, logs, or command history. Enrollment writes a runner credential to `FORGELOOP_RUNNER_STATE_FILE` (or `/state/runner` in the container image); mount `/state` as a durable, permission-restricted volume and do not commit its contents.
 
 The runner automatically clones authorized repositories using lease-bound GitHub App grants and uploads evidence through the control plane's authenticated artifact endpoint. It creates guarded detached worktrees, executes policy-selected planner/coding/review providers, integrates declared task commits, pushes the integrated branch with a scoped installation token, and executes repository-policy-selected verification tasks. Delivery remains subject to the configured approval and auto-merge policy.
+
+Repository scan findings can be expanded into an issue draft with the optional `ISSUE_SPECIFICATION` provider-policy entry. The follow-up call receives only the scan's bounded finding evidence, affected paths, and commit identity, not another checkout or arbitrary repository files. Its token/cost metadata is recorded separately from the scan. The runner only returns a draft; an organization administrator must review, edit, and approve it before ForgeLoop creates a GitHub issue.
 
 Planner and writing prompts include a bounded runner-local repository manifest and text-only source context. Authorized paths are prioritized, Git metadata and binary contents are excluded, individual files and total context are capped, and the server independently enforces the fixed capability for every role. The model cannot invent a new runner capability or expand its write scope.
 
