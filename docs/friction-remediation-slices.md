@@ -10,7 +10,7 @@ production-ready.
 
 | Slice | Outcome | GitHub issue | Pull request | State |
 | --- | --- | --- | --- | --- |
-| 1 | Reliable isolated PostgreSQL restore drill | [#47](https://github.com/JRH89/ForgeLoop/issues/47) | Pending | In progress |
+| 1 | Reliable isolated PostgreSQL restore drill | [#47](https://github.com/JRH89/ForgeLoop/issues/47) | [#53](https://github.com/JRH89/ForgeLoop/pull/53) | In review |
 | 2 | Administrator-managed customer invitations | [#48](https://github.com/JRH89/ForgeLoop/issues/48) | Pending | Planned |
 | 3 | Trustworthy, guided runner installation | [#49](https://github.com/JRH89/ForgeLoop/issues/49) | Pending | Planned |
 | 4 | Safe desktop runner update experience | [#50](https://github.com/JRH89/ForgeLoop/issues/50) | Pending | Planned |
