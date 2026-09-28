@@ -24,6 +24,6 @@ class GithubLoginSuccessHandlerTest {
             assertEquals(target.startsWith("/support#")?target:"/app",response.getRedirectedUrl());
             assertNull(request.getSession().getAttribute("SUPPORT_RETURN"));
         }
-        verify(provisioner,times(3)).requireMembership("123");
+        verify(provisioner,times(3)).requireMembership("123", null);
     }
 }

@@ -9,11 +9,17 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import jakarta.servlet.http.HttpSession;
+import java.util.List;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Component;
 
 /** Resolves the organization exclusively from a validated JWT claim, with an explicit local-only development fallback. */
 @Component
 public class OperatorContext {
+    private static final String ACTIVE_ORGANIZATION = "FORGELOOP_ACTIVE_ORGANIZATION";
     private final String mode;
     private final String developmentOrganizationId;
     private final OrganizationMembershipRepository memberships;
@@ -69,9 +75,36 @@ public class OperatorContext {
         if (authentication instanceof OAuth2AuthenticationToken oauth) return GithubLoginProvisioner.subject(githubId(oauth));
         return authentication != null && authentication.isAuthenticated() ? authentication.getName() : "development-anonymous";
     }
+    public List<OrganizationMembership> myMemberships() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof OAuth2AuthenticationToken oauth) return memberships.findBySubjectOrderByIdAsc(GithubLoginProvisioner.subject(githubId(oauth)));
+        if (authentication instanceof JwtAuthenticationToken jwt) return memberships.findByOrganization_IdAndSubject(organizationId(), jwt.getName()).stream().toList();
+        if ("development".equals(mode)) return List.of();
+        throw new AccessDeniedException("An authenticated operator is required");
+    }
+    @Transactional public void selectOrganization(String organizationId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (!(authentication instanceof OAuth2AuthenticationToken oauth)) throw new AccessDeniedException("GitHub browser sign-in is required to switch workspaces");
+        String subject = GithubLoginProvisioner.subject(githubId(oauth));
+        OrganizationMembership membership = memberships.findByOrganization_IdAndSubject(organizationId, subject)
+                .orElseThrow(() -> new AccessDeniedException("You are not a member of this organization"));
+        ServletRequestAttributes attributes = requestAttributes();
+        if (attributes == null) throw new AccessDeniedException("A browser session is required");
+        membership.accept();
+        attributes.getRequest().getSession().setAttribute(ACTIVE_ORGANIZATION, organizationId);
+    }
     private OrganizationMembership oauthMembership(OAuth2AuthenticationToken oauth) {
         String subject = GithubLoginProvisioner.subject(githubId(oauth));
-        return memberships.findBySubjectOrderByIdAsc(subject).stream().findFirst().orElseThrow(() -> new AccessDeniedException("Organization membership is required"));
+        List<OrganizationMembership> available = memberships.findBySubjectOrderByIdAsc(subject);
+        ServletRequestAttributes attributes = requestAttributes();
+        HttpSession session = attributes == null ? null : attributes.getRequest().getSession(false);
+        Object selected = session == null ? null : session.getAttribute(ACTIVE_ORGANIZATION);
+        return available.stream().filter(item -> item.getOrganizationId().equals(selected)).findFirst()
+                .or(() -> available.stream().findFirst())
+                .orElseThrow(() -> new AccessDeniedException("Organization membership is required"));
+    }
+    private static ServletRequestAttributes requestAttributes() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes ? attributes : null;
     }
     private static String githubId(OAuth2AuthenticationToken oauth) {
         Object id = oauth.getPrincipal().getAttribute("id");

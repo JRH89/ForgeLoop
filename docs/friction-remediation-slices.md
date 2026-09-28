@@ -10,8 +10,8 @@ production-ready.
 
 | Slice | Outcome | GitHub issue | Pull request | State |
 | --- | --- | --- | --- | --- |
-| 1 | Reliable isolated PostgreSQL restore drill | [#47](https://github.com/JRH89/ForgeLoop/issues/47) | [#53](https://github.com/JRH89/ForgeLoop/pull/53) | In review |
-| 2 | Administrator-managed customer invitations | [#48](https://github.com/JRH89/ForgeLoop/issues/48) | Pending | Planned |
+| 1 | Reliable isolated PostgreSQL restore drill | [#47](https://github.com/JRH89/ForgeLoop/issues/47) | [#53](https://github.com/JRH89/ForgeLoop/pull/53) | Merged |
+| 2 | GitHub self-signup and administrator-managed invitations | [#48](https://github.com/JRH89/ForgeLoop/issues/48) | [#54](https://github.com/JRH89/ForgeLoop/pull/54) | In review |
 | 3 | Trustworthy, guided runner installation | [#49](https://github.com/JRH89/ForgeLoop/issues/49) | Pending | Planned |
 | 4 | Safe desktop runner update experience | [#50](https://github.com/JRH89/ForgeLoop/issues/50) | Pending | Planned |
 | 5 | Clear GitHub issue handoff and intake diagnosis | [#51](https://github.com/JRH89/ForgeLoop/issues/51) | Pending | Planned |
@@ -26,14 +26,16 @@ both a valid backup and a bounded failure/timeout; keep cleanup limited to the
 unique drill container and temporary dump. Exit when the end-to-end CI restore
 step is repeatable and still validates schema plus operational records.
 
-## Slice 2 — Administrator-managed customer invitations
+## Slice 2 — Self-service GitHub signup and administrator-managed invitations
 
 GitHub login currently denies users without persisted membership after the
-bootstrap administrator. Add an authenticated, organization-scoped invitation
-workflow that an administrator can manage in the console. Bind invitations to
-immutable GitHub user IDs, enforce role and tenant boundaries, handle duplicate
-and revoked invites, and show useful acceptance/error states. Do not silently
-self-provision strangers into an organization. Exit with authorization,
+bootstrap administrator. Any GitHub user must instead be able to sign in and
+receive a new isolated organization with safe policy and a generic harness.
+Do not add strangers to an existing organization. Separately, give an
+administrator an organization-scoped invitation workflow in the console.
+Bind invitations to immutable GitHub user IDs, enforce role and tenant
+boundaries, handle duplicate and revoked invites, and show useful
+acceptance/error states. Exit with concurrent-signup, authorization,
 integration, and browser tests plus user/admin documentation.
 
 ## Slice 3 — Trustworthy, guided runner installation

@@ -21,7 +21,8 @@ public class GithubLoginSuccessHandler implements AuthenticationSuccessHandler {
         if (!(authentication instanceof OAuth2AuthenticationToken oauth)) throw new ServletException("GitHub OAuth authentication was expected");
         try {
             Object githubId = oauth.getPrincipal().getAttribute("id");
-            provisioner.requireMembership(String.valueOf(githubId));
+            Object githubLogin = oauth.getPrincipal().getAttribute("login");
+            provisioner.requireMembership(String.valueOf(githubId), githubLogin == null ? null : String.valueOf(githubLogin));
             Object supportReturn=request.getSession().getAttribute("SUPPORT_RETURN");
             request.getSession().removeAttribute("SUPPORT_RETURN");
             // Only fixed local destinations are allowed; never reflect a user-supplied redirect.

@@ -12,7 +12,7 @@ import OnboardingPage from './onboarding/OnboardingPage';
 import UsagePage from './usage/UsagePage';
 import './console-navigation.css';
 import './support/console-link.css';
-import { BarChart3, GitBranch, LifeBuoy, ListChecks, Menu, X, SlidersHorizontal } from "lucide-react";
+import { BarChart3, GitBranch, LifeBuoy, ListChecks, Menu, X, SlidersHorizontal, Users } from "lucide-react";
 import GuideNavigation from "./GuideNavigation";
 import {
   approveFeatureRun,
@@ -23,6 +23,7 @@ import {
   createHarnessDefinition,
   createLocalMcpConfiguration,
   loadOperator,
+  loadMyOrganizations,
   loadRunAnalytics,
   loadPlatformConfiguration,
   loadRepositoryConnections,
@@ -31,9 +32,11 @@ import {
   loadRuns,
   retryFeatureTask,
   resolveEscalation,
+  selectOrganization,
   submitFeature,
   type FeatureRun,
   type OperatorSession,
+  type OrganizationMember,
   type RepositoryConnection,
   type RunOperations,
   type RunAnalytics,
@@ -45,6 +48,7 @@ import UserGuidePage from "./UserGuidePage";
 import RunnerSetup from "./RunnerSetup";
 import RunnerPairingPage from "./RunnerPairingPage";
 import RunnerDownloads from "./RunnerDownloads";
+import TeamPage from "./TeamPage";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
 import "./styles.css";
@@ -833,7 +837,7 @@ function App() {
     document.addEventListener('keydown', escape); document.addEventListener('pointerdown', outside);
     return () => { document.removeEventListener('keydown', escape); document.removeEventListener('pointerdown', outside); };
   }, [mobileMenuOpen]);
-  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted">("Runs");
+  const [page, setPage] = useState<"Runs" | "Repositories" | "Analytics" | "Configuration" | "Guide" | "GettingStarted" | "Team">("Runs");
   const [guideTarget, setGuideTarget] = useState<{ id: string }>();
   useEffect(() => {
     if (page !== 'Guide' || !guideTarget) return;
@@ -848,15 +852,17 @@ function App() {
   const [repositories, setRepositories] = useState<RepositoryConnection[]>([]);
   const [runs, setRuns] = useState<FeatureRun[]>([]);
   const [operator, setOperator] = useState<OperatorSession>();
+  const [workspaces, setWorkspaces] = useState<OrganizationMember[]>([]);
   const [analytics,setAnalytics]=useState<RunAnalytics>();
   const [error, setError] = useState("");
   useEffect(() => {
-    void Promise.all([loadRepositoryConnections(), loadRuns(), loadOperator(),loadRunAnalytics()])
-      .then(([connected, loaded, current,metrics]) => {
+    void Promise.all([loadRepositoryConnections(), loadRuns(), loadOperator(),loadRunAnalytics(),loadMyOrganizations()])
+      .then(([connected, loaded, current,metrics,available]) => {
         setRepositories(connected);
         setRuns(loaded);
         setOperator(current);
         setAnalytics(metrics);
+        setWorkspaces(available);
       })
       .catch((reason) =>
         setError(
@@ -868,6 +874,9 @@ function App() {
     () => `${runs.filter((run) => !terminal.has(run.state)).length} active`,
     [runs],
   );
+  const switchWorkspace = (organizationId: string) => {
+    void selectOrganization(organizationId).then(() => window.location.reload()).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
+  };
   return (
     <main className="console-app">
       <header>
@@ -883,9 +892,10 @@ function App() {
           {summary}
           {operator && (
             <span>
-              {operator.role.toLowerCase()} · {operator.organizationId}
+              {operator.role.toLowerCase()} · {workspaces.find(workspace => workspace.organizationId === operator.organizationId)?.organizationName ?? operator.organizationId}
             </span>
           )}
+          {operator && workspaces.length > 1 && <select className="workspace-switch desktop-workspace" aria-label="Workspace" value={operator.organizationId} onChange={event => switchWorkspace(event.target.value)}>{workspaces.map(workspace => <option value={workspace.organizationId} key={workspace.id}>{workspace.organizationName} · {workspace.role.toLowerCase()}</option>)}</select>}
           <a className="logout desktop-signout" href="/logout">Sign out</a>
           <button ref={menuButton} className="console-menu-toggle" aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenuOpen} aria-controls="console-navigation" onClick={() => setMobileMenuOpen(value => !value)}>{mobileMenuOpen ? <X aria-hidden="true" size={22}/> : <Menu aria-hidden="true" size={22}/>}</button>
         </div>
@@ -893,6 +903,7 @@ function App() {
       <div className="shell">
         <aside ref={menuPanel} id="console-navigation" className={mobileMenuOpen ? 'console-sidebar menu-open' : 'console-sidebar'} inert={mobile && !mobileMenuOpen} aria-hidden={mobile && !mobileMenuOpen ? true : undefined} onClick={() => { if (mobile) { setMobileMenuOpen(false); menuButton.current?.focus(); } }}>
           <nav aria-label="ForgeLoop navigation">
+            {operator && workspaces.length > 1 && <select className="workspace-switch mobile-workspace" aria-label="Workspace" value={operator.organizationId} onClick={event => event.stopPropagation()} onChange={event => switchWorkspace(event.target.value)}>{workspaces.map(workspace => <option value={workspace.organizationId} key={workspace.id}>{workspace.organizationName} · {workspace.role.toLowerCase()}</option>)}</select>}
             <button
               className={page === "Runs" ? "active" : ""}
               onClick={() => setPage("Runs")}
@@ -909,6 +920,7 @@ function App() {
             <button className={page === "Configuration" ? "active" : ""} onClick={() => setPage("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
             <GuideNavigation active={page === 'Guide'} onSelect={id => { setGuideTarget({ id }); setPage('Guide'); }}/>
             <button className={page === "GettingStarted" ? "active" : ""} onClick={() => setPage("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
+            {operator?.role === 'ADMIN' && <button className={page === 'Team' ? 'active' : ''} onClick={() => setPage('Team')}><span className="nav-icon" aria-hidden="true"><Users size={17} strokeWidth={1.9}/></span> Team</button>}
             <a className="support-console-link" href="/support#mine"><span className="nav-icon" aria-hidden="true"><LifeBuoy size={17} strokeWidth={1.9} /></span> Support</a>
             <a className="logout mobile-signout" href="/logout">Sign out</a>
           </nav>
@@ -935,6 +947,8 @@ function App() {
             <RepositoryPage items={repositories} operator={operator} onSaved={updated=>setRepositories(current=>current.map(item=>item.id===updated.id?updated:item))}/>
           ) : page === "Configuration" ? (
             <><RunnerSetup operator={operator}/><ConfigurationPage operator={operator}/></>
+          ) : page === "Team" ? (
+            operator.role === 'ADMIN' ? <TeamPage operator={operator}/> : <p role="alert">Administrator access is required.</p>
           ) : page === "Guide" ? (
             <UserGuidePage />
           ) : (

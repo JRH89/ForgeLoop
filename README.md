@@ -57,6 +57,8 @@ only the frontend and does not package the runner.
 - [x] Public landing page and GitHub OAuth browser sessions with immutable GitHub identity mapping, persisted membership authorization, first-administrator bootstrap locking, and authenticated console routing.
 - [x] Flyway forward migrations verified against the local PostgreSQL control-plane database.
 - [x] Persisted organization memberships and roles scope repository ownership, delivery-run visibility, runner enrollment, and privileged operator actions.
+- [x] Administrator team invitations resolve GitHub usernames to immutable account IDs, track first sign-in, support membership-checked workspace switching, and provide audited revocation with last-admin protection.
+- [x] Self-service GitHub signup provisions an isolated organization, default execution policy, and generic harness for every new account; it does not grant access to another customer's workspace.
 - [x] JWT `org_id` context is checked against persisted membership server-side; cross-organization repository access and runner-token issuance are rejected.
 - [x] OIDC JWT issuer and audience boundary outside explicitly selected development mode, with digest-only audit records and tenant-scoped run timeline queries.
 - [x] Production startup rejects missing OIDC audience, webhook secret, PostgreSQL, validated schema mode, artifact-storage URI, or encryption-key configuration.
