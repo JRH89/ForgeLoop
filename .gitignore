@@ -12,3 +12,6 @@ evidence/
 artifacts/
 frontend/.prerender/
 forgeloop-dev.2026-09-20.private-key.pem
+# Internal planning notes and unreleased Version 2 design specifications.
+docs/2026-09-2026-roadmap.md
+docs/Version_2/
