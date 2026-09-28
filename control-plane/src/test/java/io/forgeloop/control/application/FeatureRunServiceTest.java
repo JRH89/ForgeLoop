@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
 import io.forgeloop.control.domain.DeliveryTaskRepository;
@@ -37,6 +38,7 @@ class FeatureRunServiceTest {
     FeatureRun existing = new FeatureRun("acme/support", "issue-142", "Assignment", "- criterion", 10, "JVM_REACT", 1);
     when(runs.findByRepositoryAndSourceRef("acme/support", "issue-142")).thenReturn(java.util.Optional.of(existing));
     assertEquals(existing, service.submitIssue(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- criterion", 10)));
+    verify(runs, never()).save(any());
   }
   @Test void transitionRequiresAccessToTheTaskRunRepository() {
     FeatureRun run = new FeatureRun("local-development", "acme/support", "issue-1", "Title", "- criterion", 10, "JVM_REACT", 1);

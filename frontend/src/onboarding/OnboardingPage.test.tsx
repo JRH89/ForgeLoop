@@ -37,18 +37,33 @@ it('walks a fresh workspace through all five steps without provider calls', asyn
   expect(fetcher.mock.calls.every(([url]) => url === '/graphql')).toBe(true);
 });
 
-it('checks an issue only on demand and explains missing labels and assignees', async () => {
+it('checks a pasted issue URL only on demand and explains missing labels and assignees', async () => {
   const fetcher = mockApi();
   render(<OnboardingPage operator={operator} navigate={vi.fn()} />);
-  await screen.findByRole('button', { name: 'Check issue intake' });
+  await screen.findByRole('button', { name: 'Check intake — read only' });
   expect(fetcher).toHaveBeenCalledTimes(4);
-  fireEvent.change(screen.getByLabelText('Existing GitHub issue number'), { target: { value: '7' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Check issue intake' }));
+  fireEvent.change(screen.getByLabelText('GitHub issue number or URL'), { target: { value: 'https://github.com/acme/project/issues/7' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check intake — read only' }));
   expect(await screen.findByText('Add the required label: forgeloop')).toBeInTheDocument();
   expect(screen.getByText('Assign the issue to: owner')).toBeInTheDocument();
   expect(JSON.parse(String(fetcher.mock.calls[4][1].body)).variables).toEqual({ repository: 'acme/project', issueNumber: 7 });
-  fireEvent.change(screen.getByLabelText('Existing GitHub issue number'), { target: { value: '8' } });
+  fireEvent.change(screen.getByLabelText('GitHub issue number or URL'), { target: { value: '8' } });
   expect(screen.queryByText('Add the required label: forgeloop')).not.toBeInTheDocument();
+});
+
+it('rejects malformed and wrong-repository links before calling the control plane', async () => {
+  const fetcher = mockApi();
+  render(<OnboardingPage operator={operator} navigate={vi.fn()} />);
+  await screen.findByRole('button', { name: 'Check intake — read only' });
+  const input = screen.getByLabelText('GitHub issue number or URL');
+  fireEvent.change(input, { target: { value: 'https://github.com/other/project/issues/7' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check intake — read only' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Choose an issue from acme/project');
+  expect(fetcher).toHaveBeenCalledTimes(4);
+  fireEvent.change(input, { target: { value: 'https://github.com/acme/project/pull/7' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check intake — read only' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Pull request links are not supported');
+  expect(fetcher).toHaveBeenCalledTimes(4);
 });
 
 it('does not offer admin installation to viewers and keeps local key checks explicit', async () => {
@@ -63,12 +78,12 @@ it('clears a diagnostic when changing repositories', async () => {
   mockApi([repository, { ...repository, id: 'second', repository: 'acme/second' }]);
   render(<OnboardingPage operator={operator} navigate={vi.fn()} />);
   await screen.findByLabelText('Repository');
-  fireEvent.change(screen.getByLabelText('Existing GitHub issue number'), { target: { value: '7' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Check issue intake' }));
+  fireEvent.change(screen.getByLabelText('GitHub issue number or URL'), { target: { value: '7' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Check intake — read only' }));
   await screen.findByText('Add the required label: forgeloop');
   fireEvent.change(screen.getByLabelText('Repository'), { target: { value: 'acme/second' } });
   expect(screen.queryByText('Add the required label: forgeloop')).not.toBeInTheDocument();
-  expect(screen.getByLabelText('Existing GitHub issue number')).toHaveValue(null);
+  expect(screen.getByLabelText('GitHub issue number or URL')).toHaveValue('');
 });
 
 it('marks previously successful metadata stale when refresh fails', async () => {
@@ -113,10 +128,15 @@ it('explains approval, blocked tasks, budget exhaustion, and uncertain heartbeat
   expect(runExplanation({ ...run, state: 'QUEUED', tasks: [{ state: 'PENDING', requiredCapability: 'browser' } as FeatureRun['tasks'][number]] }, [runner])).toContain('missing from enabled runners: browser');
 });
 
-it('builds a safe issue draft without automatically triggering intake', () => {
-  const url = new URL(newIssueUrl('acme/project')!);
+it('builds a helpful issue draft without automatically triggering intake', () => {
+  const url = new URL(newIssueUrl('acme/project', 'forgeloop', 'owner')!);
   expect(url.hostname).toBe('github.com');
   expect(url.searchParams.has('labels')).toBe(false);
+  expect(url.searchParams.has('assignees')).toBe(false);
+  expect(url.searchParams.get('title')).toBe('Describe the change');
   expect(url.searchParams.get('body')).toContain('Acceptance criteria');
-  expect(newIssueUrl('../bad?redirect=elsewhere')).toBeUndefined();
+  expect(url.searchParams.get('body')).toContain('Required label: `forgeloop`');
+  expect(url.searchParams.get('body')).toContain('Required assignee: `owner`');
+  expect(url.searchParams.get('body')).toContain('Do not add the required label or assignment until this issue is ready');
+  expect(newIssueUrl('../bad?redirect=elsewhere', 'forgeloop')).toBeUndefined();
 });

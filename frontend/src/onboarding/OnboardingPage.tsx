@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { checkIssueIntake, loadPlatformConfiguration, loadRepositoryConnections, loadRunners, loadRuns,
   type FeatureRun, type IssueIntakeCheck, type OperatorSession, type PlatformConfiguration, type RepositoryConnection, type Runner } from '../api';
 import { configurationWarnings, newIssueUrl, recentRunners, runExplanation } from './readiness';
+import { parseIssueReference } from './issueReference';
 import './onboarding.css';
 
 type Snapshot = { repositories: RepositoryConnection[]; runners: Runner[]; runs: FeatureRun[]; config: PlatformConfiguration; at: number };
@@ -36,7 +37,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
   const repository = snapshot?.repositories.find(item => item.repository === selected) ?? snapshot?.repositories[0];
   const warnings = snapshot && repository ? configurationWarnings(repository, snapshot.config) : [];
   const recent = snapshot ? recentRunners(snapshot.runners, snapshot.at) : [];
-  const issueUrl = repository && newIssueUrl(repository.repository);
+  const issueUrl = repository && newIssueUrl(repository.repository, repository.issueLabel, repository.requiredAssignee);
   const admin = operator.role === 'ADMIN';
   return <section className="onboarding">
     <h1>Getting started</h1>
@@ -70,8 +71,9 @@ export default function OnboardingPage({ operator, navigate }: Props) {
           <button onClick={() => navigate('Repositories')}>Review intake settings</button> <button onClick={() => navigate('Configuration')}>Review harness &amp; policy</button>
         </li>
         <li><h2>Create and follow your first issue</h2>
-          <p>Start with a small change and explicit acceptance criteria. Add the required label and assignee only when ready: an eligible issue may start paid work on a running worker.</p>
-          {issueUrl && <a href={issueUrl} target="_blank" rel="noreferrer">Draft an issue on GitHub</a>}
+          <p>Start with one small change and explicit acceptance criteria. The GitHub draft includes a safe title and checklist, but does not apply the intake label or assignee.</p>
+          {repository && <p>An issue enters intake when it has the required label <code>{repository.issueLabel}</code>{repository.requiredAssignee ? <> and assignee <code>{repository.requiredAssignee}</code></> : null}. Add whichever is missing only when you intend to activate this work. A running worker can make paid provider calls as soon as an issue becomes eligible.</p>}
+          {issueUrl && <a href={issueUrl} target="_blank" rel="noreferrer">Draft a safe issue on GitHub</a>}
           {repository?.enabled && <IssueCheck key={repository.repository} repository={repository.repository} />}
           <p>Intake handles opened, labeled, assigned, and reopened issue events. Editing the description alone does not trigger intake. If an eligible issue has no run, check GitHub App webhook deliveries; do not repeatedly create issues or replay work.</p>
           <button onClick={() => navigate('Runs')}>Open runs and live evidence</button>
@@ -87,7 +89,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
 }
 
 function IssueCheck({ repository }: { repository: string }) {
-  const [number, setNumber] = useState('');
+  const [reference, setReference] = useState('');
   const [result, setResult] = useState<IssueIntakeCheck>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -95,22 +97,22 @@ function IssueCheck({ repository }: { repository: string }) {
   useEffect(() => () => { generation.current++; }, []);
   async function check(event: FormEvent) {
     event.preventDefault();
-    const issueNumber = Number(number);
-    if (!Number.isInteger(issueNumber) || issueNumber < 1 || issueNumber > 2_147_483_647) { setError('Enter a positive issue number.'); return; }
+    const parsed = parseIssueReference(reference, repository);
+    if ('error' in parsed) { setResult(undefined); setError(parsed.error); return; }
     const current = ++generation.current;
     setBusy(true); setResult(undefined); setError('');
     try {
-      const response = await checkIssueIntake(repository, issueNumber);
+      const response = await checkIssueIntake(repository, parsed.issueNumber);
       if (current === generation.current) setResult(response);
     } catch {
       if (current === generation.current) setError('Unable to check this issue. Verify its number, your session, and GitHub App access, then retry.');
     } finally { if (current === generation.current) setBusy(false); }
   }
   return <form className="setup-issue" onSubmit={event => void check(event)}>
-    <label htmlFor="setup-issue-number">Existing GitHub issue number</label>
-    <input id="setup-issue-number" type="number" min="1" max="2147483647" step="1" required value={number} disabled={busy} onChange={event => { setNumber(event.target.value); setResult(undefined); setError(''); }} />
-    <button disabled={busy} type="submit">{busy ? 'Checking issue…' : 'Check issue intake'}</button>
-    <p>Reads this issue from GitHub only. Does not modify it, replay a webhook, or start a run.</p>
+    <label htmlFor="setup-issue-reference">GitHub issue number or URL</label>
+    <input id="setup-issue-reference" type="text" inputMode="url" autoComplete="off" placeholder="42 or https://github.com/owner/repo/issues/42" required value={reference} disabled={busy} onChange={event => { setReference(event.target.value); setResult(undefined); setError(''); }} />
+    <button disabled={busy} type="submit">{busy ? 'Checking issue…' : 'Check intake — read only'}</button>
+    <p>Reads an issue only from the selected repository. It does not modify the issue, replay a webhook, submit a run, or call a model.</p>
     {error && <p role="alert">{error}</p>}
     {result && <div role="status"><p>{result.eligible ? 'Intake rules pass. This is not confirmation that GitHub delivered a webhook or that a run started.' : 'This issue is not eligible for intake:'}</p>
       <ul>{result.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Checked {new Date(result.checkedAt).toLocaleTimeString()}</p></div>}
