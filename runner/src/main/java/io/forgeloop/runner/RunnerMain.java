@@ -241,7 +241,7 @@ public final class RunnerMain {
                 .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
         ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[6], arguments[7], Integer.parseInt(arguments[8]));
         String policyPrefixes = task.ownedPaths().isEmpty() ? arguments[9] : String.join(",", task.ownedPaths());
-        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[10]);
+        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[10], null);
     }
 
     /** Production entry point: provider and model come from a runner-local reviewed policy file, not task input. */
@@ -252,33 +252,34 @@ public final class RunnerMain {
         RunnerTask task = client.availableTasks(identity).stream().filter(candidate -> candidate.id().equals(arguments[3])).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Task is not available to this runner"));
         if ("VERIFICATION".equals(task.role())) {
-            executeVerificationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
+            executeVerificationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]), Path.of(arguments[6]));
             return;
         }
         if (List.of("RED_CHECK", "GREEN_CHECK").contains(task.role())) {
-            executeTestCheckTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
+            executeTestCheckTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]), Path.of(arguments[6]));
             return;
         }
         ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[6])).select(task.role());
         if ("INTEGRATION".equals(task.role())) {
-            executeIntegrationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
+            executeIntegrationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]), Path.of(arguments[6]));
             return;
         }
         if ("PLANNER".equals(task.role())) {
-            executePlannerTask(client, identity, task, arguments[4], arguments[5], policy, Path.of(arguments[8]));
+            executePlannerTask(client, identity, task, arguments[4], arguments[5], policy, Path.of(arguments[8]), Path.of(arguments[6]));
             return;
         }
         if ("REVIEW".equals(task.role())) {
-            executeReviewTask(client, identity, task, arguments[4], arguments[5], policy, Path.of(arguments[8]));
+            executeReviewTask(client, identity, task, arguments[4], arguments[5], policy, Path.of(arguments[8]), Path.of(arguments[6]));
             return;
         }
         String policyPrefixes = task.ownedPaths().isEmpty() ? arguments[7] : String.join(",", task.ownedPaths());
-        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[8]);
+        executeProviderTask(arguments[1], arguments[2], task, arguments[4], arguments[5], policy, policyPrefixes, arguments[8], Path.of(arguments[6]));
     }
 
     /** Executes only the immutable command and container digest selected by the repository policy snapshot. */
     private static void executeVerificationTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
-                                                String repositoriesRoot, String workspaceRoot, Path leaseFile) throws Exception {
+                                                String repositoriesRoot, String workspaceRoot, Path leaseFile,
+                                                Path policyFile) throws Exception {
         if (task.verificationGateName() == null || task.verificationImageDigest() == null || task.verificationCommand().isEmpty()
                 || task.verificationTimeoutSeconds() == null || task.verificationNetworkPolicy() == null) throw new IllegalArgumentException("Verification task policy is incomplete");
         RunnerLease lease = client.claimTask(identity, task.id());
@@ -289,7 +290,9 @@ public final class RunnerMain {
         RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);
         events.info("LEASE_ACKNOWLEDGED","Verification lease acknowledged");
         events.info("EXECUTION_STARTED","Policy verification started");
+        RunJournalSession journal = null;
         try {
+            journal = RunJournalSession.start(task, lease, leaseFile, worktree, null, policyFile);
             Path evidenceDirectory = Path.of(workspaceRoot).resolve("evidence").resolve(task.id());
             Files.createDirectories(evidenceDirectory);
             VerificationResult result;
@@ -324,10 +327,12 @@ public final class RunnerMain {
             writer.write(evidenceDirectory, report);
             client.recordEvidence(identity, lease, report);
             events.info(result.passed()?"TASK_COMPLETED":"TASK_FAILED",result.passed()?"Policy verification completed":"Policy verification failed");
+            finishJournal(task, identity, lease, client, events, journal, result.passed() ? "COMPLETED" : "VERIFICATION_FAILURE", null);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), result.passed());
             if (!result.passed()) throw new IllegalStateException("Policy verification failed: " + task.verificationGateName());
             System.out.println("Verification task completed: gate=" + task.verificationGateName() + " evidence=" + report.bundleDigest());
         } catch (Exception failure) {
+            finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
             try { client.completeLease(identity, lease.leaseId(), lease.nonce(), false); } catch (Exception ignored) { /* Original verification failure wins. */ }
             throw failure;
         }
@@ -335,7 +340,8 @@ public final class RunnerMain {
 
     /** Runs the server-selected gate at the test commit boundary and submits only bounded, checksummed summaries. */
     private static void executeTestCheckTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
-                                             String repositoriesRoot, String workspaceRoot, Path leaseFile) throws Exception {
+                                             String repositoriesRoot, String workspaceRoot, Path leaseFile,
+                                             Path policyFile) throws Exception {
         if (!List.of("RED_CHECK", "GREEN_CHECK").contains(task.role()) || task.verificationGateName() == null
                 || task.verificationImageDigest() == null || task.verificationCommand().isEmpty()
                 || task.verificationNetworkPolicy() == null || task.verificationTimeoutSeconds() == null
@@ -351,7 +357,9 @@ public final class RunnerMain {
         RunnerEventReporter events = new RunnerEventReporter(client, identity, lease);
         events.info("LEASE_ACKNOWLEDGED", "Test-check lease acknowledged");
         events.info("EXECUTION_STARTED", "Isolated " + task.role() + " repository check started");
+        RunJournalSession journal = null;
         try {
+            journal = RunJournalSession.start(task, lease, leaseFile, repository, null, policyFile);
             String targetSha = task.verificationBaseRef();
             TestCheckArtifact artifact;
             if ("RED_CHECK".equals(task.role())) {
@@ -387,9 +395,11 @@ public final class RunnerMain {
                     "application/json", "VERIFICATION_BUNDLE",
                     "RED_CHECK".equals(task.role()) ? "red-evidence.json" : "green-evidence.json");
             events.info("ARTIFACT_UPLOADED", "Checksummed test-check artifact uploaded");
+            finishJournal(task, identity, lease, client, events, journal, "COMPLETED", null);
             client.recordTestCheckEvidence(identity, lease, reference, digest);
             events.info("TEST_CHECK_SUBMITTED", "Test-check evidence submitted for server-side verdict");
         } catch (Exception failure) {
+            finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
             try { client.completeLease(identity, lease.leaseId(), lease.nonce(), false); }
             catch (Exception closeFailure) { failure.addSuppressed(closeFailure); }
             throw failure;
@@ -425,7 +435,8 @@ public final class RunnerMain {
 
     /** Cherry-picks only dependency commits declared by the validated task graph. */
     private static void executeIntegrationTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
-                                               String repositoriesRoot, String workspaceRoot, Path leaseFile) throws Exception {
+                                               String repositoriesRoot, String workspaceRoot, Path leaseFile,
+                                               Path policyFile) throws Exception {
         if (task.dependencyChangeShas().isEmpty()) throw new IllegalArgumentException("Integration task has no dependency changes");
         RunnerLease lease = client.claimTask(identity, task.id());
         new RunnerLeaseStore().save(leaseFile, lease);
@@ -433,13 +444,18 @@ public final class RunnerMain {
         Path worktree = new GitWorktreeManager().create(repository, checkoutRef(task,task.executionBaseRef()), task.id(), Path.of(workspaceRoot));
         client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
         RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);events.info("LEASE_ACKNOWLEDGED","Integration lease acknowledged");events.info("EXECUTION_STARTED","Integration started");
+        RunJournalSession journal = null;
         try {
+            journal = RunJournalSession.start(task, lease, leaseFile, worktree, null, policyFile);
             String integratedSha = new GitWorktreeManager().integrate(worktree, task.dependencyChangeShas());
+            if (journal != null) safeCommitEvidence(journal, worktree, integratedSha);
             GithubPushGrant push = client.issueGithubPushGrant(identity, lease);
             new GitWorktreeManager().pushIntegrated(worktree, push.repository(), push.branch(), push.expectedHeadSha(), integratedSha, push.token());
+            finishJournal(task, identity, lease, client, events, journal, "COMPLETED", integratedSha);
             events.info("TASK_COMPLETED","Integrated branch pushed");client.completeGithubPush(identity, lease, integratedSha);
             System.out.println("Integration task completed: commit=" + integratedSha);
         } catch (Exception conflict) {
+            finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
             throw conflict;
         }
@@ -447,28 +463,41 @@ public final class RunnerMain {
 
     /** Executes a non-writing planner under the same authenticated lease and telemetry boundary. */
     private static void executePlannerTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
-                                           String repositoriesRoot,String workspaceRoot, ProviderExecutionPolicy policy, Path leaseFile) throws Exception {
+                                           String repositoriesRoot,String workspaceRoot, ProviderExecutionPolicy policy,
+                                           Path leaseFile, Path policyFile) throws Exception {
         RunnerLease lease = client.claimTask(identity, task.id());
         new RunnerLeaseStore().save(leaseFile, lease);
         client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
         RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);events.info("LEASE_ACKNOWLEDGED","Planner lease acknowledged");events.info("EXECUTION_STARTED","Planning started");
+        RunJournalSession journal = null;
         try {
             Path repository = checkout(client,identity,lease,repositoriesRoot,task.repository());
             Path worktree=new GitWorktreeManager().create(repository,checkoutRef(task,task.executionBaseRef()),task.id(),Path.of(workspaceRoot));
-            String context = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"))
-                    + collectMcpOrFail(client, identity, lease, task, worktree);
-            PlannerResult result = new PlannerWorker().execute(policy, new ProgressProviderClient(new ProviderClientFactory().create(policy), events), task, context, lease.leaseId());
+            journal = RunJournalSession.start(task, lease, leaseFile, worktree, policy, policyFile);
+            String repositoryContext = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"));
+            if (journal != null) journal.context("REPOSITORY", repositoryContext, null, false);
+            String mcpContext = collectMcpOrFail(task, worktree, journal);
+            PlannerResult result = new PlannerWorker().execute(policy, providerClient(policy, events, journal), task,
+                    repositoryContext + mcpContext, lease.leaseId());
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
+            finishJournal(task, identity, lease, client, events, journal, "COMPLETED", null);
             events.info("TASK_COMPLETED","Validated task plan submitted");client.submitTaskPlan(identity, lease, result.plan());
             System.out.println("Planner task completed: tasks=" + result.plan().tasks().size());
         } catch (ProviderExecutionFailure failure) {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
+            finishJournal(task, identity, lease, client, events, journal,
+                    ProviderFailureEvidence.from(policy, failure, lease.leaseId()).category(), null);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
             throw failure;
         } catch (PlannerOutputFailure invalidOutput) {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(invalidOutput.usage(), "INVALID_PLAN_SCHEMA"));
+            finishJournal(task, identity, lease, client, events, journal, "INVALID_PLAN_SCHEMA", null);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
             throw invalidOutput;
+        } catch (Exception failure) {
+            finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
         }
     }
 
@@ -667,17 +696,58 @@ public final class RunnerMain {
     private static String safeDiagnostic(String detail){if(detail==null||detail.isBlank())return "unavailable";String singleLine=detail.replaceAll("[\\r\\n]+"," ").replaceAll("(?i)(api[_-]?key|authorization|token|secret)\\s*[:=]\\s*\\S+","$1=[REDACTED]");return singleLine.substring(0,Math.min(singleLine.length(),240));}
     private static void cleanupWorktree(RunnerTask task,String repositoriesRoot,String workspaceRoot){try{Path workspace=Path.of(workspaceRoot).toAbsolutePath().normalize().resolve(task.id());if(Files.exists(workspace)){Path repository=new RepositoryWorkspaceResolver().resolve(Path.of(repositoriesRoot),task.repository());new GitWorktreeManager().remove(repository,task.id(),Path.of(workspaceRoot));}}catch(Exception cleanup){System.err.println("Task worktree cleanup failed: task="+task.id());}}
 
-    private static void executeReviewTask(RunnerClient client,RunnerIdentity identity,RunnerTask task,String repositoriesRoot,String workspaceRoot,ProviderExecutionPolicy policy,Path leaseFile)throws Exception{
-        if(task.dependencyChangeShas().isEmpty())throw new IllegalArgumentException("Review task has no integrated dependency");
-        RunnerLease lease=client.claimTask(identity,task.id());new RunnerLeaseStore().save(leaseFile,lease);Path repository=checkout(client,identity,lease,repositoriesRoot,task.repository());Path worktree=new GitWorktreeManager().create(repository,task.dependencyChangeShas().getLast(),task.id(),Path.of(workspaceRoot));client.acknowledgeLease(identity,lease.leaseId(),lease.nonce());RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);events.info("LEASE_ACKNOWLEDGED","Review lease acknowledged");events.info("EXECUTION_STARTED","Independent review started");
-        try{String diff=new GitWorktreeManager().boundedDiff(worktree,task.baseBranch());RunnerTask contextualTask=withAdditionalContext(task,collectMcpOrFail(client,identity,lease,task,worktree));ReviewResult result=new ReviewWorker().execute(policy,new ProgressProviderClient(new ProviderClientFactory().create(policy),events),contextualTask,diff,lease.leaseId());client.recordReviewEvidence(identity,lease,result);client.recordProviderAttempt(identity,lease,ProviderAttemptReport.succeeded(result.usage()));events.info(result.approved()?"TASK_COMPLETED":"TASK_FAILED",result.approved()?"Independent review passed":"Independent review rejected the change");client.completeLease(identity,lease.leaseId(),lease.nonce(),result.approved());if(!result.approved())throw new IllegalStateException("Independent review rejected the integrated change: "+result.summary());System.out.println("Independent review passed.");}
-        catch(ProviderExecutionFailure failure){client.recordProviderAttempt(identity,lease,ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy,failure,lease.leaseId())));client.completeLease(identity,lease.leaseId(),lease.nonce(),false);throw failure;}
-        catch(GuardedPatchFailure invalid){client.recordProviderAttempt(identity,lease,ProviderAttemptReport.rejected(invalid.usage(),invalid.category()));client.completeLease(identity,lease.leaseId(),lease.nonce(),false);throw invalid;}
+    private static void executeReviewTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
+                                         String repositoriesRoot, String workspaceRoot, ProviderExecutionPolicy policy,
+                                         Path leaseFile, Path policyFile) throws Exception {
+        if (task.dependencyChangeShas().isEmpty()) throw new IllegalArgumentException("Review task has no integrated dependency");
+        RunnerLease lease = client.claimTask(identity, task.id());
+        new RunnerLeaseStore().save(leaseFile, lease);
+        Path repository = checkout(client, identity, lease, repositoriesRoot, task.repository());
+        Path worktree = new GitWorktreeManager().create(repository, task.dependencyChangeShas().getLast(), task.id(), Path.of(workspaceRoot));
+        client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        RunnerEventReporter events = new RunnerEventReporter(client, identity, lease);
+        events.info("LEASE_ACKNOWLEDGED", "Review lease acknowledged"); events.info("EXECUTION_STARTED", "Independent review started");
+        RunJournalSession journal = null;
+        try {
+            GitWorktreeManager git = new GitWorktreeManager();
+            journal = RunJournalSession.start(task, lease, leaseFile, worktree, policy, policyFile);
+            String diff = git.boundedDiff(worktree, task.baseBranch());
+            String diffBase = git.resolveCommitSha(worktree, task.baseBranch());
+            if (journal != null) journal.context("REVIEW_DIFF", diff, diffBase, false);
+            RunnerTask contextualTask = withAdditionalContext(task,
+                    collectMcpOrFail(task, worktree, journal));
+            ReviewResult result = new ReviewWorker().execute(policy, providerClient(policy, events, journal), contextualTask,
+                    diff, lease.leaseId());
+            client.recordReviewEvidence(identity, lease, result);
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
+            finishJournal(task, identity, lease, client, events, journal, "COMPLETED", null);
+            events.info(result.approved() ? "TASK_COMPLETED" : "TASK_FAILED",
+                    result.approved() ? "Independent review passed" : "Independent review rejected the change");
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), result.approved());
+            if (!result.approved()) throw new IllegalStateException("Independent review rejected the integrated change: " + result.summary());
+            System.out.println("Independent review passed.");
+        } catch (ProviderExecutionFailure failure) {
+            ProviderFailureEvidence outcome = ProviderFailureEvidence.from(policy, failure, lease.leaseId());
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(outcome));
+            finishJournal(task, identity, lease, client, events, journal, outcome.category(), null);
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
+        } catch (GuardedPatchFailure invalid) {
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(invalid.usage(), invalid.category()));
+            if (journal != null) safePatchRefused(journal, invalid);
+            finishJournal(task, identity, lease, client, events, journal, invalid.category(), null);
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw invalid;
+        } catch (Exception failure) {
+            finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
+        }
     }
 
     private static void executeProviderTask(String controlPlane, String identityFile, RunnerTask task, String repositoriesRoot,
                                             String workspaceRoot, ProviderExecutionPolicy policy, String allowedPrefixes,
-                                            String leaseFile) throws Exception {
+                                            String leaseFile, Path policyFile) throws Exception {
         if (!GuardedPatchWorker.supports(task.role())) throw new IllegalArgumentException("Task role is not supported by the guarded patch worker");
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(identityFile));
         RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(controlPlane));
@@ -687,27 +757,40 @@ public final class RunnerMain {
         Path worktree = new GitWorktreeManager().create(repository, checkoutRef(task,task.executionBaseRef()), task.id(), Path.of(workspaceRoot));
         client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
         RunnerEventReporter events=new RunnerEventReporter(client,identity,lease);events.info("LEASE_ACKNOWLEDGED","Implementation lease acknowledged");events.info("EXECUTION_STARTED","Guarded implementation started");
+        RunJournalSession journal = null;
         GuardedPatchResult result;
         try {
+            journal = RunJournalSession.start(task, lease, Path.of(leaseFile), worktree, policy, policyFile);
             RunnerTask contextualTask = withAdditionalContext(task,
-                    collectMcpOrFail(client, identity, lease, task, worktree));
+                    collectMcpOrFail(task, worktree, journal));
             List<String> preferredContextPaths = new ArrayList<>(task.ownedPaths());
             preferredContextPaths.addAll(new GitWorktreeManager().changedFiles(worktree,
                     checkoutRef(task, task.baseBranch())));
-            result = new GuardedPatchWorker().execute(policy, new ProgressProviderClient(new ProviderClientFactory().create(policy), events), task.role(),
+            result = new GuardedPatchWorker().execute(policy, providerClient(policy, events, journal), task.role(),
                     task.title(), contextualTask.specification(), worktree, List.of(allowedPrefixes.split(",")),
-                    preferredContextPaths, lease.leaseId(), new WriteBoundary(task.writeBoundary(), task.testPathGlobs()));
+                    preferredContextPaths, lease.leaseId(), new WriteBoundary(task.writeBoundary(), task.testPathGlobs()),
+                    journal == null ? null : journal.journal());
         } catch (ProviderExecutionFailure failure) {
-            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
+            ProviderFailureEvidence outcome = ProviderFailureEvidence.from(policy, failure, lease.leaseId());
+            client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(outcome));
+            finishJournal(task, identity, lease, client, events, journal, outcome.category(), null);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
             throw failure;
         } catch (GuardedPatchFailure unsafeOutput) {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(unsafeOutput.usage(), unsafeOutput.category()));
+            if (journal != null) safePatchRefused(journal, unsafeOutput);
+            finishJournal(task, identity, lease, client, events, journal, unsafeOutput.category(), null);
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
             throw unsafeOutput;
+        } catch (Exception failure) {
+            finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
+            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            throw failure;
         }
         client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
         new GitWorktreeManager().pinTaskCommit(worktree, task.id(), result.commitSha());
+        if (journal != null) safeCommitEvidence(journal, worktree, result.commitSha());
+        finishJournal(task, identity, lease, client, events, journal, "COMPLETED", result.commitSha());
         events.info("TASK_COMPLETED","Guarded implementation commit created");client.completeProviderWork(identity, lease, result.commitSha());
         System.out.println("Provider task completed: commit=" + result.commitSha());
     }
@@ -749,17 +832,40 @@ public final class RunnerMain {
                 task.verificationImageDigest(), task.verificationCommand(), task.verificationNetworkPolicy(),
                 task.verificationTimeoutSeconds(), task.verificationBaseRef(), task.executionBaseRef(),
                 task.acceptanceCriteria(), task.mcpConfigurations(), task.writeBoundary(), task.testPathGlobs(), task.testReportFormat(),
-                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence(), task.redPrerequisite(), task.loopEnforcement());
+                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence(), task.redPrerequisite(), task.loopEnforcement(), task.runRecord());
     }
 
-    private static String collectMcpOrFail(RunnerClient client, RunnerIdentity identity, RunnerLease lease,
-                                           RunnerTask task, Path worktree) throws Exception {
-        try {
-            return new LocalMcpContextClient().collect(task.mcpConfigurations(), worktree);
-        } catch (Exception failure) {
-            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
-            throw failure;
-        }
+    private static String collectMcpOrFail(RunnerTask task, Path worktree, RunJournalSession journal) throws Exception {
+        String context = new LocalMcpContextClient().collect(task.mcpConfigurations(), worktree);
+        if (journal != null) journal.context("MCP", context, null, true);
+        return context;
+    }
+
+    private static ProviderClient providerClient(ProviderExecutionPolicy policy, RunnerEventReporter events,
+                                                 RunJournalSession journal) {
+        ProviderClient provider = new ProviderClientFactory().create(policy);
+        if (journal != null) provider = new RecordingProviderClient(provider, policy, journal.journal());
+        return new ProgressProviderClient(provider, events);
+    }
+
+    /** Records before the server closes a lease; upload failure is metadata-only and never blocks delivery. */
+    private static void finishJournal(RunnerTask task, RunnerIdentity identity, RunnerLease lease, RunnerClient client,
+                                      RunnerEventReporter events, RunJournalSession journal,
+                                      String category, String changeSha) {
+        if (journal == null || !journal.markFinished()) return;
+        try { journal.workerEnded(category, changeSha); }
+        catch (Exception ignored) { /* The task lifecycle is not blocked by a local journal write failure. */ }
+        new JournalUploader().upload(task, identity, lease, client, journal.journal(), events);
+    }
+
+    private static void safePatchRefused(RunJournalSession journal, GuardedPatchFailure failure) {
+        try { journal.patchRefused(failure.category(), failure.getMessage()); }
+        catch (Exception ignored) { /* Preserve the harness refusal and lease outcome. */ }
+    }
+
+    private static void safeCommitEvidence(RunJournalSession journal, Path worktree, String commitSha) {
+        try { journal.commit(new GitWorktreeManager().commitEvidence(worktree, commitSha)); }
+        catch (Exception ignored) { /* Preserve delivery; the record will be explicitly incomplete. */ }
     }
 
     private static void removeWorktree(String[] arguments) throws Exception {

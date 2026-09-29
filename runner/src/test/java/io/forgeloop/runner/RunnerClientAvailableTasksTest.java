@@ -34,11 +34,14 @@ class RunnerClientAvailableTasksTest {
             List<RunnerTask> tasks = client.availableTasks(new RunnerIdentity("runner-1", "credential"));
 
             assertTrue(query.get().contains("redPrerequisite{testTaskId targetSha evidenceDigest}"));
+            assertTrue(query.get().contains("runRecord"));
             assertTrue(query.get().contains("agentLoop{enforcement{protectedPaths allowWorkflowChanges finishGate}}"));
             assertEquals(new RunnerRedPrerequisite("test-writer", "a".repeat(40), "c".repeat(64)),
                     tasks.getFirst().redPrerequisite());
             assertEquals(new RunnerLoopEnforcement(List.of("src/generated/**"), true, "verify"),
                     tasks.getFirst().loopEnforcement());
+            assertTrue(tasks.getFirst().runRecord());
+            assertEquals(false, tasks.get(1).runRecord());
             assertNull(tasks.get(1).redPrerequisite());
             assertNull(tasks.get(1).loopEnforcement());
             assertNull(tasks.get(2).loopEnforcement().protectedPaths());
@@ -67,7 +70,7 @@ class RunnerClientAvailableTasksTest {
                 + "\"repository\":\"org/repo\",\"baseBranch\":\"main\",\"executionBaseRef\":\"main\","
                 + "\"sourceRef\":\"issue-1\",\"specification\":\"spec\",\"requiredCapability\":\"provider\","
                 + "\"budgetUsd\":1,\"ownedPaths\":[\"src\"],\"dependencyChangeShas\":[],"
-                + "\"acceptanceCriteria\":[],\"mcpConfigurations\":[],\"writeBoundary\":\"NO_TESTS\","
+                + "\"acceptanceCriteria\":[],\"mcpConfigurations\":[],\"runRecord\":" + ("implementation".equals(id) ? "true" : "false") + ",\"writeBoundary\":\"NO_TESTS\","
                 + "\"testPathGlobs\":[\"**/*Test.java\"],\"expectedTests\":[],\"expectedTestsOverflow\":false,"
                 + "\"redPrerequisite\":" + prerequisite + ",\"agentLoop\":" + agentLoop + "}";
     }

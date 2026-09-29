@@ -1,9 +1,13 @@
 package io.forgeloop.runner;
 
 /** Normalized provider result; caller treats provider text as untrusted until its task schema validates it. */
-public record ProviderResult(String output, long inputTokens, long outputTokens, String providerRequestId, String answeredModel) {
+public record ProviderResult(String output, long inputTokens, long outputTokens, String providerRequestId, String answeredModel,
+                             String responseBody) {
+    public ProviderResult(String output, long inputTokens, long outputTokens, String providerRequestId, String answeredModel) {
+        this(output, inputTokens, outputTokens, providerRequestId, answeredModel, null);
+    }
     public ProviderResult(String output, long inputTokens, long outputTokens, String providerRequestId) {
-        this(output, inputTokens, outputTokens, providerRequestId, null);
+        this(output, inputTokens, outputTokens, providerRequestId, null, null);
     }
 
     public ProviderResult {

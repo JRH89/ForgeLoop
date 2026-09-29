@@ -23,6 +23,7 @@ public class ArtifactDownloadService {
     public Download download(String id) {
         ArtifactMetadata artifact = metadata.findById(id).orElseThrow(() -> new IllegalArgumentException("Artifact not found"));
         if (!artifact.getOrganizationId().equals(operators.organizationId())) throw new IllegalArgumentException("Artifact not found");
+        if ("RUN_JOURNAL".equals(artifact.getArtifactType())) operators.requireOperator();
         String prefix = "artifact://";
         if (!artifact.getStorageReference().startsWith(prefix)) throw new IllegalStateException("Artifact reference is invalid");
         byte[] content = store.getVerified(artifact.getStorageReference().substring(prefix.length()), artifact.getSha256(), maxBytes);

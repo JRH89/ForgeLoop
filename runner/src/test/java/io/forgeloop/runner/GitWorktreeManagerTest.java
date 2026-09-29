@@ -118,6 +118,36 @@ class GitWorktreeManagerTest {
                 && file.blobSha().chars().allMatch(character -> character == '0')));
     }
 
+    @Test
+    void commitEvidencePreservesHashableRawCommitObjectAndChangedFileDigests() throws Exception {
+        run("git", "init", temporaryDirectory.toString());
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.email", "runner@example.test");
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.name", "ForgeLoop Runner");
+        Files.writeString(temporaryDirectory.resolve("README.md"), "base\n");
+        run("git", "-C", temporaryDirectory.toString(), "add", ".");
+        run("git", "-C", temporaryDirectory.toString(), "commit", "-m", "base");
+        Files.writeString(temporaryDirectory.resolve("README.md"), "changed\n");
+
+        GitWorktreeManager git = new GitWorktreeManager();
+        String commitSha = git.commit(temporaryDirectory, "feat: record change");
+        GitWorktreeManager.CommitEvidence evidence = git.commitEvidence(temporaryDirectory, commitSha);
+
+        assertTrue(evidence.rawCommit().endsWith("\n"));
+        assertEquals(commitSha, hashRawCommit(evidence.rawCommit()));
+        assertEquals(EvidenceDigests.sha256("changed\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                evidence.fileSha256().get("README.md"));
+    }
+
+    private static String hashRawCommit(String rawCommit) throws Exception {
+        Process process = new ProcessBuilder("git", "hash-object", "-t", "commit", "--stdin").start();
+        try (var input = process.getOutputStream()) {
+            input.write(rawCommit.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        String hash = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).strip();
+        if (process.waitFor() != 0) throw new IllegalStateException("Git could not hash the recorded commit object");
+        return hash;
+    }
+
     private static String output(String... command) throws Exception {
         Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         String result = new String(process.getInputStream().readAllBytes());

@@ -5,6 +5,7 @@ public final class RunnerEventReporter {
     private final RunnerClient client; private final RunnerIdentity identity; private final RunnerLease lease; private long sequence;
     public RunnerEventReporter(RunnerClient client,RunnerIdentity identity,RunnerLease lease){this.client=client;this.identity=identity;this.lease=lease;}
     public void info(String type,String message){send("INFO",type,message);}
+    public void warn(String type,String message){send("WARN",type,message);}
     public void error(String message){send("ERROR","TASK_FAILED",message);}
     /** Bounded metadata heartbeat for a long verification command; closes before lease completion. */
     public AutoCloseable progress(String operation) {

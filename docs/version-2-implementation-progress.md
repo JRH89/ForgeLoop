@@ -4,9 +4,9 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 5b, attempt outcomes and attempt-local routing; issue [#88](https://github.com/JRH89/ForgeLoop/issues/88), in PR #97.
-- **Delivery branch:** `feat/5b-lease-outcomes-pr` is based on the merged prerequisite chain; only one PR is open at a time.
-- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, #93, #94, #95, and #96 are merged to `master` (2026-09-29).
+- **Active work:** Slice 5c, opt-in run-record content capture and journal upload; issue [#89](https://github.com/JRH89/ForgeLoop/issues/89), in PR #98. Slice 5e's offline replay implementation is verified locally; live fixture agreement and drift validation remain pending.
+- **Delivery branch:** `feat/5c-run-record-content-pr` is based on the merged prerequisite chain; only one PR is open at a time.
+- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, #93, #94, #95, #96, and #97 are merged to `master` (2026-09-29).
 - **Issue provenance:** #83-#86 decompose design 04 into slices 4a-4d; #87-#90 track design 05 slices 5a, 5b, 5c, and 5e; #91 tracks 5d-i. Slice 5d-ii is still planned without an issue.
 - **Safety boundary:** the agent loop remains dormant. Slices 4a–4c add enforcement contracts only; they must not enable or wire dispatch.
 - **External validation:** no paid provider-backed run is included. Local HTTP fixtures and hosted CI are not provider-backed evidence.
@@ -30,9 +30,9 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / [#94](https://github.com/JRH89/ForgeLoop/pull/94) | Merged to `master` (2026-09-29); hosted checks passed |
 | 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) / [#95](https://github.com/JRH89/ForgeLoop/pull/95) | Merged to `master` (2026-09-29); hosted checks passed |
 | 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) / [#96](https://github.com/JRH89/ForgeLoop/pull/96) | Merged to `master`; issue closed; hosted checks passed |
-| 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) / [#97](https://github.com/JRH89/ForgeLoop/pull/97) | Hosted checks pending |
-| 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) | Implemented and locally verified; queued behind 5b |
-| 17 | 5e - Provider replay and drift probe | 3a, 5c fixtures | [#90](https://github.com/JRH89/ForgeLoop/issues/90) | Offline replay verified; live canonical fixtures and paid drift calls pending |
+| 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) / [#97](https://github.com/JRH89/ForgeLoop/pull/97) | Merged to `master`; issue closed; hosted checks passed |
+| 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) / [#98](https://github.com/JRH89/ForgeLoop/pull/98) | Hosted checks pending |
+| 17 | 5e - Provider replay and drift probe | 3a, 5c fixtures | [#90](https://github.com/JRH89/ForgeLoop/issues/90) | Offline implementation locally verified; canonical live fixtures and drift probe remain pending |
 | 18 | 5d-i - Run-record export and core integrity checks | 5a, 5b, 5c, 5e | [#91](https://github.com/JRH89/ForgeLoop/issues/91) | Planned after prerequisite slices; no paid provider calls or live fixture capture |
 | 19 | 5d-ii - Deterministic re-execution checks | 5d-i | Not opened | Planned |
 | 20 | 6a - Pull-request rounds and lifecycle | 2-5 | Not opened | Planned |
@@ -137,14 +137,23 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Run meaning:** GraphQL exposes derived `FeatureRun.exitMeaning` and `exitReason`; successful, cancelled, held, failed, legacy, and unresolved-escalation cases are covered without persisting a duplicate run summary.
 - **Migration:** V43 adds nullable `task_lease.outcome` and `outcome_category`; `claimed_at` already exists from V39. Existing closed rows remain unclassified rather than receiving invented outcomes.
 - **Verification:** on the combined #87 + #88 stack, control-plane `mvn -q verify` passed (332 tests), runner `mvn -q -Dforgeloop.revision=deadbeef0 verify` passed (290 tests, 9 platform/live-fixture skips), and harness `mvn -q verify` passed (2 tests); zero failures or errors. V43 applied on a disposable PostgreSQL 18 instance and both columns were confirmed nullable. JPA-backed tests exercised the new batched outcome queries; `git diff --check` passed. No provider-backed calls or deployment changes.
-- **Delivery:** implementation commit `9504782` is delivered by [PR #97](https://github.com/JRH89/ForgeLoop/pull/97); hosted checks pending.
+- **Delivery:** merged as [PR #97](https://github.com/JRH89/ForgeLoop/pull/97) on 2026-09-29; issue #88 is closed. Hosted checks passed, including end-to-end and supply-chain checks.
 
 ## Slice 5c - Opt-in record content and journal upload
 
 - **Issue:** [#89](https://github.com/JRH89/ForgeLoop/issues/89).
 - **Result:** adds an administrator-only repository switch with revision/audit tracking and an immutable per-run policy snapshot. The dashboard explains the implications of storing prompts, provider responses, and repository context. The runner records attempt pins, context digests, exact request-body hashes, raw responses, patch refusals, and commit-object/file digests. Opted-in attempts upload bounded, whole-line gzip JSONL segments before lease close; uploaded copies redact recognizable tokens/private keys, preserve original-line hashes, and mark oversize records omitted. Uploads are retried once; failure reports metadata-only `RECORD_UPLOAD_FAILED` and does not block delivery. The control plane rejects malformed, out-of-lease, out-of-order, secret-bearing, oversized, or non-opted-in journals and restricts downloads to operators in the owning organization.
 - **Verification:** on the combined #87–#89 stack, control-plane `mvn -q verify` passed (339 tests), runner `mvn -q -Dforgeloop.revision=deadbeef0 verify` passed (292 tests, 9 platform/live-fixture skips), and harness `mvn -q verify` passed (2 tests), all with zero failures/errors. Frontend `npm.cmd run check` passed: lint, 80 tests, TypeScript, production build, prerender of 19 public pages, and SEO checks. V44 applied on an isolated PostgreSQL 18 instance; all 45 migrations reached v44 and both switch columns were confirmed. `git diff --check` passed. No provider-backed calls or deployment changes.
-- **Delivery:** implementation commit `3bd2a72` is validated locally and queued behind #88; no #89 PR is open yet.
+- **Delivery:** implementation is in [PR #98](https://github.com/JRH89/ForgeLoop/pull/98); hosted checks are pending.
+
+## Slice 5e - Provider replay and drift probes
+
+- **Issue:** [#90](https://github.com/JRH89/ForgeLoop/issues/90).
+- **Implementation:** added bounded hash-chain-verified journal reading; single-call and conversation replay clients that reuse production serializers/parsers, enforce exact request matching and recorded failure order, and reject redacted/omitted records; fixture metadata/pin validation; parser path/type drift comparison; and a `provider-drift-check` CLI that refuses to call a provider without a matching live-recorded fixture. The optional drift call is capped at one 128-token health request and emits only path/type differences.
+- **Offline worker coverage:** planner, guarded patch, review, and full agent-loop tests replay deterministic test-double responses with no credentials or network. These fixtures are synthetic test scaffolding, not canonical provider captures.
+- **Verification:** runner `mvn -q -Dforgeloop.revision=deadbeef0 verify` passed (292 tests, 0 failures/errors, 9 skipped: 5 platform-dependent and 4 live-fixture agreement tests awaiting real captures). Replay worker tests passed; `git diff --check` passed. No provider call was made.
+- **Pending external validation:** canonical live-observed provider fixtures and the live drift probe require an explicit provider key and budget. They have not been fabricated or run; issue #90 remains open until that acceptance evidence exists.
+- **Delivery:** offline implementation is local on `prep/issue-90-after-89`; it will be published after #89 merges. No live provider action was taken.
 
 ## Update protocol
 

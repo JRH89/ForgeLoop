@@ -95,6 +95,22 @@ public final class StepJournal implements LoopJournal {
         return List.copyOf(result);
     }
 
+    /** Returns original, hash-verified JSONL bytes for upload without reserializing any record. */
+    public synchronized List<String> rawLines() throws IOException {
+        recoverChain();
+        byte[] contents = Files.readAllBytes(path);
+        int completeLength = lastNewline(contents) + 1;
+        List<String> lines = new ArrayList<>();
+        int start = 0;
+        while (start < completeLength) {
+            int end = start;
+            while (end < completeLength && contents[end] != '\n') end++;
+            if (end > start) lines.add(new String(contents, start, end - start, StandardCharsets.UTF_8));
+            start = end + 1;
+        }
+        return List.copyOf(lines);
+    }
+
     private void recoverChain() throws IOException {
         long size = Files.size(path);
         if (size > MAX_RECOVERY_BYTES) throw new IOException("Step journal exceeds the safe recovery limit");

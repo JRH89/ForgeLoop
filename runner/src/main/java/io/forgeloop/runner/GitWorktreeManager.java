@@ -60,6 +60,34 @@ public final class GitWorktreeManager {
         return output(worktree, List.of("git", "rev-parse", "HEAD"));
     }
 
+    /** Pins the exact commit bytes and SHA-256s of files it introduced for a run record. */
+    public CommitEvidence commitEvidence(Path worktree, String commitSha) throws IOException, InterruptedException {
+        requireCommitSha(commitSha);
+        String parent = output(worktree, List.of("git", "rev-parse", commitSha + "^"));
+        String tree = output(worktree, List.of("git", "rev-parse", commitSha + "^{tree}"));
+        String rawCommit = outputRaw(worktree, List.of("git", "cat-file", "commit", commitSha), 256 * 1024);
+        Path root = worktree.toAbsolutePath().normalize();
+        java.util.Map<String, String> files = new java.util.TreeMap<>();
+        for (ChangedFile changed : changedFilesInCommit(worktree, parent, commitSha)) {
+            Path file = root.resolve(changed.path()).normalize();
+            if (!file.startsWith(root) || Files.isSymbolicLink(file) || !Files.isRegularFile(file))
+                throw new IllegalStateException("Committed file path is not a regular repository file");
+            files.put(changed.path(), EvidenceDigests.sha256(Files.readAllBytes(file)));
+        }
+        return new CommitEvidence(commitSha, tree, parent, rawCommit, files);
+    }
+
+    /** Captures the checkout's effective CRLF policy for deterministic context reconstruction. */
+    public String coreAutocrlf(Path worktree) throws IOException, InterruptedException {
+        if (!Files.exists(worktree.resolve(".git"))) throw new IllegalArgumentException("Repository must be a local Git worktree");
+        try {
+            String value = output(worktree, List.of("git", "config", "--get", "core.autocrlf"));
+            return value.isBlank() ? "false" : value;
+        } catch (RuntimeException missing) {
+            return "false";
+        }
+    }
+
     /** Integrates only server-declared commit identities, without invoking a shell. */
     public String integrate(Path worktree, List<String> commitShas) throws IOException, InterruptedException {
         if (!Files.exists(worktree.resolve(".git")) || commitShas == null || commitShas.isEmpty()
@@ -147,6 +175,19 @@ public final class GitWorktreeManager {
                 throw new IllegalArgumentException("Git changed-file identity is invalid");
             }
         }
+    }
+
+    /** Resolves a local ref to its immutable commit identity for journal context pins. */
+    public String resolveCommitSha(Path repository, String ref) throws IOException, InterruptedException {
+        if (ref == null || ref.isBlank() || ref.startsWith("-") || ref.contains(".."))
+            throw new IllegalArgumentException("Git ref is invalid");
+        String resolved = output(repository, List.of("git", "rev-parse", "--verify", ref + "^{commit}"));
+        requireCommitSha(resolved);
+        return resolved;
+    }
+
+    public record CommitEvidence(String sha, String tree, String parent, String rawCommit, java.util.Map<String, String> fileSha256) {
+        public CommitEvidence { fileSha256 = java.util.Map.copyOf(fileSha256); }
     }
 
     /** Returns a bounded list of repository-relative paths changed since the supplied base ref. */

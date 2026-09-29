@@ -40,20 +40,21 @@ type Mutation {
 }
 input VerificationPolicyInput { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int!, required: Boolean!, criterionCoverage: String!, testReport: String }
 extend type Mutation { configureRepositoryTestFirst(repository: String!, testGate: String, testPaths: [String!]!): RepositoryConnection!, archiveFeatureRun(runId: ID!, archived: Boolean!): FeatureRun!, deleteFeatureRun(runId: ID!): Boolean!, configureRepositoryIntake(repository: String!, requireAssignee: Boolean!, requiredAssignee: String): RepositoryConnection!, requestRepositoryScan(repository: String!): RepositoryScan!, requestRepositoryIssueProposal(scanId: ID!, findingId: ID!): RepositoryIssueProposal!, approveRepositoryIssueProposal(proposalId: ID!, title: String!, body: String!, acceptanceCriteria: [String!]!): RepositoryIssueProposal!, rejectRepositoryIssueProposal(proposalId: ID!, reason: String): RepositoryIssueProposal!, claimRepositoryScan(runnerId: ID!, credential: String!): RepositoryScanGrant, completeRepositoryScan(scanId: ID!, runnerId: ID!, credential: String!, input: RepositoryScanResultInput!): RepositoryScan!, claimRepositoryIssueProposal(runnerId: ID!, credential: String!): RepositoryIssueProposalGrant, completeRepositoryIssueProposal(proposalId: ID!, runnerId: ID!, credential: String!, input: RepositoryIssueProposalResultInput!): RepositoryIssueProposal! }
-extend type FeatureRun { archived: Boolean! }
+  extend type FeatureRun { archived: Boolean!, runRecord: Boolean! }
 extend type Mutation { approveRunnerPairing(challenge: String!, name: String!): Boolean!, exchangeRunnerPairing(verifier: String!): RunnerEnrollment }
 extend type RepositoryConnection { requiredAssignee: String, requireAssignee: Boolean! }
-extend type Mutation {
-  configureRepositoryAgentLoop(repository: String!, budget: AgentLoopBudgetInput): RepositoryConnection!
+  extend type Mutation {
+    configureRepositoryAgentLoop(repository: String!, budget: AgentLoopBudgetInput): RepositoryConnection!
+    configureRepositoryRunRecord(repository: String!, enabled: Boolean!): RepositoryConnection!
   configureRepositoryEnforcement(repository: String!, input: RepositoryEnforcementInput!): RepositoryConnection!
   renewTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): TaskLease!
   holdTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, reason: String!, summary: String!): TaskLease!
   reserveTaskSpend(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, micros: Float!): SpendReservation!
 }
-extend type RepositoryConnection { agentLoop: AgentLoopBudget }
+  extend type RepositoryConnection { agentLoop: AgentLoopBudget, runRecord: Boolean! }
 extend type RepositoryConnection { enforcement: LoopEnforcement! }
 extend type Task { agentLoop: TaskAgentLoop }
-extend type Task { redPrerequisite: RedPrerequisite }
+  extend type Task { redPrerequisite: RedPrerequisite, runRecord: Boolean! }
 type AgentLoopBudget { maxToolCalls: Int!, maxTokens: Int!, maxWallSeconds: Int!, maxConversationBytes: Int! }
 type AgentLoopGate { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int! }
 type TaskAgentLoop { budget: AgentLoopBudget!, gates: [AgentLoopGate!]!, enforcement: LoopEnforcement! }

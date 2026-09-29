@@ -55,6 +55,7 @@ import RepositoryScans from "./repositories/RepositoryScans";
 import IssueChatPage from "./issue-chat/IssueChatPage";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
+import RunRecordSettings from "./RunRecordSettings";
 import "./styles.css";
 import "./dashboard-responsive.css";
 
@@ -109,6 +110,7 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
                   {item.requiredGates.join(", ")}
                 </small>
                 <IntakeSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
+                <RunRecordSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
                 <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
               </div>
               <span className="status complete">
