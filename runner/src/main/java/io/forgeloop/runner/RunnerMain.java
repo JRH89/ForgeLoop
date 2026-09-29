@@ -48,6 +48,10 @@ public final class RunnerMain {
             providerHealth(arguments);
             return;
         }
+        if (arguments.length > 0 && "provider-tool-check".equals(arguments[0])) {
+            providerToolCheck(arguments);
+            return;
+        }
         if (arguments.length > 0 && "generate-patch".equals(arguments[0])) {
             generatePatch(arguments);
             return;
@@ -190,6 +194,17 @@ public final class RunnerMain {
         ProviderClient provider = new ProviderClientFactory().create(policy);
         ProviderResult result = provider.execute(new ProviderRequest(arguments[2], "You are a credential health check.", "Reply with exactly: ForgeLoop provider ready.", 128));
         System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
+    }
+
+    /** Live two-turn check; output is limited to normalized stop reasons and token counts. */
+    private static void providerToolCheck(String[] arguments) throws Exception {
+        if (arguments.length != 3) throw new IllegalArgumentException("Usage: provider-tool-check <anthropic|openai|gemini|local> <model>");
+        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], 1);
+        ConversationClient client = (ConversationClient) new ProviderClientFactory().create(policy);
+        ProviderToolCheckResult result = new ProviderToolCheck().run(client, policy.model(), policy.maxAttempts());
+        System.out.println("Provider tool check passed. firstStop=" + result.firstStopReason() + " secondStop=" + result.secondStopReason()
+                + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens()
+                + " attempts=" + result.firstAttempts() + "+" + result.secondAttempts());
     }
 
     /** Generates and commits a schema-validated Claude patch only within operator-supplied policy prefixes. */
