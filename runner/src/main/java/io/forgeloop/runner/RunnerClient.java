@@ -163,7 +163,7 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence redPrerequisite{testTaskId targetSha evidenceDigest} mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
         if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
@@ -180,7 +180,8 @@ public final class RunnerClient {
                     nullableText(task, "writeBoundary"), JSON.convertValue(task.path("testPathGlobs"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
                     nullableText(task, "testReportFormat"),
                     JSON.convertValue(task.path("expectedTests"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
-                    task.path("expectedTestsOverflow").asBoolean(false), nullableText(task, "testFirstEvidence")));
+                    task.path("expectedTestsOverflow").asBoolean(false), nullableText(task, "testFirstEvidence"),
+                    redPrerequisite(task.path("redPrerequisite"))));
         }
         return List.copyOf(tasks);
     }
@@ -319,6 +320,11 @@ public final class RunnerClient {
     private static String nullable(String value) { return value == null ? "null" : "\"" + escape(value) + "\""; }
     private static String jsonStrings(List<String> values) { return "[" + values.stream().map(value -> "\"" + escape(value) + "\"").reduce((a,b)->a+","+b).orElse("") + "]"; }
     private static String nullableText(JsonNode node, String field) { return node.path(field).isMissingNode() || node.path(field).isNull() ? null : node.path(field).asText(); }
+    private static RunnerRedPrerequisite redPrerequisite(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return null;
+        return new RunnerRedPrerequisite(nullableText(node, "testTaskId"), nullableText(node, "targetSha"),
+                nullableText(node, "evidenceDigest"));
+    }
     private static String escape(String value) {
         StringBuilder escaped = new StringBuilder(value.length() + 16);
         for (int index = 0; index < value.length(); index++) {

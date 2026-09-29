@@ -50,4 +50,45 @@ class EnforcementDescriptorTest {
         assertEquals(HoldClass.RULE_INPUT_MISSING,
                 EnforcementPreflight.check(badProtectedPath, baseSha).orElseThrow().holdClass());
     }
+
+    @Test
+    void redPrerequisiteRequiresCompleteCurrentProofForTheResolvedBase() {
+        String baseSha = "a".repeat(40);
+        String digest = "c".repeat(64);
+        List<RunnerRedPrerequisite> invalid = List.of(
+                new RunnerRedPrerequisite("test-task", null, digest),
+                new RunnerRedPrerequisite("test-task", "b".repeat(40), digest),
+                new RunnerRedPrerequisite("test-task", baseSha, null),
+                new RunnerRedPrerequisite(null, baseSha, digest));
+
+        for (RunnerRedPrerequisite prerequisite : invalid) {
+            EnforcementDescriptor descriptor = EnforcementDescriptor.fromDispatched("NO_TESTS",
+                    List.of("**/*Test.java"), prerequisite, List.of(), false, null, List.of());
+            PolicyHold hold = EnforcementPreflight.check(descriptor, baseSha).orElseThrow();
+            assertEquals(HoldClass.PREREQUISITE_MISSING, hold.holdClass());
+            assertEquals("red-prerequisite", hold.check());
+        }
+
+        EnforcementDescriptor current = EnforcementDescriptor.fromDispatched("NO_TESTS", List.of("**/*Test.java"),
+                new RunnerRedPrerequisite("test-task", baseSha, digest), List.of(), false, null, List.of());
+        assertTrue(EnforcementPreflight.check(current, baseSha).isEmpty());
+        EnforcementDescriptor notRequired = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), false, null, List.of());
+        assertTrue(EnforcementPreflight.check(notRequired, baseSha).isEmpty());
+    }
+
+    @Test
+    void taskDescriptorCarriesDispatchedRedProofIntoTheFingerprintedPolicy() {
+        RunnerRedPrerequisite prerequisite = new RunnerRedPrerequisite("test-task", "a".repeat(40), "c".repeat(64));
+        RunnerTask task = new RunnerTask("impl", "IMPLEMENTATION", "Implement", "org/repo", "main", "main",
+                "spec", "provider", 1, List.of("src"), List.of(), null, null, null, List.of(), null, null,
+                "main", "main", List.of(), List.of(), "NO_TESTS", List.of("**/*Test.java"), null,
+                List.of(), false, null, prerequisite);
+
+        EnforcementDescriptor descriptor = EnforcementDescriptor.of(task, List.of());
+
+        assertEquals(prerequisite, descriptor.redPrerequisite());
+        assertEquals(List.of("enforcement-config", "red-prerequisite"), descriptor.checkNames());
+        assertEquals("2", descriptor.journalValue().get("rulesVersion"));
+    }
 }

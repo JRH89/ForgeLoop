@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.Transient;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.Set;
 @Entity
 public class DeliveryTask {
     private static final Set<String> WRITING_ROLES = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "REPAIR");
+    private static final Set<String> RED_PREREQUISITE_ROLES = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND");
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
     @ManyToOne(optional = false) private FeatureRun run;
     private String role;
@@ -41,6 +43,8 @@ public class DeliveryTask {
     @OneToMany(mappedBy = "task") private List<RepairPackage> repairPackages = new ArrayList<>();
     @OneToMany(mappedBy = "task") private List<TestCheckEvidence> testCheckEvidence = new ArrayList<>();
     @ManyToOne private VerificationGate verificationGate;
+    @Transient private boolean redPrerequisiteResolved;
+    @Transient private RedPrerequisite redPrerequisite;
 
     protected DeliveryTask() { }
     DeliveryTask(FeatureRun run, String planKey, String role, String title, String requiredCapability,
@@ -188,6 +192,39 @@ public class DeliveryTask {
         List<AgentLoopGate> gates = run.getGates().stream().map(VerificationGate::toAgentLoopGate)
                 .filter(java.util.Objects::nonNull).toList();
         return new TaskAgentLoop(budget, gates);
+    }
+    /**
+     * Pins a test-first implementation to passing RED evidence without sharing the base-ref
+     * selection helper, so the runner can independently compare both values before provider use.
+     */
+    public RedPrerequisite getRedPrerequisite() {
+        if (!redPrerequisiteResolved) {
+            redPrerequisite = deriveRedPrerequisite();
+            redPrerequisiteResolved = true;
+        }
+        return redPrerequisite;
+    }
+    private RedPrerequisite deriveRedPrerequisite() {
+        if (!run.isTestFirst() || !RED_PREREQUISITE_ROLES.contains(role)) return null;
+        List<DeliveryTask> testWriters = dependencies.stream()
+                .filter(task -> "INDEPENDENT_TEST".equals(task.role)).toList();
+        if (testWriters.isEmpty()) return null;
+        if (testWriters.size() != 1) return new RedPrerequisite(null, null, null);
+
+        DeliveryTask testWriter = testWriters.getFirst();
+        List<DeliveryTask> redChecks = dependencies.stream()
+                .filter(task -> "RED_CHECK".equals(task.role))
+                .filter(check -> check.dependencies.stream().anyMatch(dependency -> dependency == testWriter))
+                .toList();
+        if (redChecks.size() != 1 || testWriter.changeSha == null) {
+            return new RedPrerequisite(testWriter.id, null, null);
+        }
+
+        return redChecks.getFirst().getTestCheckEvidence().stream()
+                .filter(evidence -> evidence.isCurrentRedFor(testWriter.changeSha))
+                .max(java.util.Comparator.comparing(TestCheckEvidence::recordedAtInstant))
+                .map(evidence -> new RedPrerequisite(testWriter.id, evidence.getTargetSha(), evidence.getDigest()))
+                .orElseGet(() -> new RedPrerequisite(testWriter.id, null, null));
     }
     private static boolean isWritingRole(String role) {
         return WRITING_ROLES.contains(role);

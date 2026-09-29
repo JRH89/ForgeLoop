@@ -1,10 +1,12 @@
-# Agent-loop enforcement (Slice 4a)
+# Agent-loop enforcement (Slices 4a and 4b)
 
 This document describes the fail-closed guard layer added to the dormant agent loop. It is not an enablement guide: no runner dispatch path invokes the loop, and this slice must not enable one.
 
 ## Before the first provider request
 
 The runner snapshots dispatched enforcement inputs in an immutable `EnforcementDescriptor`. Its canonical SHA-256 and rule-version are recorded in `LOOP_STARTED`. `EnforcementPreflight` validates the descriptor before constructing or invoking the provider conversation. Invalid or unsupported settings produce `POLICY_HOLD`, a `LOOP_ENDED` record, and no provider request.
+
+For test-first implementation, backend, and frontend tasks, the control plane dispatches the matching test writer ID plus its current passing RED target SHA and evidence digest. Preflight requires the proof target to equal the base SHA resolved by the runner. A missing, malformed, or stale proof is a `PREREQUISITE_MISSING` hold before the first provider turn. Other task roles and non-test-first runs do not receive this prerequisite.
 
 The descriptor is derived from task policy and gate names, not the issue text, specification, MCP context, or model-produced content. That keeps policy authority outside prompt-controlled data.
 
@@ -26,7 +28,7 @@ Enforcement holds are `RULE_INPUT_MISSING`, `PREREQUISITE_MISSING`, `RULE_FAILED
 
 The control-plane lease hold maps these classes to `ENFORCEMENT_RULE_INPUT_MISSING`, `ENFORCEMENT_PREREQUISITE_MISSING`, `ENFORCEMENT_RULE_FAILED`, and `ENFORCEMENT_BOUNDARY_BREACHED`, respectively. All four are accepted only for an active acknowledged agent-loop lease and each creates a HIGH-severity escalation. The runner-to-control-plane mapping is documented here but is not wired into dispatch in this slice.
 
-The descriptor can represent RED prerequisite inputs, but current server dispatch does not populate them; binding and validating live RED evidence is Slice 4b. Repository-configured protected globs, audited workflow opt-out, and finish-gate behavior are Slice 4c. Spend reservations are Slice 4d. None of these future slices is implied complete by 4a.
+Slice 4b binds RED prerequisites to the current `TestCheckEvidence` record and transports them through GraphQL into the runner task and enforcement fingerprint. The derivation follows the `RED_CHECK` edge and its independent test writer, separately from the execution-base helper, so dependency ordering cannot make both checks agree on the same wrong input. Repository-configured protected globs, audited workflow opt-out, and finish-gate behavior are Slice 4c. Spend reservations are Slice 4d.
 
 ## Verification
 
@@ -38,4 +40,4 @@ $mavenExe = Join-Path $env:LOCALAPPDATA 'ForgeLoop\tools\apache-maven-3.9.12\bin
 & $mavenExe -B verify
 ```
 
-The test suite covers the descriptor/preflight, credential paths and redaction, protected/test boundaries, gateway exception handling, and loop holds. No provider-backed work was run; the loop remains dormant.
+Verification on the local integration stack: control-plane `mvn -B verify` passed (294 tests); runner `mvn -B verify` passed (226 tests, 1 existing symlink-permission skip). The suite covers descriptor/preflight, dispatched RED proof parsing and context preservation, credential paths and redaction, protected/test boundaries, gateway exception handling, and loop holds. No provider-backed work was run; the loop remains dormant.

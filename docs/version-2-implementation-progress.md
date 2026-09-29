@@ -4,11 +4,12 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 4a, fail-closed enforcement for agent-loop tool calls; issue [#83](https://github.com/JRH89/ForgeLoop/issues/83).
-- **Local integration branch:** `feat/4a-enforcement-integration` combines PR #76 (2c), PR #80 (3b), and PR #82 (3c) solely to verify the dependency stack. Do not treat it as a delivery branch.
-- **Commits:** `26b07ef` merges 2c/3b for local integration; `4707c10` implements runner-side 4a. Control-plane integration and enforcement reason handling are verified locally but not yet committed.
-- **Open prerequisite PRs:** #72, #74, #76, #78, #80, and #82. User retains control of merges.
-- **Safety boundary:** the agent loop remains dormant. Slice 4a must not enable or wire dispatch.
+- **Active work:** Slice 4b, RED prerequisite validation before test-first implementation loops; issue [#84](https://github.com/JRH89/ForgeLoop/issues/84), PR [#93](https://github.com/JRH89/ForgeLoop/pull/93).
+- **Local integration branch:** `feat/4b-red-prerequisite` is isolated against the updated `master`. Only one PR is open at a time; later slices remain on local dependent branches until prerequisites merge.
+- **Commits:** PR #92 added 4a after the merged 3b/3c stack. The remaining issue slices have their own local implementation commits; migration ordering is documented in their entries.
+- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, and #92 are merged to `master` (2026-09-29). PR #93 is the only open PR.
+- **Issue provenance:** #83-#86 decompose design 04 into slices 4a-4d; #87-#90 track design 05 slices 5a, 5b, 5c, and 5e; #91 tracks 5d-i. Slice 5d-ii is still planned without an issue.
+- **Safety boundary:** the agent loop remains dormant. Slices 4a and 4b add enforcement contracts only; they must not enable or wire dispatch.
 - **External validation:** no paid provider-backed run is included. Local HTTP fixtures and hosted CI are not provider-backed evidence.
 - **Project direction:** `docs/original_outline.md`; approved design order is in `docs/Version_2/`.
 
@@ -17,24 +18,24 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | # | Slice | Depends on | Issue / PR | Status |
 |---:|---|---|---|---|
 | 1 | Sequenced writers | - | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Merged; local and hosted verification passed |
-| 2 | 2a - Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Open; local and hosted verification passed |
-| 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Open, stacked on #72; hosted checks passed |
-| 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Open, stacked on #74; hosted checks passed |
-| 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Open; hosted checks passed |
-| 6 | 3b - Agent loop core and journal | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80) | Open, stacked on #78; hosted checks passed; dormant |
-| 7 | 3c - Control-plane loop policy and lease lifecycle | 3a; parallel with 3b | [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82) | Open, stacked on #78; hosted checks passed |
+| 2 | 2a - Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Merged to `master` (2026-09-29) |
+| 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Merged to `master` (2026-09-29) |
+| 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Merged to `master` (2026-09-29) |
+| 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Merged to `master` (2026-09-29) |
+| 6 | 3b - Agent loop core and journal | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80) | Merged to `master` (2026-09-29); remains dormant |
+| 7 | 3c - Control-plane loop policy and lease lifecycle | 3a; parallel with 3b | [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82) | Merged to `master` (2026-09-29); execution remains dormant |
 | 8 | 3d - Runner loop wiring behind a default-off switch | 3b, 3c, 4a | Not opened | Planned; remain disabled until 4a is complete |
 | 9 | 3e - Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
-| 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / Not opened | Implemented and locally verified on integration stack; PR waits for prerequisite branches |
-| 11 | 4b - RED prerequisite validation | 4a, 2b | Not opened | Planned |
-| 12 | 4c - Repository enforcement policy | 4a | Not opened | Planned |
-| 13 | 4d - Spend reservation and enforcement | 4a | Not opened | Planned / deferrable |
-| 14 | 5a - Run-record identity and input pins | 3 | Not opened | Planned |
-| 15 | 5b - Evidence links and record verification | 5a, 2 | Not opened | Planned |
-| 16 | 5c - Exportable/verifiable record | 5a, 5b | Not opened | Planned |
-| 17 | 5d-i - Trace capture | 3, 5a | Not opened | Planned |
-| 18 | 5d-ii - Trace replay | 5d-i | Not opened | Planned |
-| 19 | 5e - Drift probe | 5a, 5b | Not opened | Planned |
+| 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / [#92](https://github.com/JRH89/ForgeLoop/pull/92) | Merged to `master` (2026-09-29); dispatch remains dormant |
+| 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Open; hosted checks pending |
+| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) | Implemented locally; queued behind 4b |
+| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) | Implemented locally; queued behind 4c |
+| 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) | Implemented locally; queued behind 4d |
+| 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) | Implemented locally; queued behind 5a |
+| 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) | Implemented locally; queued behind 5b |
+| 17 | 5e - Provider replay and drift probe | 3a, 5c fixtures | [#90](https://github.com/JRH89/ForgeLoop/issues/90) | Offline replay verified; live canonical fixtures and paid drift calls pending |
+| 18 | 5d-i - Run-record export and core integrity checks | 5a, 5b, 5c, 5e | [#91](https://github.com/JRH89/ForgeLoop/issues/91) | Next planned slice; no paid provider calls or live fixture capture |
+| 19 | 5d-ii - Deterministic re-execution checks | 5d-i | Not opened | Planned |
 | 20 | 6a - Pull-request rounds and lifecycle | 2-5 | Not opened | Planned |
 | 21 | 6b-i - GitHub feedback sweep and evidence | 6a | Not opened | Planned |
 | 22 | 6b-ii - Review comments and permission checks | 6b-i | Not opened | Planned |
@@ -97,7 +98,15 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Runner verification:** focused suite passed (32 tests), then `mvn -B verify` passed (222 tests, 0 failures/errors, 1 existing symlink-permission skip).
 - **Control-plane:** `hold` accepts the four `ENFORCEMENT_<CLASS>` reasons; all four produce HIGH escalations. Unit tests cover acceptance, state transition, and severity.
 - **Verification:** runner `mvn -B verify` passed (222 tests, 0 failures/errors, 1 existing symlink-permission skip); combined control-plane `mvn -B verify` passed (288 tests, 0 failures/errors/skips); harness `mvn -B verify` passed (2 tests). `git diff --check` passed. No paid provider run.
-- **Delivery:** issue #83 is linked; a PR waits until prerequisite branches are merged so it can target a clean base.
+- **Delivery:** merged as [PR #92](https://github.com/JRH89/ForgeLoop/pull/92) on 2026-09-29; issue #83 is closed. Hosted control-plane, runner, harness, frontend, MCP, end-to-end, installer, desktop-package, supply-chain, and CodeQL checks passed. No paid provider run.
+
+## Slice 4b - RED prerequisite validation
+
+- **Issue:** [#84](https://github.com/JRH89/ForgeLoop/issues/84).
+- **Scope:** derive the RED proof from the implementation task's `RED_CHECK` edge and the check's test writer; dispatch the test task ID, target SHA, and evidence digest; reject missing, malformed, stale, or mismatched proof before the first provider turn.
+- **Result:** control-plane derives the current passing record from the exact RED-check/test-writer edges without calling the base-ref helper; GraphQL and runner transport preserve the test ID, target SHA, and evidence digest; absent, malformed, stale, and mismatched proof holds before a provider turn. Dispatch caches the materialized value before lazy persistence state leaves the transaction.
+- **Verification:** focused runner suite passed (23 tests); focused control-plane suite passed (11 tests); full runner `mvn -B verify` passed (226 tests, 1 existing symlink-permission skip); full control-plane `mvn -B verify` passed (294 tests); harness `mvn -B verify` passed (2 tests). No paid provider run.
+- **Delivery:** issue #84 is linked to [PR #93](https://github.com/JRH89/ForgeLoop/pull/93), opened after 4a merged. Hosted checks are pending; the PR contains only 4b changes plus the progress-tracker update.
 
 ## Update protocol
 

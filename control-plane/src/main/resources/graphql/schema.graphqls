@@ -50,9 +50,11 @@ extend type Mutation {
 }
 extend type RepositoryConnection { agentLoop: AgentLoopBudget }
 extend type Task { agentLoop: TaskAgentLoop }
+extend type Task { redPrerequisite: RedPrerequisite }
 type AgentLoopBudget { maxToolCalls: Int!, maxTokens: Int!, maxWallSeconds: Int!, maxConversationBytes: Int! }
 type AgentLoopGate { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int! }
 type TaskAgentLoop { budget: AgentLoopBudget!, gates: [AgentLoopGate!]! }
+type RedPrerequisite { testTaskId: ID, targetSha: String, evidenceDigest: String }
 input AgentLoopBudgetInput { maxToolCalls: Int!, maxTokens: Int!, maxWallSeconds: Int!, maxConversationBytes: Int! }
 input VerificationEvidenceInput { kind: String!, gate: String!, image: String!, command: [String!]!, exitCode: Int!, timedOut: Boolean!, output: String!, startedAt: String!, finishedAt: String!, artifactReference: String, outputDigest: String!, bundleDigest: String! }
 input ReviewCriterionInput { statement: String!, status: String!, evidence: String! }

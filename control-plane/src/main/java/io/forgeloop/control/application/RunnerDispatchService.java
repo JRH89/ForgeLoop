@@ -45,6 +45,7 @@ public class RunnerDispatchService {
             task.getTestFirstEvidence();
             task.getTestCheckEvidence();
             task.getAgentLoop();
+            task.getRedPrerequisite();
         });
         return available;
     }
