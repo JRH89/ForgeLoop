@@ -11,12 +11,13 @@ public class TaskLease {
     @ManyToOne(optional = false) private Runner runner;
     @Column(nullable = false, unique = true) private String nonceHash;
     @Column(nullable = false) private Instant expiresAt;
+    @Column(nullable = false) private Instant claimedAt;
     private Instant acknowledgedAt;
     private Instant completedAt;
 
     protected TaskLease() { }
     public TaskLease(DeliveryTask task, Runner runner, String nonceHash, Instant expiresAt) {
-        this.task = task; this.runner = runner; this.nonceHash = nonceHash; this.expiresAt = expiresAt;
+        this.task = task; this.runner = runner; this.nonceHash = nonceHash; this.expiresAt = expiresAt; this.claimedAt = Instant.now();
     }
     public boolean active() { return completedAt == null && Instant.now().isBefore(expiresAt); }
     public boolean belongsTo(String runnerId) { return runner.getId().equals(runnerId); }
@@ -33,6 +34,19 @@ public class TaskLease {
     }
     /** Closes a failed quality-stage lease before the run atomically materializes its code-repair cycle. */
     public void closeForRepairCycle() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        completedAt = Instant.now();
+    }
+    /** Extends only acknowledged loop leases and never beyond the original claim-time budget cap. */
+    public void renew(Instant now, Instant maximumExpiry) {
+        if (now == null || completedAt != null || acknowledgedAt == null || !now.isBefore(expiresAt))
+            throw new IllegalStateException("Lease must be active and acknowledged before renewal");
+        if (maximumExpiry == null || !maximumExpiry.isAfter(now)) throw new IllegalArgumentException("Lease renewal limit reached");
+        Instant requested = now.plus(java.time.Duration.ofMinutes(10));
+        expiresAt = requested.isBefore(maximumExpiry) ? requested : maximumExpiry;
+    }
+    /** Closes an acknowledged lease after the runner deliberately holds its task for an operator. */
+    public void closeForHold() {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         completedAt = Instant.now();
     }
@@ -73,5 +87,6 @@ public class TaskLease {
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public DeliveryTask getTask() { return task; }
     public String getRunnerId() { return runner.getId(); } public String getExpiresAt() { return expiresAt.toString(); }
+    public Instant getClaimedAt() { return claimedAt; }
     public boolean isAcknowledged() { return acknowledgedAt != null; } public boolean isCompleted() { return completedAt != null; }
 }

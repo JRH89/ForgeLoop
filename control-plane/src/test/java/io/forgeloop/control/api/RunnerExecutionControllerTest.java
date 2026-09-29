@@ -100,6 +100,33 @@ class RunnerExecutionControllerTest {
     }
 
     @Test
+    void authenticatesRunnerBeforeRenewingLease() {
+        controller.renewTaskLease("lease-1", "runner-1", "nonce", "runner-credential");
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).renew("lease-1", "runner-1", "nonce");
+    }
+
+    @Test
+    void authenticatesRunnerBeforeHoldingLease() {
+        controller.holdTaskLease("lease-1", "runner-1", "nonce", "runner-credential",
+                "LOOP_BUDGET_EXHAUSTED", "The loop reached its configured limit.");
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).hold("lease-1", "runner-1", "nonce", "LOOP_BUDGET_EXHAUSTED",
+                "The loop reached its configured limit.");
+    }
+
+    @Test
+    void forwardsAnOptionalCompletionCategoryAfterRunnerAuthentication() {
+        controller.completeTaskLease("lease-1", "runner-1", "nonce", "runner-credential", false,
+                "LOOP_HARNESS_FAILURE");
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).complete("lease-1", "runner-1", "nonce", false, "LOOP_HARNESS_FAILURE");
+    }
+
+    @Test
     void authenticatesRunnerBeforeRecordingEvidence() {
         Instant time = Instant.parse("2026-01-01T00:00:00Z");
         String outputDigest = VerificationEvidence.digest("ok");

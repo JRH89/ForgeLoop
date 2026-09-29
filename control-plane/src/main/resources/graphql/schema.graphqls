@@ -8,12 +8,52 @@ type IssueChatTurnGrant { id: ID!, repository: String!, draftTitle: String, draf
 type IssueChatTurnMessage { role: String!, content: String! }
 input IssueChatTurnResultInput { passed: Boolean!, assistantMessage: String, title: String, body: String, acceptanceCriteria: [String!], provider: String, model: String, inputTokens: Float!, outputTokens: Float!, estimatedCostMicros: Float!, costKnown: Boolean! }
 type ProviderActivity { id: ID!, repository: String!, activityType: String!, sourceId: String!, provider: String!, model: String!, inputTokens: Float!, outputTokens: Float!, estimatedCostMicros: Float!, costKnown: Boolean!, recordedAt: String! }
-type Mutation { submitFeature(input: SubmitFeatureInput!): FeatureRun!, configureOrganizationPolicy(input: OrganizationPolicyInput!): OrganizationPolicy!, createHarnessDefinition(input: HarnessDefinitionInput!): HarnessDefinition!, createLocalMcpConfiguration(input: LocalMcpConfigurationInput!): LocalMcpConfiguration!, connectRepository(input: ConnectRepositoryInput!): RepositoryConnection!, configureRepositoryVerification(repository: String!, policies: [VerificationPolicyInput!]!): RepositoryConnection!, issueRunnerRegistrationToken(organizationId: String!): String!, registerRunner(input: RegisterRunnerInput!): RunnerEnrollment!, runnerHeartbeat(runnerId: ID!, credential: String!): Runner!, grantOrganizationMembership(organizationId: String!, subject: String!, role: OperatorRole!): OrganizationMembership!, claimTaskLease(taskId: ID!, runnerId: ID!, credential: String!): LeaseGrant!, acknowledgeTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): TaskLease!, completeTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, passed: Boolean!): TaskLease!, completeProviderTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, changeSha: String!): TaskLease!, issueGithubCheckoutGrant(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): GithubCheckoutGrant!, issueGithubPushGrant(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): GithubPushGrant!, completeGithubPush(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, integratedSha: String!): TaskLease!, submitTaskPlan(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: TaskPlanInput!): FeatureRun!, recordVerificationEvidence(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: VerificationEvidenceInput!): VerificationEvidence!, recordReviewEvidence(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: ReviewEvidenceInput!): ReviewEvidence!, recordProviderAttempt(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: ProviderAttemptInput!): ProviderAttempt!, retryFeatureTask(taskId: ID!, reason: String!, confirmation: String!): Task!, approveFeatureRun(runId: ID!, confirmation: String!): FeatureRun!, overrideVerificationGate(runId: ID!, gate: String!, reason: String!): FeatureRun!, cancelFeatureRun(runId: ID!, confirmation: String!): FeatureRun!, acknowledgeEscalation(id: ID!, confirmation: String!): HumanEscalation!, resolveEscalation(id: ID!, confirmation: String!): HumanEscalation!, synchronizeGithubInstallation(installationId: Float!): [RepositoryConnection!]! }
+type Mutation {
+  submitFeature(input: SubmitFeatureInput!): FeatureRun!
+  configureOrganizationPolicy(input: OrganizationPolicyInput!): OrganizationPolicy!
+  createHarnessDefinition(input: HarnessDefinitionInput!): HarnessDefinition!
+  createLocalMcpConfiguration(input: LocalMcpConfigurationInput!): LocalMcpConfiguration!
+  connectRepository(input: ConnectRepositoryInput!): RepositoryConnection!
+  configureRepositoryVerification(repository: String!, policies: [VerificationPolicyInput!]!): RepositoryConnection!
+  issueRunnerRegistrationToken(organizationId: String!): String!
+  registerRunner(input: RegisterRunnerInput!): RunnerEnrollment!
+  runnerHeartbeat(runnerId: ID!, credential: String!): Runner!
+  grantOrganizationMembership(organizationId: String!, subject: String!, role: OperatorRole!): OrganizationMembership!
+  claimTaskLease(taskId: ID!, runnerId: ID!, credential: String!): LeaseGrant!
+  acknowledgeTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): TaskLease!
+  completeTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, passed: Boolean!, category: String): TaskLease!
+  completeProviderTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, changeSha: String!): TaskLease!
+  issueGithubCheckoutGrant(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): GithubCheckoutGrant!
+  issueGithubPushGrant(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): GithubPushGrant!
+  completeGithubPush(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, integratedSha: String!): TaskLease!
+  submitTaskPlan(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: TaskPlanInput!): FeatureRun!
+  recordVerificationEvidence(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: VerificationEvidenceInput!): VerificationEvidence!
+  recordReviewEvidence(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: ReviewEvidenceInput!): ReviewEvidence!
+  recordProviderAttempt(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, input: ProviderAttemptInput!): ProviderAttempt!
+  retryFeatureTask(taskId: ID!, reason: String!, confirmation: String!): Task!
+  approveFeatureRun(runId: ID!, confirmation: String!): FeatureRun!
+  overrideVerificationGate(runId: ID!, gate: String!, reason: String!): FeatureRun!
+  cancelFeatureRun(runId: ID!, confirmation: String!): FeatureRun!
+  acknowledgeEscalation(id: ID!, confirmation: String!): HumanEscalation!
+  resolveEscalation(id: ID!, confirmation: String!): HumanEscalation!
+  synchronizeGithubInstallation(installationId: Float!): [RepositoryConnection!]!
+}
 input VerificationPolicyInput { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int!, required: Boolean!, criterionCoverage: String! }
 extend type Mutation { archiveFeatureRun(runId: ID!, archived: Boolean!): FeatureRun!, deleteFeatureRun(runId: ID!): Boolean!, configureRepositoryIntake(repository: String!, requireAssignee: Boolean!, requiredAssignee: String): RepositoryConnection!, requestRepositoryScan(repository: String!): RepositoryScan!, requestRepositoryIssueProposal(scanId: ID!, findingId: ID!): RepositoryIssueProposal!, approveRepositoryIssueProposal(proposalId: ID!, title: String!, body: String!, acceptanceCriteria: [String!]!): RepositoryIssueProposal!, rejectRepositoryIssueProposal(proposalId: ID!, reason: String): RepositoryIssueProposal!, claimRepositoryScan(runnerId: ID!, credential: String!): RepositoryScanGrant, completeRepositoryScan(scanId: ID!, runnerId: ID!, credential: String!, input: RepositoryScanResultInput!): RepositoryScan!, claimRepositoryIssueProposal(runnerId: ID!, credential: String!): RepositoryIssueProposalGrant, completeRepositoryIssueProposal(proposalId: ID!, runnerId: ID!, credential: String!, input: RepositoryIssueProposalResultInput!): RepositoryIssueProposal! }
 extend type FeatureRun { archived: Boolean! }
 extend type Mutation { approveRunnerPairing(challenge: String!, name: String!): Boolean!, exchangeRunnerPairing(verifier: String!): RunnerEnrollment }
 extend type RepositoryConnection { requiredAssignee: String, requireAssignee: Boolean! }
+extend type Mutation {
+  configureRepositoryAgentLoop(repository: String!, budget: AgentLoopBudgetInput): RepositoryConnection!
+  renewTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): TaskLease!
+  holdTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, reason: String!, summary: String!): TaskLease!
+}
+extend type RepositoryConnection { agentLoop: AgentLoopBudget }
+extend type Task { agentLoop: TaskAgentLoop }
+type AgentLoopBudget { maxToolCalls: Int!, maxTokens: Int!, maxWallSeconds: Int!, maxConversationBytes: Int! }
+type AgentLoopGate { name: String!, kind: String!, imageDigest: String!, command: [String!]!, networkPolicy: String!, timeoutSeconds: Int! }
+type TaskAgentLoop { budget: AgentLoopBudget!, gates: [AgentLoopGate!]! }
+input AgentLoopBudgetInput { maxToolCalls: Int!, maxTokens: Int!, maxWallSeconds: Int!, maxConversationBytes: Int! }
 input VerificationEvidenceInput { kind: String!, gate: String!, image: String!, command: [String!]!, exitCode: Int!, timedOut: Boolean!, output: String!, startedAt: String!, finishedAt: String!, artifactReference: String, outputDigest: String!, bundleDigest: String! }
 input ReviewCriterionInput { statement: String!, status: String!, evidence: String! }
 input ReviewEvidenceInput { approved: Boolean!, summary: String!, criteria: [ReviewCriterionInput!]! }

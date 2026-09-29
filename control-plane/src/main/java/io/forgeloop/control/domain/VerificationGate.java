@@ -42,6 +42,11 @@ public class VerificationGate {
         if (kind == null) throw new IllegalStateException("Legacy verification gate has no executable policy");
         return new VerificationPolicySpec(name, kind, imageDigest, getCommand(), networkPolicy, timeoutSeconds, required, criterionCoverage);
     }
+    /** Returns only executable, fully specified gates for an agent loop; legacy display-only gates are omitted. */
+    public AgentLoopGate toAgentLoopGate() {
+        if (kind == null) return null;
+        return new AgentLoopGate(name, kind, imageDigest, getCommand(), networkPolicy, timeoutSeconds);
+    }
     public String getId() { return id; } public String getName() { return name; } public boolean isRequired() { return required; }
     public String getState() { return state.name(); } public String getKind() { return kind; } public String getImageDigest() { return imageDigest; }
     public List<String> getCommand() { return command == null ? List.of() : command.lines().toList(); }

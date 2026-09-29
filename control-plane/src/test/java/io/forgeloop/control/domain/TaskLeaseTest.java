@@ -1,6 +1,7 @@
 package io.forgeloop.control.domain;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Instant;
 import java.util.List;
@@ -84,5 +85,25 @@ class TaskLeaseTest {
         assertEquals(TaskState.INTEGRATED, backend.getState());
         assertEquals(TaskState.INTEGRATED, frontend.getState());
         assertEquals(TaskState.INTEGRATED, integration.getState());
+    }
+
+    @Test
+    void renewalIsCappedAtTheClaimBudgetAndHoldClosesTheLease() {
+        FeatureRun run = new FeatureRun("owner/repository", "issue-2", "Feature", "criterion", 5, "GENERIC", 1);
+        DeliveryTask task = run.addPlannedTask("backend", "BACKEND", "Backend", "provider", List.of("src"), 2, 1_000_000);
+        task.transition(TaskState.LEASED);
+        Instant claim = Instant.now();
+        TaskLease lease = new TaskLease(task, new Runner("org", "runner", "1", List.of("provider"), "hash"),
+                "nonce", claim.plusSeconds(600));
+        lease.acknowledge();
+
+        Instant renewAt = claim.plusSeconds(120);
+        Instant cap = claim.plusSeconds(300);
+        lease.renew(renewAt, cap);
+
+        assertEquals(cap.toString(), lease.getExpiresAt());
+        assertThrows(IllegalArgumentException.class, () -> lease.renew(renewAt, renewAt));
+        lease.closeForHold();
+        assertEquals(true, lease.isCompleted());
     }
 }

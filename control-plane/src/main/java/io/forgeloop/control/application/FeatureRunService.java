@@ -21,6 +21,7 @@ public class FeatureRunService {
     platform.requireHarness(connection.getHarnessProfile());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
     FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
+    run.adoptAgentLoop(connection.getAgentLoopBudget());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
     if (connection.getVerificationPolicies().isEmpty()) throw new IllegalStateException("Repository verification policy is not configured");
     connection.getVerificationPolicies().forEach(run::addGate);

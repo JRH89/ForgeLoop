@@ -83,8 +83,15 @@ public class RunnerExecutionController {
     @MutationMapping public TaskLease acknowledgeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
         runners.authenticated(runnerId, credential); return leases.acknowledge(leaseId, runnerId, nonce);
     }
-    @MutationMapping public TaskLease completeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument boolean passed) {
-        runners.authenticated(runnerId, credential); return leases.complete(leaseId, runnerId, nonce, passed);
+    @MutationMapping public TaskLease completeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument boolean passed, @Argument String category) {
+        runners.authenticated(runnerId, credential); return leases.complete(leaseId, runnerId, nonce, passed, category);
+    }
+    @MutationMapping public TaskLease renewTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
+        runners.authenticated(runnerId, credential); return leases.renew(leaseId, runnerId, nonce);
+    }
+    @MutationMapping public TaskLease holdTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce,
+                                                     @Argument String credential, @Argument String reason, @Argument String summary) {
+        runners.authenticated(runnerId, credential); return leases.hold(leaseId, runnerId, nonce, reason, summary);
     }
     @MutationMapping public TaskLease completeProviderTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument String changeSha) {
         runners.authenticated(runnerId, credential); return leases.completeProviderWork(leaseId, runnerId, nonce, changeSha);

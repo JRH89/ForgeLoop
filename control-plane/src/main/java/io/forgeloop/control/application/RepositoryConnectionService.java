@@ -2,6 +2,7 @@ package io.forgeloop.control.application;
 
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
+import io.forgeloop.control.domain.AgentLoopBudget;
 import io.forgeloop.control.security.OperatorContext;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,14 @@ public class RepositoryConnectionService {
   @Transactional public RepositoryConnection configureVerification(String repository, List<io.forgeloop.control.domain.VerificationPolicySpec> policies) {
     RepositoryConnection connection = requireEnabled(repository); connection.replaceVerificationPolicies(policies);
     RepositoryConnection saved = connections.save(connection); audit.record("REPOSITORY_VERIFICATION_POLICY_UPDATED", "REPOSITORY_CONNECTION", saved.getId(), "revision=" + saved.getPolicyRevision()); return saved;
+  }
+  @Transactional public RepositoryConnection configureAgentLoop(String repository, AgentLoopBudget budget) {
+    operators.requireAdministrator();
+    RepositoryConnection connection = requireEnabled(repository);
+    connection.configureAgentLoop(budget);
+    RepositoryConnection saved = connections.save(connection);
+    audit.record("REPOSITORY_AGENT_LOOP_UPDATED", "REPOSITORY_CONNECTION", saved.getId(), "revision=" + saved.getPolicyRevision());
+    return saved;
   }
   public RepositoryConnection requireEnabled(String repository) {
     RepositoryConnection connection = connections.findByRepository(repository).orElseThrow(() -> new IllegalStateException("Repository is not connected"));

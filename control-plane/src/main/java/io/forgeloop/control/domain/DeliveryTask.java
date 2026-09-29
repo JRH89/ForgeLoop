@@ -170,6 +170,15 @@ public class DeliveryTask {
         return dependencies.stream().filter(task -> isWritingRole(task.role)).findFirst();
     }
     public boolean isWritingTask() { return isWritingRole(role); }
+    /** Exposes the snapshotted loop only for source-writing roles, never control or review tasks. */
+    public TaskAgentLoop getAgentLoop() {
+        if (!isWritingRole(role)) return null;
+        AgentLoopBudget budget = run.getAgentLoopBudget();
+        if (budget == null) return null;
+        List<AgentLoopGate> gates = run.getGates().stream().map(VerificationGate::toAgentLoopGate)
+                .filter(java.util.Objects::nonNull).toList();
+        return new TaskAgentLoop(budget, gates);
+    }
     private static boolean isWritingRole(String role) {
         return WRITING_ROLES.contains(role);
     }

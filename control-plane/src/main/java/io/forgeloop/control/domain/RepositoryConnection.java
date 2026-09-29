@@ -6,6 +6,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Embedded;
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.OneToMany;
 import java.util.ArrayList;
@@ -29,6 +32,14 @@ public class RepositoryConnection {
   @Column(nullable = false) private int policyRevision;
   private String requiredAssignee;
   @Column(nullable = false) private boolean requireAssignee;
+  @Embedded
+  @AttributeOverrides({
+      @AttributeOverride(name = "maxToolCalls", column = @Column(name = "agent_loop_max_tool_calls")),
+      @AttributeOverride(name = "maxTokens", column = @Column(name = "agent_loop_max_tokens")),
+      @AttributeOverride(name = "maxWallSeconds", column = @Column(name = "agent_loop_max_wall_seconds")),
+      @AttributeOverride(name = "maxConversationBytes", column = @Column(name = "agent_loop_max_conversation_bytes"))
+  })
+  private AgentLoopBudget agentLoopBudget;
   public String getRequiredAssignee() { return requiredAssignee; }
   public boolean isRequireAssignee() { return requireAssignee || requiredAssignee != null; }
   /** Null disables assignment gating; usernames are compared case-insensitively. */
@@ -48,6 +59,11 @@ public class RepositoryConnection {
       throw new IllegalArgumentException("Enter a GitHub assignee login, without @");
     requireAssignee = required;
     requiredAssignee = required && !normalized.isEmpty() ? normalized : null;
+    policyRevision++;
+  }
+  /** Null disables loop dispatch; every mutation advances the repository policy revision. */
+  public void configureAgentLoop(AgentLoopBudget budget) {
+    agentLoopBudget = budget == null ? null : budget.copy();
     policyRevision++;
   }
   @OneToMany(mappedBy = "connection", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -90,4 +106,5 @@ public class RepositoryConnection {
   public String getHarnessProfile() { return harnessProfile; } public double getMaxBudgetUsd() { return maxBudgetUsd; } public int getPolicyRevision() { return policyRevision; }
   public List<String> getRequiredGates() { return Arrays.stream(requiredGates.split(",")).filter(gate -> !gate.isBlank()).toList(); }
   public List<VerificationPolicySpec> getVerificationPolicies() { return verificationPolicies.stream().map(RepositoryVerificationPolicy::toSpec).toList(); }
+  public AgentLoopBudget getAgentLoopBudget() { return agentLoopBudget == null ? null : agentLoopBudget.copy(); }
 }
