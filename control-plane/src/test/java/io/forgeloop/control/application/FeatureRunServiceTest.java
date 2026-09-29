@@ -13,6 +13,7 @@ import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.FeatureRunRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.VerificationPolicySpec;
+import io.forgeloop.control.domain.AgentLoopBudget;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,9 +27,19 @@ class FeatureRunServiceTest {
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of(
             new VerificationPolicySpec("compile", "CONTAINER", image, List.of("npm", "run", "build"), "NONE", 300, true, "ALL"),
             new VerificationPolicySpec("browser", "BROWSER", image, List.of("npm", "run", "e2e"), "NONE", 600, true, "ALL")), 25, true);
+    connection.configureAgentLoop(new AgentLoopBudget(25, 250_000, 600, 524_288));
     when(connections.requireEnabled("acme/support")).thenReturn(connection); when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
     FeatureRun run = service.submit(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- Admin can assign\n- Cross org is denied", 25));
-    assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(1, run.getPolicyRevision()); assertEquals(1, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(0, run.getCriteria().size()); assertEquals(io.forgeloop.control.domain.RunState.PLANNING, run.getState()); verify(runs).save(run);
+    assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(2, run.getPolicyRevision()); assertEquals(1, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(0, run.getCriteria().size()); assertEquals(io.forgeloop.control.domain.RunState.PLANNING, run.getState());
+    assertEquals(600, run.getAgentLoopBudget().getMaxWallSeconds());
+    DeliveryTask planner = run.getTasks().getFirst();
+    assertEquals(null, planner.getAgentLoop());
+    DeliveryTask writer = run.addPlannedTask("backend", "BACKEND", "Backend", "provider", List.of("src"), 2, 100_000);
+    assertEquals(2, writer.getAgentLoop().gates().size());
+    assertEquals(image, writer.getAgentLoop().gates().getFirst().imageDigest());
+    connection.configureAgentLoop(new AgentLoopBudget(10, 100_000, 120, 65_536));
+    assertEquals(600, run.getAgentLoopBudget().getMaxWallSeconds(), "the submitted run keeps its policy snapshot");
+    verify(runs).save(run);
   }
   @Test void rejectsBudgetAboveRepositoryPolicy() {
     when(connections.requireEnabled("acme/support")).thenReturn(new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile"), 10));

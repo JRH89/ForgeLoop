@@ -12,6 +12,14 @@ public class FeatureRun {
   private String repository; private String sourceRef; private String title;
   @Column(length=20000) private String specification;
   private double budgetUsd; private String harnessProfile; private String baseBranch; private int policyRevision;
+  @Embedded
+  @AttributeOverrides({
+      @AttributeOverride(name = "maxToolCalls", column = @Column(name = "agent_loop_max_tool_calls")),
+      @AttributeOverride(name = "maxTokens", column = @Column(name = "agent_loop_max_tokens")),
+      @AttributeOverride(name = "maxWallSeconds", column = @Column(name = "agent_loop_max_wall_seconds")),
+      @AttributeOverride(name = "maxConversationBytes", column = @Column(name = "agent_loop_max_conversation_bytes"))
+  })
+  private AgentLoopBudget agentLoopBudget;
   @Enumerated(EnumType.STRING) private RunState state; private Instant createdAt;
   private Instant approvedAt; private String approvedBy;
   @Column(length=80) private String testFirstGate;
@@ -55,6 +63,8 @@ public class FeatureRun {
   public void block(){if(state==RunState.COMPLETE||state==RunState.CANCELLED)throw new IllegalStateException("Terminal run cannot be blocked");state=RunState.BLOCKED;}
   public void addGate(String name){gates.add(new VerificationGate(this,name));}
   public void addGate(VerificationPolicySpec policy){gates.add(new VerificationGate(this,policy));}
+  /** Captures the repository's opt-in budget so later edits do not mutate this run. */
+  public void adoptAgentLoop(AgentLoopBudget budget) { agentLoopBudget = budget == null ? null : budget.copy(); }
   public void addCriterion(String statement){criteria.add(new AcceptanceCriterion(this,statement));}
   public void addPolicyVerificationTasks(){List<DeliveryTask> prerequisites=tasks.stream().filter(task->!"PLANNER".equals(task.getRole())&&!"VERIFICATION".equals(task.getRole())).toList();DeliveryTask previous=null;for(VerificationGate gate:gates){if(gate.getKind()==null)continue;if(!gate.isRequired()){gate.skipByPolicy();continue;}DeliveryTask verification=new DeliveryTask(this,"verify-"+gate.getName(),"VERIFICATION","Verify "+gate.getName(),"docker",List.of(),2,0);verification.attachVerificationGate(gate);prerequisites.forEach(verification::dependsOn);if(previous!=null)verification.dependsOn(previous);tasks.add(verification);previous=verification;}}
   /** Inserts server-owned checks between each test writer and implementation, then gates review on GREEN. */
@@ -133,5 +143,5 @@ public class FeatureRun {
   public void resumeAfterRetry(DeliveryTask task){if(state!=RunState.BLOCKED&&state!=RunState.FAILED)throw new IllegalStateException("Run is not blocked");if(task.getRun()!=this)throw new IllegalArgumentException("Retry task does not belong to run");state="PLANNER".equals(task.getRole())?RunState.PLANNING:RunState.EXECUTING;approvedAt=null;approvedBy=null;}
   public long getSpentCostMicros(){return tasks.stream().mapToLong(DeliveryTask::getSpentCostMicros).sum();}
   public boolean hasBudgetRemaining(){return !archived && getSpentCostMicros()<Math.round(budgetUsd*1_000_000d);}
-  public String getId(){return id;} public String getOrganizationId(){return organizationId;} public String getRepository(){return repository;} public String getSourceRef(){return sourceRef;} public String getTitle(){return title;} public String getSpecification(){return specification;} public double getBudgetUsd(){return budgetUsd;} public String getHarnessProfile(){return harnessProfile;} public String getBaseBranch(){return baseBranch;} public int getPolicyRevision(){return policyRevision;} public RunState getState(){return state;} public String getCreatedAt(){return createdAt.toString();} public List<DeliveryTask> getTasks(){return List.copyOf(tasks);} public List<VerificationGate> getGates(){return List.copyOf(gates);} public List<AcceptanceCriterion> getCriteria(){return List.copyOf(criteria);} public boolean isApproved(){return approvedAt!=null;} public String getApprovedAt(){return approvedAt==null?null:approvedAt.toString();} public String getApprovedBy(){return approvedBy;}
+  public String getId(){return id;} public String getOrganizationId(){return organizationId;} public String getRepository(){return repository;} public String getSourceRef(){return sourceRef;} public String getTitle(){return title;} public String getSpecification(){return specification;} public double getBudgetUsd(){return budgetUsd;} public String getHarnessProfile(){return harnessProfile;} public String getBaseBranch(){return baseBranch;} public int getPolicyRevision(){return policyRevision;} public AgentLoopBudget getAgentLoopBudget(){return agentLoopBudget == null ? null : agentLoopBudget.copy();} public RunState getState(){return state;} public String getCreatedAt(){return createdAt.toString();} public List<DeliveryTask> getTasks(){return List.copyOf(tasks);} public List<VerificationGate> getGates(){return List.copyOf(gates);} public List<AcceptanceCriterion> getCriteria(){return List.copyOf(criteria);} public boolean isApproved(){return approvedAt!=null;} public String getApprovedAt(){return approvedAt==null?null:approvedAt.toString();} public String getApprovedBy(){return approvedBy;}
 }

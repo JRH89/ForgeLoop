@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,6 +67,10 @@ public class TaskLeaseService {
     }
 
     @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed) {
+        return complete(leaseId, runnerId, nonce, passed, null);
+    }
+
+    @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed, String failureCategory) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         if (passed && java.util.List.of("RED_CHECK", "GREEN_CHECK").contains(task.getRole())) {
@@ -85,11 +90,58 @@ public class TaskLeaseService {
         lease.complete(passed);
         if (!passed) {
             String category = latestProviderCategory == null ? "EXECUTION_FAILED" : latestProviderCategory;
+            if (!List.of("REVIEW", "VERIFICATION").contains(task.getRole()) && failureCategory != null) {
+                if (!failureCategory.matches("[A-Z_]{1,80}")) throw new IllegalArgumentException("Failure category is invalid");
+                category = failureCategory;
+            }
             String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
                     .map(VerificationEvidence::getDigest).orElse(null);
             repairPackages.save(new RepairPackage(task, category, digest));
             if (task.getState() == TaskState.FAILED) escalations.escalate(task, "ATTEMPT_BUDGET_EXHAUSTED", "Task failed after all autonomous attempts: " + task.getTitle());
         }
+        return lease;
+    }
+
+    /** Renews an acknowledged agent-loop lease only while the run remains executable. */
+    @Transactional public TaskLease renew(String leaseId, String runnerId, String nonce) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalArgumentException("Lease is not active");
+        DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        AgentLoopBudget budget = task.getAgentLoop() == null ? null : task.getAgentLoop().budget();
+        if (budget == null) throw new IllegalArgumentException("Lease renewal requires an agent-loop task");
+        RunState runState = task.getRun().getState();
+        if (task.getState() != TaskState.LEASED || runState == null
+                || List.of(RunState.CANCELLED, RunState.COMPLETE, RunState.FAILED, RunState.REJECTED).contains(runState))
+            throw new IllegalArgumentException("Task is no longer running");
+        Instant now = Instant.now();
+        Instant cap = lease.getClaimedAt().plusSeconds(budget.getMaxWallSeconds() + 15L * 60);
+        lease.renew(now, cap);
+        return lease;
+    }
+
+    /** Holds bounded loop stops for explicit operator review without converting partial work into failure. */
+    @Transactional public TaskLease hold(String leaseId, String runnerId, String nonce, String reason, String summary) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalArgumentException("Lease is not active");
+        if (reason == null || !List.of("LOOP_BUDGET_EXHAUSTED", "BUDGET_EXHAUSTED", "WORKER_DECLINED").contains(reason))
+            throw new IllegalArgumentException("Hold reason is invalid");
+        if (summary == null || summary.isBlank() || summary.length() > 1000) throw new IllegalArgumentException("Hold summary is invalid");
+        EvidenceSecretPolicy.requireRedacted(summary);
+        DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        if (task.getAgentLoop() == null) throw new IllegalArgumentException("Holding requires an agent-loop task");
+        if (task.getState() == TaskState.HELD) {
+            // Cancellation may hold the task just before this runner reports its own stop.
+            lease.closeForHold();
+            return lease;
+        }
+        RunState runState = task.getRun().getState();
+        if (task.getState() != TaskState.LEASED || runState == null
+                || List.of(RunState.CANCELLED, RunState.COMPLETE, RunState.FAILED, RunState.REJECTED).contains(runState))
+            throw new IllegalArgumentException("Task is no longer running");
+        task.transition(TaskState.HELD);
+        lease.closeForHold();
+        task.getRun().block();
+        escalations.escalate(task, reason, summary);
         return lease;
     }
 

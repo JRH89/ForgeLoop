@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.DeliveryTaskRepository;
@@ -21,7 +23,9 @@ import io.forgeloop.control.domain.TaskState;
 import io.forgeloop.control.domain.VerificationEvidenceRepository;
 import io.forgeloop.control.domain.VerificationEvidence;
 import io.forgeloop.control.domain.VerificationPolicySpec;
+import io.forgeloop.control.domain.AgentLoopBudget;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -238,6 +242,115 @@ class TaskLeaseServiceTest {
         service.completeProviderWork("lease", "runner", "nonce", "a".repeat(40));
 
         verify(lease).completeChangeReady("a".repeat(40));
+    }
+
+    @Test
+    void renewalRequiresLoopPolicyAndUsesTheClaimTimeWallCap() {
+        FeatureRun run = activeLoopRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = authorizedLease(task);
+        Instant claimedAt = Instant.now().minus(Duration.ofMinutes(2));
+        when(lease.getClaimedAt()).thenReturn(claimedAt);
+
+        service.renew("lease", "runner", "nonce");
+
+        org.mockito.ArgumentCaptor<Instant> now = org.mockito.ArgumentCaptor.forClass(Instant.class);
+        org.mockito.ArgumentCaptor<Instant> cap = org.mockito.ArgumentCaptor.forClass(Instant.class);
+        verify(lease).renew(now.capture(), cap.capture());
+        assertEquals(claimedAt.plusSeconds(600 + 15 * 60), cap.getValue());
+        assertEquals(true, now.getValue().isAfter(claimedAt));
+    }
+
+    @Test
+    void renewalRefusesSingleCallTasksAndCancelledRuns() {
+        FeatureRun unconfigured = activeRun();
+        DeliveryTask task = unconfigured.getTasks().getFirst();
+        TaskLease lease = authorizedLease(task);
+        IllegalArgumentException noPolicy = assertThrows(IllegalArgumentException.class, () -> service.renew("lease", "runner", "nonce"));
+        assertEquals("Lease renewal requires an agent-loop task", noPolicy.getMessage());
+
+        FeatureRun cancelled = activeLoopRun();
+        DeliveryTask cancelledTask = cancelled.getTasks().getFirst();
+        cancelled.cancel();
+        TaskLease cancelledLease = authorizedLease(cancelledTask);
+        when(cancelledLease.getClaimedAt()).thenReturn(Instant.now().minusSeconds(30));
+        IllegalArgumentException stopped = assertThrows(IllegalArgumentException.class, () -> service.renew("lease", "runner", "nonce"));
+        assertEquals("Task is no longer running", stopped.getMessage());
+    }
+
+    @Test
+    void holdStopsAndEscalatesButCancellationRaceOnlyClosesLease() {
+        FeatureRun run = activeLoopRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = authorizedLease(task);
+        service.hold("lease", "runner", "nonce", "LOOP_BUDGET_EXHAUSTED", "Loop reached its token budget after 8 calls.");
+        assertEquals(TaskState.HELD, task.getState());
+        assertEquals(RunState.BLOCKED, run.getState());
+        verify(lease).closeForHold();
+        verify(escalations).escalate(task, "LOOP_BUDGET_EXHAUSTED", "Loop reached its token budget after 8 calls.");
+
+        FeatureRun cancelled = activeLoopRun();
+        DeliveryTask cancelledTask = cancelled.getTasks().getFirst();
+        cancelled.cancel();
+        TaskLease raced = authorizedLease(cancelledTask);
+        service.hold("lease", "runner", "nonce", "WORKER_DECLINED", "Cancellation won the race.");
+        verify(raced).closeForHold();
+        verify(escalations, never()).escalate(eq(cancelledTask), any(), any());
+        assertEquals(RunState.CANCELLED, cancelled.getState());
+    }
+
+    @Test
+    void holdRejectsSecretsAndInvalidReasons() {
+        FeatureRun run = activeLoopRun();
+        TaskLease lease = authorizedLease(run.getTasks().getFirst());
+        assertThrows(IllegalArgumentException.class, () -> service.hold("lease", "runner", "nonce", "OTHER", "A bounded summary."));
+        assertThrows(IllegalArgumentException.class, () -> service.hold("lease", "runner", "nonce", "WORKER_DECLINED", "Authorization: Bearer sensitive-value"));
+        verify(lease, never()).closeForHold();
+    }
+
+    @Test
+    void explicitFailureCategoryIsUsedOnlyForGeneralExecutionFailures() {
+        FeatureRun run = activeRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = authorizedLease(task);
+        when(providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())).thenReturn(Optional.empty());
+        when(evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())).thenReturn(Optional.empty());
+        when(repairPackages.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.complete("lease", "runner", "nonce", false, "LOOP_HARNESS_FAILURE");
+
+        org.mockito.ArgumentCaptor<io.forgeloop.control.domain.RepairPackage> repair =
+                org.mockito.ArgumentCaptor.forClass(io.forgeloop.control.domain.RepairPackage.class);
+        verify(repairPackages).save(repair.capture());
+        assertEquals("LOOP_HARNESS_FAILURE", repair.getValue().getFailureCategory());
+        verify(lease).complete(false);
+        assertThrows(IllegalArgumentException.class, () -> service.complete("lease", "runner", "nonce", false, "bad category"));
+    }
+
+    private FeatureRun activeRun() {
+        FeatureRun run = new FeatureRun("org", "owner/repository", "issue-1", "x", "spec", 5, "GENERIC", "main", 1);
+        run.addPlannedTask("writer", "IMPLEMENTATION", "Write", "provider", List.of("src"), 2, 100_000);
+        run.beginPlanning(); run.queuePlannedWork(); run.startExecution();
+        run.getTasks().getFirst().transition(TaskState.LEASED);
+        return run;
+    }
+
+    private FeatureRun activeLoopRun() {
+        FeatureRun run = activeRun();
+        run.adoptAgentLoop(new AgentLoopBudget(20, 100_000, 600, 524_288));
+        return run;
+    }
+
+    private TaskLease authorizedLease(DeliveryTask task) {
+        TaskLease lease = mock(TaskLease.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(true);
+        when(lease.getTaskId()).thenReturn("task");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        return lease;
     }
 
     @Test

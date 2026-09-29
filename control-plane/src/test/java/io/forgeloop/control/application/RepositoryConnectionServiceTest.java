@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
+import io.forgeloop.control.domain.AgentLoopBudget;
 import io.forgeloop.control.security.OperatorContext;
 import io.forgeloop.control.domain.OrganizationMembershipRepository;
 import java.util.List;
@@ -19,6 +20,18 @@ class RepositoryConnectionServiceTest {
   @Test void rejectsDuplicateRepository() { when(repository.findByRepository("acme/support")).thenReturn(Optional.of(new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20))); assertThrows(IllegalStateException.class, () -> service.register(new RepositoryRegistration("acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20))); }
   @Test void rejectsConnectionOwnedByAnotherOrganization() { when(repository.findByRepository("other/support")).thenReturn(Optional.of(new RepositoryConnection("other", "other/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20))); assertThrows(IllegalStateException.class, () -> service.requireEnabled("other/support")); }
   @Test void listsOnlyTheCurrentOrganizationsPolicyFetchedConnections() { RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20); when(repository.findByOrganizationId("local-development")).thenReturn(List.of(connection)); assertEquals(List.of(connection), service.list()); }
+  @Test void configuresAndDisablesAnAuditedRepositoryLoopBudget() {
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20);
+    when(repository.findByRepository("acme/support")).thenReturn(Optional.of(connection));
+    when(repository.save(any(RepositoryConnection.class))).thenAnswer(call -> call.getArgument(0));
+    RepositoryConnection configured = service.configureAgentLoop("acme/support", new AgentLoopBudget(25, 250_000, 600, 524_288));
+    assertEquals(2, configured.getPolicyRevision());
+    assertEquals(25, configured.getAgentLoopBudget().getMaxToolCalls());
+    RepositoryConnection disabled = service.configureAgentLoop("acme/support", null);
+    assertEquals(3, disabled.getPolicyRevision());
+    assertEquals(null, disabled.getAgentLoopBudget());
+  }
+
   @Test void configuresTestFirstForAnEnabledRepository() {
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("unit"), 20);
     String image = "node@sha256:" + "a".repeat(64);

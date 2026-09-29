@@ -29,4 +29,19 @@ class RunnerEventServiceTest {
         RunnerEvent existing=new RunnerEvent("org","run","task","runner","lease",1,"INFO","EXECUTION_STARTED","first",Instant.EPOCH);when(leaseValidation.requireActiveTaskId("lease","runner","nonce")).thenReturn("task");when(events.findByLeaseIdAndSequenceNumber("lease",1)).thenReturn(Optional.of(existing));
         assertThrows(IllegalStateException.class,()->service.append("lease","runner","nonce",1,"INFO","EXECUTION_STARTED","different",Instant.EPOCH));
     }
+
+    @Test void acceptsMetadataOnlyLoopProgressEventTypes() {
+        TaskLease lease = mock(TaskLease.class); DeliveryTask task = mock(DeliveryTask.class); FeatureRun run = mock(FeatureRun.class);
+        when(leaseValidation.requireActiveTaskId("lease", "runner", "nonce")).thenReturn("task");
+        when(leases.findById("lease")).thenReturn(Optional.of(lease)); when(lease.getId()).thenReturn("lease");
+        when(tasks.findById("task")).thenReturn(Optional.of(task)); when(task.getRun()).thenReturn(run);
+        when(run.getOrganizationId()).thenReturn("org"); when(run.getId()).thenReturn("run");
+        when(events.save(any())).thenAnswer(call -> call.getArgument(0));
+        String[] types = {"LOOP_STARTED", "LOOP_TOOL_CALLED", "LOOP_ENDED", "LOOP_RESUMED"};
+        for (int index = 0; index < types.length; index++) {
+            RunnerEvent event = service.append("lease", "runner", "nonce", index + 1, "INFO", types[index],
+                    "tool=read_file; status=OK; bytes=12; durationMs=4", Instant.now());
+            assertEquals(types[index], event.getEventType());
+        }
+    }
 }
