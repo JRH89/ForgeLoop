@@ -11,7 +11,7 @@ import java.util.TreeMap;
 
 /** Immutable snapshot of enforcement authority sent with a task, independent of model-visible text. */
 public final class EnforcementDescriptor {
-    public static final String RULES_VERSION = "1";
+    public static final String RULES_VERSION = "2";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final String writeBoundary;
@@ -50,7 +50,7 @@ public final class EnforcementDescriptor {
     public static EnforcementDescriptor of(RunnerTask task, List<LoopGate> gates) {
         if (task == null) throw new IllegalArgumentException("Dispatched runner task is required");
         List<String> names = gates == null ? List.of() : gates.stream().map(LoopGate::name).toList();
-        return fromDispatched(task.writeBoundary(), task.testPathGlobs(), null, List.of(), false, null, names);
+        return fromDispatched(task.writeBoundary(), task.testPathGlobs(), task.redPrerequisite(), List.of(), false, null, names);
     }
 
     /** Kept explicit so malformed wire inputs can be represented and held by preflight instead of defaulted. */

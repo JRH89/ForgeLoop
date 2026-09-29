@@ -26,6 +26,7 @@ class GraphQlSchemaTest {
         assertNotNull(schema.getMutationType().getFieldDefinition("holdTaskLease"));
         assertNotNull(schema.getMutationType().getFieldDefinition("completeTaskLease"));
         assertNotNull(schema.getObjectType("Task").getFieldDefinition("agentLoop"));
+        assertNotNull(schema.getObjectType("Task").getFieldDefinition("redPrerequisite"));
         assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("agentLoop"));
     }
 }

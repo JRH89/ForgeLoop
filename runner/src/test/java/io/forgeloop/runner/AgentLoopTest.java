@@ -253,6 +253,36 @@ class AgentLoopTest {
     }
 
     @Test
+    void missingCurrentRedProofHoldsBeforeTheFirstProviderTurn() throws Exception {
+        Path repo = gitRepository("red-prerequisite-hold");
+        String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
+        ScriptedClient client = new ScriptedClient();
+        RecordingReporter reporter = new RecordingReporter();
+        StepJournal journal = new StepJournal(temporaryDirectory.resolve("red-prerequisite-hold-state"), "task-1", "lease-1", Clock.systemUTC());
+        ToolRegistry registry = ToolRegistry.standard(new GitWorktreeManager(), null);
+        ToolGateway gateway = new ToolGateway(registry, journal, List.of());
+        EnforcementDescriptor enforcement = EnforcementDescriptor.fromDispatched("NO_TESTS", List.of("**/*Test.java"),
+                new RunnerRedPrerequisite("test-task", null, null), List.of(), false, null, List.of());
+        LoopSetup setup = new LoopSetup("task-1", "JRH89/agent-loop-test", "lease-1", "IMPLEMENTATION", "Implement a small feature", "small specification",
+                List.of("src/"), List.of(), repo, baseSha, new ProviderExecutionPolicy("openai", "test-model", 1), client,
+                standardBudget(10, 50_000, 65_536), List.of(), gateway, registry, journal, Clock.systemUTC(), reporter,
+                new AtomicBoolean(), 0, 0, enforcement);
+
+        LoopResult result = new AgentLoop().run(setup);
+
+        assertEquals(LoopOutcome.POLICY_HOLD, result.outcome());
+        assertEquals(HoldClass.PREREQUISITE_MISSING, result.holdClass());
+        assertEquals("red-prerequisite", result.holdRule());
+        assertTrue(client.requests.isEmpty());
+        assertTrue(reporter.reports.isEmpty());
+        List<JsonNode> records = journal.records();
+        assertTrue(records.stream().anyMatch(row -> row.path("type").asText().equals("LOOP_ENDED")
+                && row.path("outcome").asText().equals("POLICY_HOLD")
+                && row.path("holdClass").asText().equals("PREREQUISITE_MISSING")));
+        assertTrue(records.stream().noneMatch(row -> row.path("type").asText().equals("TURN_REQUESTED")));
+    }
+
+    @Test
     void holdAtFinishLeavesForbiddenChangeUncommittedAndSkipsRemainingCalls() throws Exception {
         Path repo = gitRepository("boundary-hold");
         String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
