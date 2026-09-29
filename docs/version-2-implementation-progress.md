@@ -4,12 +4,11 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 3c - control-plane agent-loop policy and lease lifecycle; can proceed alongside slice 3b.
-- **Branch:** `feat/agent-loop-core`, stacked on `feat/provider-conversations` / PR #78.
+- **Active work:** Slice 3b - agent loop core and journal; its production dispatch remains dormant.
+- **Branch:** `feat/agent-loop-core`, retargeted to `master` after PR #78 merged.
 - **Issue / PR:** [#79 - Implement the runner agent loop, tools, and durable step journal](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80).
-- **Code state:** Slice 3b is committed and pushed in commits `fa1205c` (implementation) and `467df94` (docs), with PR #80 stacked on #78. Full runner verification passed (180 tests, zero failures/errors/skips). The loop is not wired into production dispatch. PR #80 hosted checks are pending.
-- **Previous slice:** 3a is implemented at code commit `0f4a2b4`; docs progress commit `04ae22b`; PR #78 remains open with all hosted checks passing.
-- **Earlier slices:** PR #70 is merged. PR #72 (2a), #74 (2b), and #76 (2c) are open; #74 and #76 remain stacked while PR #72 awaits merge. All hosted checks on #76 passed.
+- **Code state:** Slice 3b is committed in `fa1205c` (implementation) and `467df94` (docs). The base merge preserves test-boundary enforcement and shared path guards; fresh hosted checks are required.
+- **Dependency status:** PRs #70, #72, #74, #76, and #78 are merged. Slice 3c remains open as PR #82 and depends on #78.
 - **Local test toolchain:** portable Temurin 21 and Maven 3.9.12 under the user-local ForgeLoop tools directory; no project files added for tooling.
 - **External validation:** live provider-backed runs have not been attempted because they incur provider spend. Local HTTP-server fixtures and hosted CI are not paid-provider evidence.
 - **Outline:** `docs/original_outline.md` is the project-level direction; the approved `docs/Version_2/` designs define this implementation sequence.
@@ -21,12 +20,12 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 | Order | Slice | Dependency | Issue / PR | Status |
 |---:|---|---|---|---|
 | 1 | 1 - Sequenced writers | - | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Merged; local and hosted verification passed |
-| 2 | 2a - Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Local and hosted verification passed; PR open |
-| 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Hosted checks passed; open and stacked on PR #72 |
-| 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Hosted checks passed; open and stacked on PR #74 |
-| 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Open against `master`; all hosted checks passing |
-| 6 | 3b - Agent loop core and journal write path | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80) | Implementation/docs committed and pushed; local runner verification passed; hosted checks pending; stacked on PR #78 |
-| 7 | 3c — Control-plane loop policy and lease lifecycle | 3a; can proceed alongside 3b | Not opened | Planned |
+| 2 | 2a - Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Merged; local and hosted verification passed (2026-09-29) |
+| 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Merged; hosted checks passed (2026-09-29) |
+| 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Merged; hosted checks passed (2026-09-29) |
+| 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Merged; local and hosted verification passed (2026-09-29) |
+| 6 | 3b - Agent loop core and journal write path | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80) | Implementation and local runner verification passed; hosted checks rerunning against `master` |
+| 7 | 3c - Control-plane loop policy and lease lifecycle | 3a; parallel with 3b | [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82) | Retargeted to `master`; merge reconciliation and hosted checks pending |
 | 8 | 3d — Runner loop wiring behind a default-off switch | 3b, 3c, 4a; keep disabled until 4a | Not opened | Planned |
 | 9 | 3e — Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
 | 10 | 4a — Fail-closed security guard | 1, 2, 3 | Not opened | Planned |
@@ -72,16 +71,16 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 
 ## Slice 2b log - RED/GREEN checks
 
-- **Issue / PR:** [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74), stacked on PR #72 because #72 remains open.
+- **Issue / PR:** [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74), originally stacked on PR #72; #72 and #74 merged on 2026-09-29.
 - **Scope and implementation:** bounded secure JUnit parsing; server-created RED/GREEN tasks and immutable evidence; deterministic verdicts, retries, idempotency and routing; runner affinity/leases; test-writer retries and quality repairs; `UNVERIFIABLE` hold/escalation; report upload/query; repair/review context; integration dependencies preventing unchecked test commits from becoming the head.
 - **Verification:** `mvn -B verify` passed in control-plane (260 tests), runner (153 tests, 1 symlink-permission skip), and harness (2). The runner included the Docker report-mount test. Hosted checks passed at `a45569f` after migration V38 and a Windows-container test guard. No paid provider run was attempted.
 - **Commits:** `0872763` control-plane; `913e6a5` runner; `1cdd879` tracker.
 
 ## Slice 2c log - GitHub branch check
 
-- **Issue / PR:** [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76), stacked on PR #74.
+- **Issue / PR:** [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76), originally stacked on PR #74; #74 and #76 merged on 2026-09-29.
 - **Scope and implementation:** authenticated GitHub compare-files request; verify published test blobs against current passing RED evidence; fail closed on removals, stale/incomplete/conflicting evidence, invalid globs, and the 300-file cap; persist held integration, blocked run, HIGH escalation, audit event, and remote head on violation.
-- **Verification:** control-plane `mvn -B verify` passed (271 tests); focused compare/verifier/push/lease/evidence tests passed (27); runner `mvn -B verify` passed (153 tests, 1 symlink-permission skip); `git diff --check` passed. All hosted checks on PR #76 passed. PR #76 remains open and stacked on #74.
+- **Verification:** control-plane `mvn -B verify` passed (271 tests); focused compare/verifier/push/lease/evidence tests passed (27); runner `mvn -B verify` passed (153 tests, 1 symlink-permission skip); `git diff --check` passed. All hosted checks on PR #76 passed before merge.
 - **Commit:** `9447671`. No paid provider call was needed.
 
 ## Slice 3a log - Provider conversations and tool calling
@@ -91,7 +90,7 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 - **Implemented:** request/item/turn types; Anthropic Messages, OpenAI Responses, OpenAI-compatible Chat Completions, and Gemini adapters; vendor-native replay and tool-result ordering; normalized stop reasons and usage; retryable malformed argument handling; optional `toolCalling` policy with hosted-vendor defaults and legacy policy compatibility; turn-level cost/usage evidence; and `provider-tool-check <provider> <model>`, which prints only stop reasons, token counts, and attempt counts.
 - **Verification:** runner `mvn -B verify` — 150 tests, 0 failures/errors/skips. Local HTTP-server tests verify all adapters send exactly the UTF-8 bytes returned by `serialize`; fixtures cover signatures/reasoning replay, tool-only responses, result ordering, malformed arguments, stop reasons, usage, policy defaults, and retries. `git diff --check` passed.
 - **Commit:** `0f4a2b4` — conversation API, four adapters, policy, diagnostic command, and tests.
-- **Hosted checks:** pending on PR #78 (2026-09-28).
+- **Hosted checks:** all checks passed on the reconciled PR #78 head; it merged to `master` on 2026-09-29.
 - **Paid validation boundary:** the diagnostic calls the selected provider twice and may incur charges. It was not run. No model loop or task execution was enabled.
 
 ## Slice 3b log - Agent loop core and journal write path
@@ -101,7 +100,7 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 - **Implementation:** added `AgentLoop`, immutable loop contracts, fixed loop instructions and paths-only context manifest; centralized `.git`, symlink, worktree-root and owned-prefix checks; bounded regex/file traversal and atomic writes; added durable sequenced/hash-linked JSONL records, owner-only POSIX permissions, torn-tail recovery, and complete loop/request/response/tool/post-image records. Journal start records now pin repository identity, provider/model/attempt limit, adapter and serializer versions, exact instructions, tool specifications, gates, budget and base SHA. Exact model-visible tool results and metadata-only `LOOP_TOOL_CALLED` events are recorded for later replay and progress reporting.
 - **Dormant boundary:** no dispatch path invokes this loop. Control-plane policy and lease renewal are 3c; runner wiring and Docker gate execution are 3d; journal resume is 3e. No hosted-provider calls were made and no cost was incurred.
 - **Verification:** runner `mvn -B verify` passed after the implementation and review hardening: 180 tests, 0 failures, 0 errors, 0 skipped. `git diff --check` passed. Hosted checks for dependency PR #78 are all green.
-- **Delivery:** commits `fa1205c` and `467df94` pushed; PR #80 targets `feat/provider-conversations`, depends on PR #78, and closes issue #79. Do not merge until the stack's base is merged and checks are green.
+- **Delivery:** commits `fa1205c` and `467df94` pushed; PR #80 now targets `master`, depends on merged PR #78, and closes issue #79. Merge only after reconciled hosted checks pass.
 
 ## Update protocol
 

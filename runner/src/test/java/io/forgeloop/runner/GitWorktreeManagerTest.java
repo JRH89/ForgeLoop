@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -87,6 +88,34 @@ class GitWorktreeManagerTest {
         assertFalse(integratedSha.isBlank());
         assertTrue(Files.readString(integration.resolve("tests/Acceptance.java")).contains("class AcceptanceTest {}"));
         assertTrue(Files.readString(integration.resolve("src/Feature.java")).contains("class Feature {}"));
+    }
+
+    @Test
+    void resolvesRedCheckParentAndCapturesAddedAndRemovedBlobIdentities() throws Exception {
+        run("git", "init", temporaryDirectory.toString());
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.email", "runner@example.test");
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.name", "ForgeLoop Runner");
+        Files.createDirectories(temporaryDirectory.resolve("tests"));
+        Files.writeString(temporaryDirectory.resolve("tests/OldTest.java"), "class OldTest {}\n");
+        run("git", "-C", temporaryDirectory.toString(), "add", ".");
+        run("git", "-C", temporaryDirectory.toString(), "commit", "-m", "base");
+        GitWorktreeManager git = new GitWorktreeManager();
+        String parent = git.headSha(temporaryDirectory);
+        Path tests = git.create(temporaryDirectory, parent, "red-writer", temporaryDirectory.resolve("worktrees"));
+        Files.delete(tests.resolve("tests/OldTest.java"));
+        Files.createDirectories(tests.resolve("tests"));
+        Files.writeString(tests.resolve("tests/NewTest.java"), "class NewTest {}\n");
+        String target = git.commit(tests, "test: replace test fixture");
+
+        assertEquals(parent, git.parentCommitSha(temporaryDirectory, target));
+        List<GitWorktreeManager.ChangedFile> changed = git.changedFilesInCommit(temporaryDirectory, parent, target);
+        String newBlob = output("git", "-C", temporaryDirectory.toString(), "rev-parse", target + ":tests/NewTest.java");
+
+        assertEquals(2, changed.size());
+        assertTrue(changed.stream().anyMatch(file -> file.path().equals("tests/NewTest.java")
+                && file.blobSha().equals(newBlob)));
+        assertTrue(changed.stream().anyMatch(file -> file.path().equals("tests/OldTest.java")
+                && file.blobSha().chars().allMatch(character -> character == '0')));
     }
 
     private static String output(String... command) throws Exception {

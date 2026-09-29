@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,7 @@ public class DeliveryTask {
     private List<DeliveryTask> dependencies = new ArrayList<>();
     @OneToMany(mappedBy = "task") private List<ProviderAttempt> providerAttempts = new ArrayList<>();
     @OneToMany(mappedBy = "task") private List<RepairPackage> repairPackages = new ArrayList<>();
+    @OneToMany(mappedBy = "task") private List<TestCheckEvidence> testCheckEvidence = new ArrayList<>();
     @ManyToOne private VerificationGate verificationGate;
 
     protected DeliveryTask() { }
@@ -74,18 +76,25 @@ public class DeliveryTask {
     public void dependsOn(DeliveryTask dependency) { dependencies.add(dependency); }
     /** Reopens only server-owned pipeline stages after a bounded quality-gate repair is scheduled. */
     void resetPipelineStage() {
-        if (!List.of("INTEGRATION", "REVIEW", "VERIFICATION").contains(role)) throw new IllegalStateException("Only pipeline stages can be reset");
+        if (!List.of("INTEGRATION", "REVIEW", "VERIFICATION", "RED_CHECK", "GREEN_CHECK").contains(role)) throw new IllegalStateException("Only pipeline stages can be reset");
         state = TaskState.PENDING;
     }
-    public void attachVerificationGate(VerificationGate gate) { if (!"VERIFICATION".equals(role)) throw new IllegalStateException("Only verification tasks can own gates"); this.verificationGate = gate; }
+    /** Requeues a failed RED check after its test writer has been sent for a bounded repair. */
+    public void requeueRedCheckAfterWriterRepair() {
+        if (!"RED_CHECK".equals(role)) throw new IllegalStateException("Only a RED check can be requeued after test-writer repair");
+        state = TaskState.PENDING;
+    }
+    public void attachVerificationGate(VerificationGate gate) { if (!List.of("VERIFICATION", "RED_CHECK", "GREEN_CHECK").contains(role)) throw new IllegalStateException("Only verification tasks can own gates"); this.verificationGate = gate; }
     public void recordChangeSha(String sha) {
         if (sha == null || !sha.matches("[0-9a-f]{40,64}")) throw new IllegalArgumentException("Change SHA is invalid");
         this.changeSha = sha;
     }
     void attachRepairPackage(RepairPackage repairPackage) { repairPackages.add(repairPackage); }
+    void attachTestCheckEvidence(TestCheckEvidence item) { testCheckEvidence.add(item); }
     public boolean dependenciesSatisfied() {
         return dependencies.stream().allMatch(task -> task.state == TaskState.INTEGRATED || task.state == TaskState.VERIFIED
                 || ("INTEGRATION".equals(role) && task.state == TaskState.CHANGE_READY)
+                || ("RED_CHECK".equals(role) && isWritingRole(task.role) && task.state == TaskState.CHANGE_READY)
                 || (isWritingRole(role) && isWritingRole(task.role) && task.state == TaskState.CHANGE_READY));
     }
     public void integrateDependencies() {
@@ -133,6 +142,7 @@ public class DeliveryTask {
                 + "\nChange SHA: " + (repair.getChangeSha() == null ? "unknown" : repair.getChangeSha())
                 + "\nEvidence digest: " + (repair.getEvidenceDigest() == null ? "unknown" : repair.getEvidenceDigest())
                 + "\nOwned paths: " + String.join(",", repair.getOwnedPaths())
+                + (repair.getFailingTests().isEmpty() ? "" : "\nFailing tests:\n- " + String.join("\n- ", repair.getFailingTests()))
                 + "\nAcceptance criteria:\n- " + String.join("\n- ", repair.getAcceptanceCriteria());
     }
     public double getBudgetUsd() { return run.getBudgetUsd(); }
@@ -198,5 +208,34 @@ public class DeliveryTask {
     public List<String> getVerificationCommand() { return verificationGate == null ? List.of() : verificationGate.getCommand(); }
     public String getVerificationNetworkPolicy() { return verificationGate == null ? null : verificationGate.getNetworkPolicy(); }
     public Integer getVerificationTimeoutSeconds() { return verificationGate == null ? null : verificationGate.getTimeoutSeconds(); }
-    public String getVerificationBaseRef() { return dependencies.stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch()); }
+    public String getTestReportFormat() { return verificationGate == null ? null : verificationGate.getTestReport(); }
+    /** Uses the persisted task role so retries cannot gain a different patch boundary. */
+    public String getWriteBoundary() {
+        if (!run.isTestFirst()) return "ANY";
+        return "INDEPENDENT_TEST".equals(role) ? "TESTS_ONLY"
+                : isWritingRole(role) ? "NO_TESTS" : "ANY";
+    }
+    public List<String> getTestPathGlobs() { return run.getTestPathGlobs(); }
+    public String getVerificationBaseRef() {
+        if ("RED_CHECK".equals(role)) return getWritingDependency().map(DeliveryTask::getChangeSha)
+                .filter(java.util.Objects::nonNull).orElseThrow(() -> new IllegalStateException("RED check has no test commit"));
+        return dependencies.stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha)
+                .filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch());
+    }
+    /** Check tasks may outlive the ordinary ten-minute provider-task lease while running repository gates. */
+    public Duration leaseDuration() {
+        if ("RED_CHECK".equals(role)) return Duration.ofMinutes(10).plusSeconds(2L * requiredGateTimeout());
+        if ("GREEN_CHECK".equals(role)) return Duration.ofMinutes(10).plusSeconds(requiredGateTimeout());
+        return Duration.ofMinutes(10);
+    }
+    private long requiredGateTimeout() {
+        if (verificationGate == null || verificationGate.getTimeoutSeconds() == null) throw new IllegalStateException("Test check has no gate timeout");
+        return verificationGate.getTimeoutSeconds();
+    }
+    public List<String> getExpectedTests() {
+        return "GREEN_CHECK".equals(role) ? run.currentRedTests().stream().limit(2_000).toList() : List.of();
+    }
+    public boolean isExpectedTestsOverflow() { return "GREEN_CHECK".equals(role) && run.currentRedTests().size() > 2_000; }
+    public String getTestFirstEvidence() { return "REVIEW".equals(role) ? run.getTestFirstReviewEvidence() : null; }
+    public List<TestCheckEvidence> getTestCheckEvidence() { return List.copyOf(testCheckEvidence); }
 }

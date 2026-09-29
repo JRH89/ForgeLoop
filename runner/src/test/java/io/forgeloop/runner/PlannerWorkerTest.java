@@ -1,6 +1,7 @@
 package io.forgeloop.runner;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -25,5 +26,17 @@ class PlannerWorkerTest {
 
         assertTrue(captured.get().instructions().contains("at most one dependency on another writing task"));
         assertTrue(captured.get().instructions().contains("starts from that task's commit"));
+    }
+
+    @Test
+    void testFirstInstructionsAreConditionalAndNameTheTestGlobs() {
+        RunnerTask ordinary = new RunnerTask("task-1", "PLANNER", "Plan", "org/repository", "main", null, "spec", "provider");
+        RunnerTask testFirst = new RunnerTask("task-2", "PLANNER", "Plan", "org/repository", "main", null, "spec", "provider",
+                1, java.util.List.of(), java.util.List.of(), null, null, null, java.util.List.of(), null, null,
+                "main", "main", java.util.List.of(), java.util.List.of(), "ANY", java.util.List.of("**/*.test.ts"), null);
+
+        assertFalse(PlannerWorker.instructionsFor(ordinary).contains("Test-first delivery is required"));
+        assertTrue(PlannerWorker.instructionsFor(testFirst).contains("Test-first delivery is required"));
+        assertTrue(PlannerWorker.instructionsFor(testFirst).contains("**/*.test.ts"));
     }
 }

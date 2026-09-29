@@ -66,6 +66,33 @@ class TaskGraphValidatorTest {
     }
 
     @Test
+    void acceptsATestFirstScaffoldTestImplementationChain() {
+        TaskPlanSubmission plan = new TaskPlanSubmission(List.of("behavior is observable"), List.of(
+                task("scaffold", "IMPLEMENTATION", List.of(), List.of("src/model"), 100),
+                task("tests", "INDEPENDENT_TEST", List.of("scaffold"), List.of("tests"), 100),
+                task("implementation", "BACKEND", List.of("tests"), List.of("src/service"), 100),
+                task("integration", "INTEGRATION", List.of("scaffold", "tests", "implementation"), List.of(), 0)));
+
+        assertDoesNotThrow(() -> validator.validate(plan, 1, true));
+    }
+
+    @Test
+    void rejectsUnpairedImplementationAndOrphanTestInTestFirstMode() {
+        TaskPlanSubmission unpairedImplementation = new TaskPlanSubmission(List.of("criterion"), List.of(
+                task("implementation", "BACKEND", List.of(), List.of("src"), 100),
+                task("tests", "INDEPENDENT_TEST", List.of(), List.of("tests"), 100),
+                task("integration", "INTEGRATION", List.of("implementation", "tests"), List.of(), 0)));
+        TaskPlanSubmission orphanTest = new TaskPlanSubmission(List.of("criterion"), List.of(
+                task("scaffold", "BACKEND", List.of(), List.of("src/model"), 100),
+                task("tests", "INDEPENDENT_TEST", List.of("scaffold"), List.of("tests"), 100),
+                task("integration", "INTEGRATION", List.of("scaffold", "tests"), List.of(), 0)));
+
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(unpairedImplementation, 1, true));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(orphanTest, 1, true));
+        assertDoesNotThrow(() -> validator.validate(unpairedImplementation, 1, false));
+    }
+
+    @Test
     void rejectsMultipleOrNonWritingDependenciesForAWriter() {
         TaskPlanSubmission multipleWriters = new TaskPlanSubmission(List.of("criterion"), List.of(
                 task("tests", "INDEPENDENT_TEST", List.of(), List.of("tests"), 100),

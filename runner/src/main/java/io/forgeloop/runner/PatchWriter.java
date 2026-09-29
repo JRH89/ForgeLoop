@@ -13,10 +13,23 @@ import java.util.List;
 /** Applies validated complete-file changes only below policy-approved relative path prefixes. */
 public final class PatchWriter {
     public void apply(Path worktree, PatchPlan plan, List<String> allowedPrefixes) throws IOException {
+        apply(worktree, plan, allowedPrefixes, WriteBoundary.any());
+    }
+
+    public void apply(Path worktree, PatchPlan plan, List<String> allowedPrefixes, WriteBoundary boundary) throws IOException {
+        if (boundary == null) throw new IllegalArgumentException("Patch write policy is incomplete");
         WorktreePathGuard guard = new WorktreePathGuard(worktree);
         List<Target> targets = new ArrayList<>();
         for (ProposedChange change : plan.changes()) {
             Path target = guard.writable(change.path(), allowedPrefixes);
+            String repositoryPath = guard.root().relativize(target).toString().replace('\\', '/');
+            boolean testPath = boundary.isTestPath(repositoryPath);
+            if (boundary.requiresTestPaths() && !testPath) {
+                throw new WriteBoundaryViolation("Patch path " + repositoryPath + " is not a test file; this task writes tests only");
+            }
+            if (boundary.forbidsTestPaths() && testPath) {
+                throw new WriteBoundaryViolation("Patch path " + repositoryPath + " is a test file; this task may not write tests");
+            }
             targets.add(new Target(change, target));
         }
         for (Target item : targets) {

@@ -26,7 +26,7 @@ public class RunnerDispatchService {
         List<DeliveryTask> available = tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED)).stream()
                 .filter(task -> runner.hasCapability(task.getRequiredCapability()))
                 .filter(DeliveryTask::dependenciesSatisfied)
-                .filter(task -> writerAffinity.permits(task, runner.getId()))
+                .filter(task -> writerAffinity.permits(task, runner))
                 .filter(DeliveryTask::hasBudgetRemaining)
                 .filter(task -> task.getRun().hasBudgetRemaining())
                 .filter(candidate -> active.stream()
@@ -40,6 +40,10 @@ public class RunnerDispatchService {
             task.getDependencyChangeShas();
             task.getExecutionSpecification();
             task.getVerificationGateName();
+            task.getExpectedTests();
+            task.isExpectedTestsOverflow();
+            task.getTestFirstEvidence();
+            task.getTestCheckEvidence();
         });
         return available;
     }

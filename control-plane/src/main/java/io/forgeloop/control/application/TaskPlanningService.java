@@ -34,13 +34,14 @@ public class TaskPlanningService {
         }
         FeatureRun run = planner.getRun();
         if (run.getTasks().size() != 1) throw new IllegalStateException("A task graph has already been materialized");
-        validator.validate(plan, run.getBudgetUsd());
+        validator.validate(plan, run.getBudgetUsd(), run.isTestFirst());
 
         plan.acceptanceCriteria().forEach(run::addCriterion);
         Map<String, DeliveryTask> materialized = new HashMap<>();
         plan.tasks().forEach(input -> materialized.put(input.key(), run.addPlannedTask(input.key(), input.role(), input.title(),
                 input.requiredCapability(), input.ownedPaths(), input.attemptBudget(), input.budgetMicros())));
         plan.tasks().forEach(input -> input.dependencies().forEach(key -> materialized.get(input.key()).dependsOn(materialized.get(key))));
+        run.addTestCheckTasks();
         run.addIndependentReviewTask();
         run.addPolicyVerificationTasks();
         planner.transition(TaskState.VERIFIED);

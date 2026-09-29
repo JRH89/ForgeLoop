@@ -29,6 +29,8 @@ public class RepositoryConnection {
   @Column(nullable = false) private int policyRevision;
   private String requiredAssignee;
   @Column(nullable = false) private boolean requireAssignee;
+  @Column(length = 80) private String testFirstGate;
+  @Column(length = 8000) private String testPathGlobs;
   public String getRequiredAssignee() { return requiredAssignee; }
   public boolean isRequireAssignee() { return requireAssignee || requiredAssignee != null; }
   /** Null disables assignment gating; usernames are compared case-insensitively. */
@@ -80,14 +82,42 @@ public class RepositoryConnection {
     if (policies == null || policies.isEmpty()) throw new IllegalArgumentException("At least one verification policy is required");
     if (policies.stream().map(VerificationPolicySpec::name).distinct().count() != policies.size()) throw new IllegalArgumentException("Verification gate names must be unique");
     java.util.Set<String> names = policies.stream().map(VerificationPolicySpec::name).collect(java.util.stream.Collectors.toSet());
+    if (testFirstGate != null && policies.stream().noneMatch(policy -> policy.name().equals(testFirstGate)
+            && policy.required() && "JUNIT_XML".equals(policy.testReport()))) {
+      throw new IllegalStateException("The test-first gate cannot be removed or weakened while test-first is on");
+    }
     verificationPolicies.removeIf(existing -> !names.contains(existing.toSpec().name()));
     policies.forEach(spec -> verificationPolicies.stream().filter(existing -> existing.matches(spec.name())).findFirst()
             .ifPresentOrElse(existing -> existing.apply(spec), () -> verificationPolicies.add(new RepositoryVerificationPolicy(this, spec))));
     requiredGates = policies.stream().filter(VerificationPolicySpec::required).map(VerificationPolicySpec::name).reduce((a,b) -> a + "," + b).orElse(""); policyRevision++;
+  }
+  /** Enables the repository's test-first contract only against a required, report-producing gate. */
+  public void configureTestFirst(String gateName, List<String> globs) {
+    if (gateName == null) {
+      testFirstGate = null;
+      testPathGlobs = null;
+      policyRevision++;
+      return;
+    }
+    List<String> normalized = globs == null ? List.of() : List.copyOf(globs);
+    if (!TestPathGlobs.areValid(normalized) || normalized.stream().distinct().count() != normalized.size()) {
+      throw new IllegalArgumentException("Test path globs are invalid");
+    }
+    VerificationPolicySpec gate = verificationPolicies.stream().map(RepositoryVerificationPolicy::toSpec)
+            .filter(policy -> policy.name().equals(gateName)).findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Test-first gate must be a required policy that declares a test report"));
+    if (!gate.required() || gate.testReport() == null) {
+      throw new IllegalArgumentException("Test-first gate must be a required policy that declares a test report");
+    }
+    testFirstGate = gateName;
+    testPathGlobs = String.join("\n", normalized);
+    policyRevision++;
   }
   public String getId() { return id; } public String getOrganizationId() { return organizationId; } public String getRepository() { return repository; } public long getInstallationId() { return installationId; }
   public boolean isEnabled() { return enabled; } public String getDefaultBranch() { return defaultBranch; } public String getIssueLabel() { return issueLabel; }
   public String getHarnessProfile() { return harnessProfile; } public double getMaxBudgetUsd() { return maxBudgetUsd; } public int getPolicyRevision() { return policyRevision; }
   public List<String> getRequiredGates() { return Arrays.stream(requiredGates.split(",")).filter(gate -> !gate.isBlank()).toList(); }
   public List<VerificationPolicySpec> getVerificationPolicies() { return verificationPolicies.stream().map(RepositoryVerificationPolicy::toSpec).toList(); }
+  public String getTestFirstGate() { return testFirstGate; }
+  public List<String> getTestPathGlobs() { return testPathGlobs == null || testPathGlobs.isBlank() ? List.of() : testPathGlobs.lines().toList(); }
 }

@@ -19,6 +19,8 @@ public final class GitWorktreeManager {
     private static final Duration COMMAND_TIMEOUT = Duration.ofMinutes(2);
     private static final int MAX_CHANGED_FILES = 400;
     private static final int MAX_CHANGED_FILE_OUTPUT_BYTES = 64 * 1024;
+    private static final java.util.regex.Pattern RAW_DIFF = java.util.regex.Pattern.compile(
+            ":\\d{6} \\d{6} ([0-9a-f]{40,64}) ([0-9a-f]{40,64}) ([A-Z])(?:\\d+)?");
     private static final List<String> FORGELOOP_IDENTITY = List.of("-c", "user.name=ForgeLoop", "-c", "user.email=runner@forgeloop.invalid");
 
     public Path create(Path repository, String baseRef, String taskId, Path workspaceRoot) throws IOException, InterruptedException {
@@ -100,6 +102,51 @@ public final class GitWorktreeManager {
     public String boundedDiff(Path worktree, String baseRef) throws IOException, InterruptedException {
         if (!Files.exists(worktree.resolve(".git")) || baseRef == null || baseRef.isBlank()) throw new IllegalArgumentException("Review diff request is invalid");
         return output(worktree, List.of("git", "diff", "--no-ext-diff", "--unified=3", baseRef + "...HEAD"), 48 * 1024);
+    }
+
+    /** Resolves the immutable parent of one server-recorded writer commit. */
+    public String parentCommitSha(Path repository, String commitSha) throws IOException, InterruptedException {
+        requireCommitSha(commitSha);
+        String parent = output(repository, List.of("git", "rev-parse", commitSha + "^"));
+        requireCommitSha(parent);
+        return parent;
+    }
+
+    /** Captures bounded commit paths and their resulting blob identities without parsing quoted Git output. */
+    public List<ChangedFile> changedFilesInCommit(Path repository, String parentSha, String commitSha)
+            throws IOException, InterruptedException {
+        requireCommitSha(parentSha);
+        requireCommitSha(commitSha);
+        String raw = outputRaw(repository, List.of("git", "diff-tree", "--no-commit-id", "--raw", "-z", "-r",
+                "--no-renames", parentSha, commitSha), MAX_CHANGED_FILE_OUTPUT_BYTES + 1);
+        if (raw.getBytes(StandardCharsets.UTF_8).length > MAX_CHANGED_FILE_OUTPUT_BYTES) {
+            throw new IllegalStateException("Test commit has too many changed-file details");
+        }
+        String[] records = raw.split("\\u0000", -1);
+        List<ChangedFile> changed = new ArrayList<>();
+        for (int index = 0; index < records.length;) {
+            String metadata = records[index++];
+            if (metadata.isEmpty()) continue;
+            if (index >= records.length) throw new IllegalStateException("Git changed-file response is incomplete");
+            String path = records[index++];
+            java.util.regex.Matcher match = RAW_DIFF.matcher(metadata);
+            if (!match.matches()) throw new IllegalStateException("Git changed-file metadata is invalid");
+            if (changed.size() == MAX_CHANGED_FILES) throw new IllegalStateException("Test commit changes too many files");
+            changed.add(new ChangedFile(path, match.group(2)));
+        }
+        return List.copyOf(changed);
+    }
+
+    private static void requireCommitSha(String sha) {
+        if (sha == null || !sha.matches("[0-9a-f]{40,64}")) throw new IllegalArgumentException("Git commit identity is invalid");
+    }
+
+    public record ChangedFile(String path, String blobSha) {
+        public ChangedFile {
+            if (path == null || path.isBlank() || blobSha == null || !blobSha.matches("[0-9a-f]{40,64}")) {
+                throw new IllegalArgumentException("Git changed-file identity is invalid");
+            }
+        }
     }
 
     /** Returns a bounded list of repository-relative paths changed since the supplied base ref. */
