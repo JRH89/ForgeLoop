@@ -45,6 +45,19 @@ class FeatureRunServiceTest {
     when(connections.requireEnabled("acme/support")).thenReturn(new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile"), 10));
     assertThrows(IllegalArgumentException.class, () -> service.submit(new FeatureSubmission("acme/support", "issue-1", "Title", "- Criterion", 11)));
   }
+  @Test void submissionSnapshotsTestFirstRepositorySettings() {
+    String image = "node@sha256:" + "a".repeat(64);
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "GENERIC", List.of(
+            new VerificationPolicySpec("unit", "CONTAINER", image, List.of("npm", "test", "--junitxml=/forgeloop/test-report/unit.xml"), "NONE", 300, true, "ALL", "JUNIT_XML")), 25, true);
+    connection.configureTestFirst("unit", List.of("src/test/**", "**/*.test.ts"));
+    when(connections.requireEnabled("acme/support")).thenReturn(connection); when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
+
+    FeatureRun run = service.submit(new FeatureSubmission("acme/support", "issue-143", "Assignment", "- Test-first", 25));
+
+    assertEquals(true, run.isTestFirst());
+    assertEquals("unit", run.getTestFirstGate());
+    assertEquals(List.of("src/test/**", "**/*.test.ts"), run.getTestPathGlobs());
+  }
   @Test void issueIntakeReusesExistingSourceRun() {
     FeatureRun existing = new FeatureRun("acme/support", "issue-142", "Assignment", "- criterion", 10, "JVM_REACT", 1);
     when(runs.findByRepositoryAndSourceRef("acme/support", "issue-142")).thenReturn(java.util.Optional.of(existing));

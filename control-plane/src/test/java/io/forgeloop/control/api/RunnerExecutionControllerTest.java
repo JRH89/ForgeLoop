@@ -24,10 +24,11 @@ class RunnerExecutionControllerTest {
     private final io.forgeloop.control.application.RepositoryScanService scans = mock(io.forgeloop.control.application.RepositoryScanService.class);
     private final io.forgeloop.control.application.RepositoryIssueProposalService issueProposals = mock(io.forgeloop.control.application.RepositoryIssueProposalService.class);
     private final io.forgeloop.control.application.IssueConversationService issueConversations = mock(io.forgeloop.control.application.IssueConversationService.class);
+    private final io.forgeloop.control.application.TestCheckEvidenceService testChecks = mock(io.forgeloop.control.application.TestCheckEvidenceService.class);
     private final RunnerExecutionController controller = new RunnerExecutionController(leases, runners, dispatch,
             mock(io.forgeloop.control.application.TaskPlanningService.class), githubPush,
             mock(io.forgeloop.control.integrations.github.GithubRunnerCheckoutService.class), reviews,
-            scans, issueProposals, issueConversations);
+            scans, issueProposals, issueConversations, testChecks);
 
     @Test void authenticatesRunnerBeforeClaimingRepositoryScan() {
         io.forgeloop.control.domain.Runner runner = mock(io.forgeloop.control.domain.Runner.class);
@@ -89,6 +90,17 @@ class RunnerExecutionControllerTest {
 
         verify(runners).authenticated("runner-1", "runner-credential");
         verify(leases).claim("task-1", "runner-1");
+    }
+
+    @Test
+    void authenticatesRunnerBeforeRecordingTestCheckEvidence() {
+        var input = new io.forgeloop.control.application.TestCheckEvidenceSubmission("artifact://org/run/task/lease/red-evidence.json", "a".repeat(64));
+        org.mockito.Mockito.when(runners.authenticated("runner-1", "runner-credential")).thenReturn(mock(io.forgeloop.control.domain.Runner.class));
+
+        controller.recordTestCheckEvidence("lease-1", "runner-1", "nonce-1", "runner-credential", input);
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(testChecks).record("lease-1", "runner-1", "nonce-1", input);
     }
 
     @Test

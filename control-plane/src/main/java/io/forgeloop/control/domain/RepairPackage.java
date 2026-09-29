@@ -23,11 +23,16 @@ public class RepairPackage {
     @Column(length = 64) private String evidenceDigest;
     @Column(nullable = false, length = 4000) private String ownedPaths;
     @Column(nullable = false, length = 12000) private String acceptanceCriteria;
+    @Column(length = 4000) private String failingTests;
     @Column(nullable = false) private Instant createdAt;
 
     protected RepairPackage() { }
 
     public RepairPackage(DeliveryTask task, String failureCategory, String evidenceDigest) {
+        this(task, failureCategory, evidenceDigest, List.of());
+    }
+
+    public RepairPackage(DeliveryTask task, String failureCategory, String evidenceDigest, List<String> failingTests) {
         this.task = task;
         this.attempt = task.getAttempts();
         this.failureCategory = failureCategory == null || failureCategory.isBlank() ? "EXECUTION_FAILED" : failureCategory;
@@ -36,6 +41,14 @@ public class RepairPackage {
         this.ownedPaths = String.join("\n", task.getOwnedPaths());
         this.acceptanceCriteria = task.getRun().getCriteria().stream().map(AcceptanceCriterion::getStatement)
                 .reduce((left, right) -> left + "\n" + right).orElse("");
+        StringBuilder boundedTests = new StringBuilder();
+        for (String test : failingTests == null ? List.<String>of() : failingTests) {
+            int addition = test.length() + (boundedTests.isEmpty() ? 0 : 1);
+            if (boundedTests.length() + addition > 4_000) break;
+            if (!boundedTests.isEmpty()) boundedTests.append('\n');
+            boundedTests.append(test);
+        }
+        this.failingTests = boundedTests.isEmpty() ? null : boundedTests.toString();
         this.createdAt = Instant.now();
         task.attachRepairPackage(this);
     }
@@ -48,5 +61,6 @@ public class RepairPackage {
     public String getEvidenceDigest() { return evidenceDigest; }
     public List<String> getOwnedPaths() { return ownedPaths.isBlank() ? List.of() : ownedPaths.lines().toList(); }
     public List<String> getAcceptanceCriteria() { return acceptanceCriteria.isBlank() ? List.of() : acceptanceCriteria.lines().toList(); }
+    public List<String> getFailingTests() { return failingTests == null || failingTests.isBlank() ? List.of() : failingTests.lines().toList(); }
     public String getCreatedAt() { return createdAt.toString(); }
 }

@@ -49,4 +49,12 @@ public class RepositoryConnectionService {
     audit.record("REPOSITORY_INTAKE_UPDATED", "REPOSITORY_CONNECTION", connection.getId(), "revision=" + connection.getPolicyRevision());
     return connection;
   }
+  @Transactional public RepositoryConnection configureTestFirst(String repository, String testGate, List<String> testPaths) {
+    operators.requireAdministrator();
+    RepositoryConnection connection = requireEnabled(repository);
+    connection.configureTestFirst(testGate, testPaths);
+    audit.record("REPOSITORY_TEST_FIRST_UPDATED", "REPOSITORY_CONNECTION", connection.getId(),
+            "revision=" + connection.getPolicyRevision());
+    return connections.save(connection);
+  }
 }

@@ -16,9 +16,13 @@ import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.GithubPublication;
 import io.forgeloop.control.domain.GithubPublicationRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
+import io.forgeloop.control.domain.TestCheckEvidence;
+import io.forgeloop.control.domain.TestCheckRules;
 import java.util.Optional;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.annotation.Transactional;
 
 class GithubRunnerPushServiceTest {
     private final TaskLeaseService leases = mock(TaskLeaseService.class);
@@ -68,7 +72,60 @@ class GithubRunnerPushServiceTest {
         service.complete("lease-1", "runner-1", "nonce", integratedSha);
 
         verify(leases).completeIntegration("lease-1", "runner-1", "nonce", integratedSha);
+        verify(github, never()).compareFiles(7L, "acme/ticketly", null, integratedSha);
         assertEquals(integratedSha, publication.getHeadSha());
+    }
+
+    @Test
+    void testFirstPushRequiresCurrentRedBlobEvidenceBeforeIntegrationCompletes() {
+        String integratedSha = "b".repeat(40);
+        GithubPublication publication = new GithubPublication("run-1", "acme/ticketly", "forgeloop/run-1", "key");
+        TestCheckEvidence red = currentRedEvidence("a".repeat(40));
+        DeliveryTask redCheck = mock(DeliveryTask.class);
+        when(redCheck.getRole()).thenReturn("RED_CHECK");
+        when(publications.findByFeatureRunId("run-1")).thenReturn(Optional.of(publication));
+        when(github.getBranchHead(7L, "acme/ticketly", "forgeloop/run-1")).thenReturn(integratedSha);
+        when(run.isTestFirst()).thenReturn(true);
+        when(run.getBaseBranch()).thenReturn("main");
+        when(run.getTestPathGlobs()).thenReturn(List.of("tests/**"));
+        when(run.getTasks()).thenReturn(List.of(redCheck));
+        when(run.currentRedEvidence()).thenReturn(List.of(red));
+        when(github.compareFiles(7L, "acme/ticketly", "main", integratedSha)).thenReturn(
+                List.of(new GithubChangedFile("tests/NewTest.java", "modified", "c".repeat(40))));
+
+        assertThrows(TestBoundaryViolationException.class,
+                () -> service.complete("lease-1", "runner-1", "nonce", integratedSha));
+
+        assertEquals(integratedSha, publication.getHeadSha());
+        verify(leases).holdIntegrationForTestBoundaryViolation("lease-1", "runner-1", "nonce",
+                "Published test files were not verified by current RED evidence: tests/NewTest.java");
+        verify(leases, never()).completeIntegration("lease-1", "runner-1", "nonce", integratedSha);
+        verify(audit).record("TEST_BOUNDARY_VIOLATION", "FEATURE_RUN", "run-1",
+                "forgeloop/run-1|" + integratedSha + "|tests/NewTest.java");
+    }
+
+    @Test
+    void acceptsAnExactCurrentRedBlobFromGithub() {
+        String integratedSha = "b".repeat(40);
+        String testBlob = "a".repeat(40);
+        GithubPublication publication = new GithubPublication("run-1", "acme/ticketly", "forgeloop/run-1", "key");
+        TestCheckEvidence red = currentRedEvidence(testBlob);
+        DeliveryTask redCheck = mock(DeliveryTask.class);
+        when(redCheck.getRole()).thenReturn("RED_CHECK");
+        when(publications.findByFeatureRunId("run-1")).thenReturn(Optional.of(publication));
+        when(github.getBranchHead(7L, "acme/ticketly", "forgeloop/run-1")).thenReturn(integratedSha);
+        when(run.isTestFirst()).thenReturn(true);
+        when(run.getBaseBranch()).thenReturn("main");
+        when(run.getTestPathGlobs()).thenReturn(List.of("tests/**"));
+        when(run.getTasks()).thenReturn(List.of(redCheck));
+        when(run.currentRedEvidence()).thenReturn(List.of(red));
+        when(github.compareFiles(7L, "acme/ticketly", "main", integratedSha)).thenReturn(
+                List.of(new GithubChangedFile("tests/NewTest.java", "modified", testBlob)));
+
+        service.complete("lease-1", "runner-1", "nonce", integratedSha);
+
+        verify(leases).completeIntegration("lease-1", "runner-1", "nonce", integratedSha);
+        verify(leases, never()).holdIntegrationForTestBoundaryViolation("lease-1", "runner-1", "nonce", "");
     }
 
     @Test
@@ -80,5 +137,23 @@ class GithubRunnerPushServiceTest {
         assertThrows(IllegalStateException.class, () -> service.complete("lease-1", "runner-1", "nonce", "b".repeat(40)));
 
         verify(leases, never()).completeIntegration("lease-1", "runner-1", "nonce", "b".repeat(40));
+    }
+
+    @Test
+    void policyViolationIsExcludedFromTransactionRollback() throws Exception {
+        Transactional transaction = GithubRunnerPushService.class
+                .getMethod("complete", String.class, String.class, String.class, String.class)
+                .getAnnotation(Transactional.class);
+
+        assertEquals(TestBoundaryViolationException.class, transaction.noRollbackFor()[0]);
+    }
+
+    private static TestCheckEvidence currentRedEvidence(String blobSha) {
+        TestCheckEvidence evidence = mock(TestCheckEvidence.class);
+        when(evidence.getKind()).thenReturn("RED");
+        when(evidence.getVerdict()).thenReturn("PASS");
+        when(evidence.changedFilesEvidence()).thenReturn(
+                List.of(new TestCheckRules.ChangedFile("tests/NewTest.java", blobSha)));
+        return evidence;
     }
 }

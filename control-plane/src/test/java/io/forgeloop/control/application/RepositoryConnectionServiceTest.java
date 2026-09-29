@@ -31,4 +31,18 @@ class RepositoryConnectionServiceTest {
     assertEquals(3, disabled.getPolicyRevision());
     assertEquals(null, disabled.getAgentLoopBudget());
   }
+
+  @Test void configuresTestFirstForAnEnabledRepository() {
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("unit"), 20);
+    String image = "node@sha256:" + "a".repeat(64);
+    connection.replaceVerificationPolicies(List.of(new io.forgeloop.control.domain.VerificationPolicySpec("unit", "CONTAINER", image,
+            List.of("npm", "test", "--junitxml=/forgeloop/test-report/unit.xml"), "NONE", 300, true, "ALL", "JUNIT_XML")));
+    when(repository.findByRepository("acme/support")).thenReturn(Optional.of(connection));
+    when(repository.save(any(RepositoryConnection.class))).thenAnswer(call -> call.getArgument(0));
+
+    RepositoryConnection configured = service.configureTestFirst("acme/support", "unit", List.of("**/*.test.ts"));
+
+    assertEquals("unit", configured.getTestFirstGate());
+    assertEquals(List.of("**/*.test.ts"), configured.getTestPathGlobs());
+  }
 }

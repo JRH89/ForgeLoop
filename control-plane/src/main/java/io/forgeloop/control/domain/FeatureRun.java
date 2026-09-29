@@ -22,6 +22,8 @@ public class FeatureRun {
   private AgentLoopBudget agentLoopBudget;
   @Enumerated(EnumType.STRING) private RunState state; private Instant createdAt;
   private Instant approvedAt; private String approvedBy;
+  @Column(length=80) private String testFirstGate;
+  @Column(length=8000) private String testPathGlobs;
   private boolean archived;
   public boolean isArchived() { return archived; }
   /** Archive is reversible and never cancels work or erases its evidence. */
@@ -43,6 +45,16 @@ public class FeatureRun {
   /** Compatibility constructor for local fixtures; production creation always supplies a repository owner. */
   public FeatureRun(String repository,String sourceRef,String title,String specification,double budgetUsd,String harnessProfile,int policyRevision) { this("local-development", repository, sourceRef, title, specification, budgetUsd, harnessProfile, policyRevision); }
   public boolean belongsTo(String candidateOrganizationId) { return organizationId.equals(candidateOrganizationId); }
+  /** Captures the repository's test-first rules immutably when the run is submitted. */
+  public void snapshotTestFirst(String gateName, List<String> globs) {
+    if (gateName == null) return;
+    if (globs == null || globs.isEmpty()) throw new IllegalArgumentException("Test path globs are invalid");
+    testFirstGate = gateName;
+    testPathGlobs = String.join("\n", globs);
+  }
+  public boolean isTestFirst() { return testFirstGate != null; }
+  public String getTestFirstGate() { return testFirstGate; }
+  public List<String> getTestPathGlobs() { return testPathGlobs == null || testPathGlobs.isBlank() ? List.of() : testPathGlobs.lines().toList(); }
   public void addTask(String role,String title,String requiredCapability){tasks.add(new DeliveryTask(this,role,title,requiredCapability));}
   public DeliveryTask addPlannedTask(String planKey,String role,String title,String requiredCapability,List<String> ownedPaths,int attemptBudget,long budgetMicros){DeliveryTask task=new DeliveryTask(this,planKey,role,title,requiredCapability,ownedPaths,attemptBudget,budgetMicros);tasks.add(task);return task;}
   public void beginPlanning(){if(state!=RunState.RECEIVED)throw new IllegalStateException("Run is not ready for planning");state=RunState.PLANNING;}
@@ -55,14 +67,74 @@ public class FeatureRun {
   public void adoptAgentLoop(AgentLoopBudget budget) { agentLoopBudget = budget == null ? null : budget.copy(); }
   public void addCriterion(String statement){criteria.add(new AcceptanceCriterion(this,statement));}
   public void addPolicyVerificationTasks(){List<DeliveryTask> prerequisites=tasks.stream().filter(task->!"PLANNER".equals(task.getRole())&&!"VERIFICATION".equals(task.getRole())).toList();DeliveryTask previous=null;for(VerificationGate gate:gates){if(gate.getKind()==null)continue;if(!gate.isRequired()){gate.skipByPolicy();continue;}DeliveryTask verification=new DeliveryTask(this,"verify-"+gate.getName(),"VERIFICATION","Verify "+gate.getName(),"docker",List.of(),2,0);verification.attachVerificationGate(gate);prerequisites.forEach(verification::dependsOn);if(previous!=null)verification.dependsOn(previous);tasks.add(verification);previous=verification;}}
+  /** Inserts server-owned checks between each test writer and implementation, then gates review on GREEN. */
+  public void addTestCheckTasks(){
+    if(!isTestFirst())return;
+    VerificationGate gate=gates.stream().filter(item->item.matches(testFirstGate)).findFirst()
+        .orElseThrow(()->new IllegalStateException("Test-first gate snapshot is missing"));
+    List<DeliveryTask> testWriters=tasks.stream().filter(task->"INDEPENDENT_TEST".equals(task.getRole())).toList();
+    if(testWriters.isEmpty())throw new IllegalArgumentException("Test-first plan must include an independent test task");
+    for(DeliveryTask testWriter:testWriters){
+      DeliveryTask red=new DeliveryTask(this,"red-"+testWriter.getPlanKey(),"RED_CHECK","Prove "+testWriter.getTitle()+" fails first","docker",List.of(),2,0);
+      red.attachVerificationGate(gate);red.dependsOn(testWriter);tasks.add(red);
+      tasks.stream().filter(DeliveryTask::isWritingTask).filter(writer->writer.getDependencies().contains(testWriter))
+          .forEach(writer->writer.dependsOn(red));
+    }
+    DeliveryTask integration=tasks.stream().filter(task->"INTEGRATION".equals(task.getRole())).findFirst()
+        .orElseThrow(()->new IllegalArgumentException("Test-first plan requires integration"));
+    // Integration must wait for every RED proof so no unchecked test commit can reach the head.
+    tasks.stream().filter(task->"RED_CHECK".equals(task.getRole())).forEach(integration::dependsOn);
+    DeliveryTask green=new DeliveryTask(this,"green","GREEN_CHECK","Prove the new tests pass","docker",List.of(),2,0);
+    green.attachVerificationGate(gate);green.dependsOn(integration);tasks.add(green);
+  }
   /** Adds a server-owned read-only review after integration; the planner cannot omit or weaken it. */
-  public void addIndependentReviewTask(){DeliveryTask review=new DeliveryTask(this,"independent-review","REVIEW","Review integrated change against the specification","provider",List.of(),2,0);List<DeliveryTask> integrated=tasks.stream().filter(task->"INTEGRATION".equals(task.getRole())).toList();(integrated.isEmpty()?tasks.stream().filter(task->!"PLANNER".equals(task.getRole())).toList():integrated).forEach(review::dependsOn);tasks.add(review);}
+  public void addIndependentReviewTask(){DeliveryTask review=new DeliveryTask(this,"independent-review","REVIEW","Review integrated change against the specification","provider",List.of(),2,0);List<DeliveryTask> integrated=tasks.stream().filter(task->"INTEGRATION".equals(task.getRole())).toList();(integrated.isEmpty()?tasks.stream().filter(task->!"PLANNER".equals(task.getRole())).toList():integrated).forEach(review::dependsOn);tasks.stream().filter(task->"GREEN_CHECK".equals(task.getRole())).forEach(review::dependsOn);tasks.add(review);}
   /** Creates a bounded code-repair task and reopens integration, review, and sequential verification. */
-  public RepairPackage scheduleQualityRepair(DeliveryTask failedTask,String failureCategory,String evidenceDigest){if(!List.of("REVIEW","VERIFICATION").contains(failedTask.getRole()))throw new IllegalArgumentException("Only review or verification can schedule a quality repair");failedTask.transition(TaskState.REPAIR_QUEUED);if(failedTask.getState()==TaskState.FAILED){block();return null;}List<String> paths=tasks.stream().filter(task->List.of("IMPLEMENTATION","BACKEND","FRONTEND","INDEPENDENT_TEST","REPAIR").contains(task.getRole())).flatMap(task->task.getOwnedPaths().stream()).distinct().toList();if(paths.isEmpty()){block();return null;}DeliveryTask repair=new DeliveryTask(this,"quality-repair-"+failedTask.getPlanKey()+"-"+failedTask.getAttempts(),"REPAIR","Repair "+failedTask.getTitle(),"provider",paths,2,0);tasks.add(repair);RepairPackage repairPackage=new RepairPackage(repair,failureCategory,evidenceDigest);tasks.stream().filter(task->"INTEGRATION".equals(task.getRole())).findFirst().orElseThrow(()->new IllegalStateException("Repair requires an integration stage")).dependsOn(repair);tasks.stream().filter(task->List.of("INTEGRATION","REVIEW","VERIFICATION").contains(task.getRole())).forEach(DeliveryTask::resetPipelineStage);gates.forEach(VerificationGate::resetForRepair);state=RunState.EXECUTING;approvedAt=null;approvedBy=null;return repairPackage;}
+  public RepairPackage scheduleQualityRepair(DeliveryTask failedTask,String failureCategory,String evidenceDigest){return scheduleQualityRepair(failedTask,failureCategory,evidenceDigest,List.of());}
+  public RepairPackage scheduleQualityRepair(DeliveryTask failedTask,String failureCategory,String evidenceDigest,List<String> failingTests){if(!List.of("REVIEW","VERIFICATION","GREEN_CHECK").contains(failedTask.getRole()))throw new IllegalArgumentException("Only review, verification or GREEN can schedule a quality repair");failedTask.transition(TaskState.REPAIR_QUEUED);if(failedTask.getState()==TaskState.FAILED){block();return null;}List<String> paths=tasks.stream().filter(task->List.of("IMPLEMENTATION","BACKEND","FRONTEND","INDEPENDENT_TEST","REPAIR").contains(task.getRole())).flatMap(task->task.getOwnedPaths().stream()).distinct().toList();if(paths.isEmpty()){block();return null;}DeliveryTask repair=new DeliveryTask(this,"quality-repair-"+failedTask.getPlanKey()+"-"+failedTask.getAttempts(),"REPAIR","Repair "+failedTask.getTitle(),"provider",paths,2,0);tasks.add(repair);RepairPackage repairPackage=new RepairPackage(repair,failureCategory,evidenceDigest,failingTests);tasks.stream().filter(task->"INTEGRATION".equals(task.getRole())).findFirst().orElseThrow(()->new IllegalStateException("Repair requires an integration stage")).dependsOn(repair);tasks.stream().filter(task->List.of("INTEGRATION","REVIEW","VERIFICATION","GREEN_CHECK").contains(task.getRole())).forEach(DeliveryTask::resetPipelineStage);gates.forEach(VerificationGate::resetForRepair);state=RunState.EXECUTING;approvedAt=null;approvedBy=null;return repairPackage;}
   public void overrideGate(String name){VerificationGate gate=gates.stream().filter(item->item.matches(name)).findFirst().orElseThrow(()->new IllegalArgumentException("Verification gate is not part of this run"));gate.manualOverride();state=RunState.BLOCKED;}
   public void recordGate(String name,boolean passed){recordGate(name,passed,false);}
   public void recordGate(String name,boolean passed,boolean timedOut){VerificationGate gate=gates.stream().filter(item->item.matches(name)).findFirst().orElseThrow(()->new IllegalArgumentException("Verification gate is not required by this run"));gate.record(passed,timedOut);if(!passed){state=RunState.BLOCKED;return;}if(gates.stream().allMatch(VerificationGate::satisfiesReview)&&gates.stream().filter(VerificationGate::isRequired).allMatch(item->"ALL".equals(item.getCriterionCoverage())))criteria.forEach(AcceptanceCriterion::cover);evaluateReviewReadiness();}
-  public void evaluateReviewReadiness(){List<DeliveryTask> verificationTasks=tasks.stream().filter(task->"VERIFICATION".equals(task.getRole())).toList();boolean workComplete=verificationTasks.isEmpty()||verificationTasks.stream().allMatch(task->task.getState()==TaskState.VERIFIED);if(workComplete&&gates.stream().allMatch(VerificationGate::satisfiesReview)&&criteria.stream().allMatch(AcceptanceCriterion::isCovered))state=RunState.READY_FOR_REVIEW;}
+  public void evaluateReviewReadiness(){List<DeliveryTask> verificationTasks=tasks.stream().filter(task->"VERIFICATION".equals(task.getRole())).toList();List<DeliveryTask> testChecks=tasks.stream().filter(task->List.of("RED_CHECK","GREEN_CHECK").contains(task.getRole())).toList();boolean workComplete=(verificationTasks.isEmpty()||verificationTasks.stream().allMatch(task->task.getState()==TaskState.VERIFIED))&&(!isTestFirst()||testChecks.stream().allMatch(task->task.getState()==TaskState.VERIFIED));if(workComplete&&gates.stream().allMatch(VerificationGate::satisfiesReview)&&criteria.stream().allMatch(AcceptanceCriterion::isCovered))state=RunState.READY_FOR_REVIEW;}
+  public List<TestCheckEvidence> currentRedEvidence(){List<TestCheckEvidence> current=new ArrayList<>();for(DeliveryTask check:tasks.stream().filter(task->"RED_CHECK".equals(task.getRole())).toList()){String sha=check.getWritingDependency().map(DeliveryTask::getChangeSha).orElse(null);if(sha==null)continue;check.getTestCheckEvidence().stream().filter(item->item.isCurrentRedFor(sha)).max(java.util.Comparator.comparing(TestCheckEvidence::recordedAtInstant)).ifPresent(current::add);}return List.copyOf(current);}
+  public List<String> currentRedTests(){return currentRedEvidence().stream().flatMap(item->item.getRedTests().stream()).collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new)).stream().toList();}
+  public int minimumRedTestCount(){return currentRedEvidence().stream().mapToInt(TestCheckEvidence::getAfterTotal).max().orElse(0);}
+  /** Gives the reviewer a bounded summary of current RED checks and the passing integration-head GREEN check. */
+  public String getTestFirstReviewEvidence(){
+    if(!isTestFirst())return null;
+    StringBuilder summary=new StringBuilder();
+    for(TestCheckEvidence red:currentRedEvidence()){
+      DeliveryTask check=tasks.stream().filter(task->"RED_CHECK".equals(task.getRole()))
+          .filter(task->task.getTestCheckEvidence().contains(red)).findFirst().orElse(null);
+      String title=check==null?"test task":check.getWritingDependency().map(DeliveryTask::getTitle).orElse("test task");
+      List<String> added=testsInGroup(red,"ADDED");
+      List<String> changed=testsInGroup(red,"CHANGED");
+      appendBounded(summary,"RED for '"+title+"' at "+shortSha(red.getTargetSha())+": parent green with "+red.getBeforeTotal()
+          +" tests; "+added.size()+" added tests fail: "+String.join(", ",added)+"; "+changed.size()
+          +" changed tests fail: "+String.join(", ",changed)+".");
+    }
+    String head=tasks.stream().filter(task->"INTEGRATION".equals(task.getRole())).map(DeliveryTask::getChangeSha)
+        .filter(Objects::nonNull).findFirst().orElse(null);
+    TestCheckEvidence green=head==null?null:tasks.stream().filter(task->"GREEN_CHECK".equals(task.getRole()))
+        .flatMap(task->task.getTestCheckEvidence().stream()).filter(item->item.isPassingGreenFor(head))
+        .max(java.util.Comparator.comparing(TestCheckEvidence::recordedAtInstant)).orElse(null);
+    if(green!=null)appendBounded(summary,"GREEN at head "+shortSha(head)+": "+green.getAfterTotal()+" tests observed ("
+        +green.getAfterPassed()+" passed, "+green.getAfterFailed()+" failed, "+green.getAfterErrored()+" errors, "
+        +green.getAfterSkipped()+" skipped).");
+    return summary.toString();
+  }
+  private static List<String> testsInGroup(TestCheckEvidence evidence,String group){
+    return evidence.getClassifiedTests().lines().map(line->line.split("\\t",4))
+        .filter(parts->parts.length==4&&group.equals(parts[0])&&"FAILED".equals(parts[3]))
+        .map(parts->parts[1]).toList();
+  }
+  private static void appendBounded(StringBuilder summary,String line){
+    if(summary.length()>=8_000)return;
+    if(summary.length()>0)summary.append('\n');
+    int remaining=8_000-summary.length();
+    summary.append(line,0,Math.min(line.length(),remaining));
+  }
+  private static String shortSha(String sha){return sha==null?"unknown":sha.substring(0,Math.min(12,sha.length()));}
   public void cancel(){if(state==RunState.COMPLETE||state==RunState.CANCELLED)throw new IllegalStateException("Run is already terminal");tasks.forEach(DeliveryTask::hold);state=RunState.CANCELLED;}
   /** Records the human release decision separately from automated verification. */
   public void approve(String actor){if(state!=RunState.READY_FOR_REVIEW)throw new IllegalStateException("Only a verified run can be approved");if(approvedAt!=null)return;if(actor==null||actor.isBlank())throw new IllegalArgumentException("Approver is required");approvedAt=Instant.now();approvedBy=actor;}

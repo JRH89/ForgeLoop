@@ -43,7 +43,10 @@ public class TaskLeaseService {
         if (!runner.hasCapability(task.getRequiredCapability())) throw new IllegalStateException("Runner lacks the task capability");
         if (task.getState() != TaskState.PENDING && task.getState() != TaskState.REPAIR_QUEUED) throw new IllegalStateException("Task is not claimable");
         if (!task.dependenciesSatisfied()) throw new IllegalStateException("Task dependencies are not complete");
-        if (!writerAffinity.permits(task, runner.getId())) throw new IllegalStateException("Task must run on the runner that produced its dependency");
+        if (writerAffinity.requiresDocker(task) && !runner.hasCapability("docker")) {
+            throw new IllegalStateException("Test-first work must run on a runner that can run its checks");
+        }
+        if (!writerAffinity.permits(task, runner)) throw new IllegalStateException("Task must run on the runner that produced its dependency");
         if (!task.hasBudgetRemaining()) throw new IllegalStateException("Task budget is exhausted");
         if (!task.getRun().hasBudgetRemaining()) throw new IllegalStateException("Run budget is exhausted");
         boolean conflict = tasks.findByRun_Id(task.getRun().getId()).stream()
@@ -53,7 +56,7 @@ public class TaskLeaseService {
         TaskLease existing = leases.findFirstByTask_IdOrderByExpiresAtDesc(taskId).orElse(null);
         if (existing != null && existing.active()) throw new IllegalStateException("Task already has an active lease");
         String nonce = secret();
-        TaskLease lease = leases.save(new TaskLease(task, runner, hash(nonce), Instant.now().plus(Duration.ofMinutes(10))));
+        TaskLease lease = leases.save(new TaskLease(task, runner, hash(nonce), Instant.now().plus(task.leaseDuration())));
         task.transition(TaskState.LEASED);
         if (!"PLANNER".equals(task.getRole())) task.getRun().startExecution();
         return new LeaseGrant(lease, nonce);
@@ -70,6 +73,9 @@ public class TaskLeaseService {
     @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed, String failureCategory) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        if (passed && java.util.List.of("RED_CHECK", "GREEN_CHECK").contains(task.getRole())) {
+            throw new IllegalStateException("Test checks require checksummed test evidence");
+        }
         String latestProviderCategory = providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId()).map(ProviderAttempt::getCategory).orElse(null);
         boolean rejectedByReviewer = "REVIEW".equals(task.getRole()) && "COMPLETED".equals(latestProviderCategory);
         if (!passed && ("VERIFICATION".equals(task.getRole()) || rejectedByReviewer)) {
@@ -147,11 +153,26 @@ public class TaskLeaseService {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.completeIntegration(integratedSha); return lease;
     }
 
+    /** Holds a published integration when GitHub shows test blobs that current RED evidence did not approve. */
+    @Transactional public TaskLease holdIntegrationForTestBoundaryViolation(String leaseId, String runnerId, String nonce,
+                                                                             String summary) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Policy hold requires an active acknowledged lease");
+        DeliveryTask task = lease.getTask();
+        if (!"INTEGRATION".equals(task.getRole())) throw new IllegalStateException("Only an integration lease can be held by the branch check");
+        task.hold();
+        task.getRun().block();
+        escalations.escalate(task, "TEST_BOUNDARY_VIOLATION", summary);
+        lease.closeForPolicyHold();
+        return lease;
+    }
+
     @Transactional public VerificationEvidence recordEvidence(String leaseId, String runnerId, String nonce,
                                                                   VerificationEvidenceSubmission submission) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Evidence requires an active acknowledged lease");
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        if (!"VERIFICATION".equals(task.getRole())) throw new IllegalStateException("Verification evidence requires a verification task");
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
         VerificationGate gate = task.getVerificationGate();
         if (gate == null || submission.gate() == null || !gate.matches(submission.gate())) throw new IllegalArgumentException("Evidence is not bound to this verification task");
@@ -191,6 +212,13 @@ public class TaskLeaseService {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Operation requires an active acknowledged lease");
         return lease.getTaskId();
+    }
+
+    /** Allows check evidence to be safely replayed after the server closed the same lease. */
+    @Transactional public TaskLease requireLeaseCredentials(String leaseId, String runnerId, String nonce) {
+        TaskLease lease = leases.findByIdForEvidenceUpdate(leaseId).orElseThrow(() -> new IllegalArgumentException("Lease not found"));
+        if (!lease.belongsTo(runnerId) || !lease.matchesNonceHash(hash(nonce))) throw new IllegalArgumentException("Lease credentials are invalid");
+        return lease;
     }
 
     private TaskLease validatedLease(String leaseId, String runnerId, String nonce) {

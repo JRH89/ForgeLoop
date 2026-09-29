@@ -37,6 +37,7 @@ public class ControlPlaneController {
   @MutationMapping public RepositoryConnection connectRepository(@Argument ConnectRepositoryInput input) { operators.requireAdministrator(); return connections.register(new RepositoryRegistration(input.repository(), input.installationId(), input.defaultBranch(), input.issueLabel(), input.harnessProfile(), input.requiredGates(), input.maxBudgetUsd())); }
   @MutationMapping public RepositoryConnection configureRepositoryVerification(@Argument String repository, @Argument List<VerificationPolicyInput> policies) { operators.requireAdministrator(); return connections.configureVerification(repository, policies.stream().map(VerificationPolicyInput::toSpec).toList()); }
   @MutationMapping public RepositoryConnection configureRepositoryAgentLoop(@Argument String repository, @Argument AgentLoopBudgetInput budget) { return connections.configureAgentLoop(repository, budget == null ? null : budget.toBudget()); }
+  @MutationMapping public RepositoryConnection configureRepositoryTestFirst(@Argument String repository, @Argument String testGate, @Argument List<String> testPaths) { return connections.configureTestFirst(repository, testGate, testPaths); }
   @MutationMapping public String issueRunnerRegistrationToken(@Argument String organizationId) { operators.requireAdministrator(); operators.requireOrganization(organizationId); return runners.issueRegistrationToken(organizationId); }
   @MutationMapping public RunnerEnrollment registerRunner(@Argument RegisterRunnerInput input) { return runners.register(new RunnerRegistration(input.token(), input.name(), input.version(), input.capabilities())); }
   @MutationMapping public Runner runnerHeartbeat(@Argument String runnerId, @Argument String credential) { return runners.heartbeat(runnerId, credential); }
@@ -55,7 +56,7 @@ public class ControlPlaneController {
   public record ConnectRepositoryInput(String repository, long installationId, String defaultBranch, String issueLabel, String harnessProfile, List<String> requiredGates, double maxBudgetUsd) { }
   public record RegisterRunnerInput(String token, String name, String version, List<String> capabilities) { }
   public record OperatorSession(String subject, String organizationId, OperatorRole role) { }
-  public record VerificationPolicyInput(String name, String kind, String imageDigest, List<String> command, String networkPolicy, int timeoutSeconds, boolean required, String criterionCoverage) { VerificationPolicySpec toSpec(){return new VerificationPolicySpec(name,kind,imageDigest,command,networkPolicy,timeoutSeconds,required,criterionCoverage);} }
+  public record VerificationPolicyInput(String name, String kind, String imageDigest, List<String> command, String networkPolicy, int timeoutSeconds, boolean required, String criterionCoverage, String testReport) { VerificationPolicySpec toSpec(){return new VerificationPolicySpec(name,kind,imageDigest,command,networkPolicy,timeoutSeconds,required,criterionCoverage,testReport);} }
   public record AgentLoopBudgetInput(int maxToolCalls, int maxTokens, int maxWallSeconds, int maxConversationBytes) {
     AgentLoopBudget toBudget() { return new AgentLoopBudget(maxToolCalls, maxTokens, maxWallSeconds, maxConversationBytes); }
   }

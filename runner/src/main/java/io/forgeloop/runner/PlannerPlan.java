@@ -53,6 +53,10 @@ public record PlannerPlan(List<String> acceptanceCriteria, List<PlannedTask> tas
 
     /** Performs runner-side semantic checks; the control plane repeats them before persistence. */
     public PlannerPlan validate(double budgetUsd) {
+        return validate(budgetUsd, false);
+    }
+
+    public PlannerPlan validate(double budgetUsd, boolean testFirst) {
         if (acceptanceCriteria.size() > 64 || tasks.size() > 32 || new HashSet<>(acceptanceCriteria).size() != acceptanceCriteria.size()
                 || acceptanceCriteria.stream().anyMatch(value -> value == null || value.isBlank())) {
             throw new IllegalArgumentException("Planner criteria or task count is invalid");
@@ -92,7 +96,42 @@ public record PlannerPlan(List<String> acceptanceCriteria, List<PlannedTask> tas
         Set<String> visiting = new HashSet<>();
         Set<String> visited = new HashSet<>();
         byKey.keySet().forEach(key -> visit(key, byKey, visiting, visited));
+        if (testFirst) validateTestFirstPlan(byKey);
         return this;
+    }
+
+    private static void validateTestFirstPlan(Map<String, PlannedTask> tasks) {
+        List<PlannedTask> tests = tasks.values().stream().filter(task -> "INDEPENDENT_TEST".equals(task.role())).toList();
+        if (tests.isEmpty()) throw new IllegalArgumentException("Planner task semantics are invalid");
+        for (PlannedTask task : tasks.values()) {
+            if ("INDEPENDENT_TEST".equals(task.role())) {
+                if (task.dependencies().size() > 1 || task.dependencies().stream()
+                        .anyMatch(key -> !isImplementation(tasks.get(key).role()) || !isScaffold(key, tasks))) {
+                    throw new IllegalArgumentException("Planner task semantics are invalid");
+                }
+                if (tasks.values().stream().noneMatch(candidate -> isImplementation(candidate.role())
+                        && candidate.dependencies().contains(task.key()))) {
+                    throw new IllegalArgumentException("Planner task semantics are invalid");
+                }
+                continue;
+            }
+            if (!isImplementation(task.role())) continue;
+            boolean implementation = task.dependencies().size() == 1
+                    && "INDEPENDENT_TEST".equals(tasks.get(task.dependencies().getFirst()).role());
+            boolean scaffold = task.dependencies().isEmpty() && isScaffold(task.key(), tasks);
+            if (!implementation && !scaffold) throw new IllegalArgumentException("Planner task semantics are invalid");
+        }
+    }
+
+    private static boolean isScaffold(String key, Map<String, PlannedTask> tasks) {
+        // Integration is required to depend on every writer and does not make a scaffold ambiguous.
+        List<PlannedTask> dependents = tasks.values().stream().filter(task -> task.dependencies().contains(key)
+                && !"INTEGRATION".equals(task.role())).toList();
+        return !dependents.isEmpty() && dependents.stream().allMatch(task -> "INDEPENDENT_TEST".equals(task.role()));
+    }
+
+    private static boolean isImplementation(String role) {
+        return Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND").contains(role);
     }
 
     private static void visit(String key, Map<String, PlannedTask> tasks, Set<String> visiting, Set<String> visited) {

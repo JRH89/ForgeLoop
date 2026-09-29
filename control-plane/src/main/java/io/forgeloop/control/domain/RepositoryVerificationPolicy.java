@@ -17,13 +17,14 @@ public class RepositoryVerificationPolicy {
     private int timeoutSeconds;
     private boolean required;
     @Column(nullable = false, length = 20) private String criterionCoverage;
+    @Column(length = 20) private String testReport;
 
     protected RepositoryVerificationPolicy() { }
     RepositoryVerificationPolicy(RepositoryConnection connection, VerificationPolicySpec spec) {
         this.connection = connection; this.name = spec.name(); apply(spec);
     }
     boolean matches(String candidate) { return name.equals(candidate); }
-    void apply(VerificationPolicySpec spec) { if (!name.equals(spec.name())) throw new IllegalArgumentException("Verification policy identity cannot change");this.kind = spec.kind(); this.imageDigest = spec.imageDigest();this.command = String.join("\n", spec.command()); this.networkPolicy = spec.networkPolicy();this.timeoutSeconds = spec.timeoutSeconds(); this.required = spec.required(); this.criterionCoverage = spec.criterionCoverage(); }
-    public VerificationPolicySpec toSpec() { return new VerificationPolicySpec(name, kind, imageDigest, command.lines().toList(), networkPolicy, timeoutSeconds, required, criterionCoverage); }
+    void apply(VerificationPolicySpec spec) { if (!name.equals(spec.name())) throw new IllegalArgumentException("Verification policy identity cannot change");this.kind = spec.kind(); this.imageDigest = spec.imageDigest();this.command = String.join("\n", spec.command()); this.networkPolicy = spec.networkPolicy();this.timeoutSeconds = spec.timeoutSeconds(); this.required = spec.required(); this.criterionCoverage = spec.criterionCoverage(); this.testReport = spec.testReport(); }
+    public VerificationPolicySpec toSpec() { return new VerificationPolicySpec(name, kind, imageDigest, command.lines().toList(), networkPolicy, timeoutSeconds, required, criterionCoverage, testReport); }
     public String getId() { return id; }
 }
