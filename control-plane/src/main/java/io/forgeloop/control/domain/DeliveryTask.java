@@ -13,10 +13,12 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /** One schedulable delivery step, explicitly constrained to a runner capability. */
 @Entity
 public class DeliveryTask {
+    private static final Set<String> WRITING_ROLES = Set.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "REPAIR");
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
     @ManyToOne(optional = false) private FeatureRun run;
     private String role;
@@ -83,7 +85,8 @@ public class DeliveryTask {
     void attachRepairPackage(RepairPackage repairPackage) { repairPackages.add(repairPackage); }
     public boolean dependenciesSatisfied() {
         return dependencies.stream().allMatch(task -> task.state == TaskState.INTEGRATED || task.state == TaskState.VERIFIED
-                || ("INTEGRATION".equals(role) && task.state == TaskState.CHANGE_READY));
+                || ("INTEGRATION".equals(role) && task.state == TaskState.CHANGE_READY)
+                || (isWritingRole(role) && isWritingRole(task.role) && task.state == TaskState.CHANGE_READY));
     }
     public void integrateDependencies() {
         if (!"INTEGRATION".equals(role)) throw new IllegalStateException("Only an integration task can integrate dependencies");
@@ -142,10 +145,49 @@ public class DeliveryTask {
     public List<String> getOwnedPaths() { return ownedPaths == null || ownedPaths.isBlank() ? List.of() : ownedPaths.lines().toList(); }
     public List<DeliveryTask> getDependencies() { return List.copyOf(dependencies); }
     public List<String> getDependencyKeys() { return dependencies.stream().map(DeliveryTask::getPlanKey).toList(); }
-    public List<String> getDependencyChangeShas() { return dependencies.stream().map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).toList(); }
+    /**
+     * Returns writer commits in a safe cherry-pick order while preserving declared order for peers.
+     * Quality repair commits are appended after the original writer graph because they are based on
+     * the prior integration head rather than on the independent writer base.
+     */
+    public List<String> getDependencyChangeShas() {
+        List<String> changeShas = new ArrayList<>();
+        java.util.Set<DeliveryTask> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        dependencies.stream().filter(task -> !"REPAIR".equals(task.role)).forEach(task -> appendWriterChangeShas(task, visited, changeShas));
+        dependencies.stream().filter(task -> "REPAIR".equals(task.role)).forEach(task -> appendWriterChangeShas(task, visited, changeShas));
+        return List.copyOf(changeShas);
+    }
+    private static void appendWriterChangeShas(DeliveryTask task, java.util.Set<DeliveryTask> visited, List<String> changeShas) {
+        if (!visited.add(task)) return;
+        if (isWritingRole(task.role)) {
+            task.dependencies.stream().filter(dependency -> isWritingRole(dependency.role))
+                    .forEach(dependency -> appendWriterChangeShas(dependency, visited, changeShas));
+        }
+        if (task.changeSha != null) changeShas.add(task.changeSha);
+    }
+    /** Returns the predecessor writer used to pin this task to a runner-local commit. */
+    public java.util.Optional<DeliveryTask> getWritingDependency() {
+        return dependencies.stream().filter(task -> isWritingRole(task.role)).findFirst();
+    }
+    public boolean isWritingTask() { return isWritingRole(role); }
+    private static boolean isWritingRole(String role) {
+        return WRITING_ROLES.contains(role);
+    }
     public List<String> getAcceptanceCriteria() { return run.getCriteria().stream().map(AcceptanceCriterion::getStatement).toList(); }
-    /** Repair workers start from the last integrated head; all other workers start from repository policy base. */
-    public String getExecutionBaseRef() { if ("REPAIR".equals(role)) return run.getTasks().stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch()); return run.getBaseBranch(); }
+    /** Repair workers use the integrated head; chained writers use their committed predecessor. */
+    public String getExecutionBaseRef() {
+        if ("REPAIR".equals(role)) {
+            return run.getTasks().stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha)
+                    .filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch());
+        }
+        if (isWritingRole(role) && !dependencies.isEmpty()) {
+            DeliveryTask dependency = getWritingDependency().filter(ignored -> dependencies.size() == 1)
+                    .orElseThrow(() -> new IllegalStateException("A chained writing task must have exactly one writing dependency"));
+            if (dependency.changeSha == null) throw new IllegalStateException("Writing dependency has no change commit");
+            return dependency.changeSha;
+        }
+        return run.getBaseBranch();
+    }
     public List<ProviderAttempt> getProviderAttempts() { return List.copyOf(providerAttempts); }
     public List<RepairPackage> getRepairPackages() { return List.copyOf(repairPackages); }
     public VerificationGate getVerificationGate() { return verificationGate; }

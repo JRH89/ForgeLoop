@@ -6,14 +6,19 @@ import static org.mockito.Mockito.when;
 import io.forgeloop.control.domain.DeliveryTaskRepository;
 import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.Runner;
+import io.forgeloop.control.domain.TaskLease;
+import io.forgeloop.control.domain.TaskLeaseRepository;
 import io.forgeloop.control.domain.TaskState;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import static org.mockito.Mockito.mock;
 
 class RunnerDispatchServiceTest {
     private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class);
-    private final RunnerDispatchService dispatch = new RunnerDispatchService(tasks);
+    private final TaskLeaseRepository leases = mock(TaskLeaseRepository.class);
+    private final RunnerDispatchService dispatch = new RunnerDispatchService(tasks, new ChainedWriterRunnerAffinity(leases));
 
     @Test
     void returnsOnlyTasksSupportedByRunnerCapabilities() {
@@ -41,5 +46,30 @@ class RunnerDispatchServiceTest {
         when(tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED))).thenReturn(List.of(conflicting, dependent, independent));
 
         assertEquals(List.of("frontend"), dispatch.available(runner).stream().map(task -> task.getPlanKey()).toList());
+    }
+
+    @Test
+    void offersAChainedWriterOnlyToTheRunnerThatProducedItsDependency() {
+        FeatureRun run = new FeatureRun("org/repository", "main", "feature", "spec", 5, "GENERIC", 1);
+        var predecessor = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 1_000_000);
+        var dependent = run.addPlannedTask("implementation", "IMPLEMENTATION", "Implementation", "provider", List.of("src"), 2, 1_000_000);
+        dependent.dependsOn(predecessor);
+        predecessor.transition(TaskState.LEASED);
+        predecessor.recordChangeSha("a".repeat(40));
+        predecessor.transition(TaskState.CHANGE_READY);
+        TaskLease producerLease = mock(TaskLease.class);
+        when(producerLease.getRunnerId()).thenReturn("runner-a");
+        when(leases.findFirstByTask_IdOrderByExpiresAtDesc(predecessor.getId())).thenReturn(Optional.of(producerLease));
+        when(tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED))).thenReturn(List.of(dependent));
+        when(tasks.findByStateIn(List.of(TaskState.LEASED, TaskState.PREPARING, TaskState.RUNNING))).thenReturn(List.of());
+        Runner producer = mock(Runner.class);
+        when(producer.getId()).thenReturn("runner-a");
+        when(producer.hasCapability("provider")).thenReturn(true);
+        Runner other = mock(Runner.class);
+        when(other.getId()).thenReturn("runner-b");
+        when(other.hasCapability("provider")).thenReturn(true);
+
+        assertEquals(List.of("implementation"), dispatch.available(producer).stream().map(task -> task.getPlanKey()).toList());
+        assertEquals(List.of(), dispatch.available(other));
     }
 }

@@ -1,6 +1,7 @@
 package io.forgeloop.control.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -33,7 +34,8 @@ class TaskLeaseServiceTest {
     ProviderAttemptRepository providerAttempts = mock(ProviderAttemptRepository.class);
     RepairPackageRepository repairPackages = mock(RepairPackageRepository.class);
     HumanEscalationService escalations = mock(HumanEscalationService.class);
-    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts, repairPackages, escalations);
+    TaskLeaseService service = new TaskLeaseService(tasks, runners, leases, evidence, providerAttempts, repairPackages, escalations,
+            new ChainedWriterRunnerAffinity(leases));
 
     @Test
     void claimCreatesExpiringSingleOwnerLease() {
@@ -53,6 +55,31 @@ class TaskLeaseServiceTest {
 
         assertEquals(64, grant.nonce().length());
         assertEquals(TaskState.LEASED, task.getState());
+    }
+
+    @Test
+    void claimRefusesAChainedWriterOnARunnerWithoutItsDependencyCommit() {
+        FeatureRun run = new FeatureRun("org", "a/b", "issue-1", "x", "spec", 1, "GENERIC", "main", 1);
+        DeliveryTask predecessor = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 100_000);
+        DeliveryTask task = run.addPlannedTask("implementation", "IMPLEMENTATION", "Implement", "provider", List.of("src"), 2, 100_000);
+        task.dependsOn(predecessor);
+        predecessor.transition(TaskState.LEASED);
+        predecessor.recordChangeSha("a".repeat(40));
+        predecessor.transition(TaskState.CHANGE_READY);
+        TaskLease producerLease = mock(TaskLease.class);
+        when(producerLease.getRunnerId()).thenReturn("runner-a");
+        Runner otherRunner = mock(Runner.class);
+        when(otherRunner.isEnabled()).thenReturn(true);
+        when(otherRunner.hasCapability("provider")).thenReturn(true);
+        when(otherRunner.getId()).thenReturn("runner-b");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task, predecessor));
+        when(runners.findById("runner-b")).thenReturn(Optional.of(otherRunner));
+        when(leases.findFirstByTask_IdOrderByExpiresAtDesc(predecessor.getId())).thenReturn(Optional.of(producerLease));
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> service.claim("task", "runner-b"));
+
+        assertEquals("Task must run on the runner that produced its dependency", failure.getMessage());
     }
 
     @Test

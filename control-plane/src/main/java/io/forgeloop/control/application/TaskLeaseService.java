@@ -20,13 +20,16 @@ public class TaskLeaseService {
     private final ProviderAttemptRepository providerAttempts;
     private final RepairPackageRepository repairPackages;
     private final HumanEscalationService escalations;
+    private final ChainedWriterRunnerAffinity writerAffinity;
     private final SecureRandom random = new SecureRandom();
 
     public TaskLeaseService(DeliveryTaskRepository tasks, RunnerRepository runners, TaskLeaseRepository leases,
                             VerificationEvidenceRepository evidence, ProviderAttemptRepository providerAttempts,
-                            RepairPackageRepository repairPackages, HumanEscalationService escalations) {
+                            RepairPackageRepository repairPackages, HumanEscalationService escalations,
+                            ChainedWriterRunnerAffinity writerAffinity) {
         this.tasks = tasks; this.runners = runners; this.leases = leases; this.evidence = evidence;
         this.providerAttempts = providerAttempts; this.repairPackages = repairPackages; this.escalations = escalations;
+        this.writerAffinity = writerAffinity;
     }
 
     @Transactional public LeaseGrant claim(String taskId, String runnerId) {
@@ -39,6 +42,7 @@ public class TaskLeaseService {
         if (!runner.hasCapability(task.getRequiredCapability())) throw new IllegalStateException("Runner lacks the task capability");
         if (task.getState() != TaskState.PENDING && task.getState() != TaskState.REPAIR_QUEUED) throw new IllegalStateException("Task is not claimable");
         if (!task.dependenciesSatisfied()) throw new IllegalStateException("Task dependencies are not complete");
+        if (!writerAffinity.permits(task, runner.getId())) throw new IllegalStateException("Task must run on the runner that produced its dependency");
         if (!task.hasBudgetRemaining()) throw new IllegalStateException("Task budget is exhausted");
         if (!task.getRun().hasBudgetRemaining()) throw new IllegalStateException("Run budget is exhausted");
         boolean conflict = tasks.findByRun_Id(task.getRun().getId()).stream()
