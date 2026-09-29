@@ -82,7 +82,8 @@ class ReplayWorkerTest {
     void guardedPatchWorkerReplaysTheSameValidatedPatchAgainstTheSameBase() throws Exception {
         Path originalRepository = gitRepository("patch-original");
         Path replayRepository = temporary.resolve("patch-replay");
-        runCommand("git", "clone", "--quiet", originalRepository.toString(), replayRepository.toString());
+        // Keep the cloned fixture byte-identical on Windows, where Git may otherwise rewrite LF to CRLF.
+        runCommand("git", "clone", "--quiet", "-c", "core.autocrlf=false", originalRepository.toString(), replayRepository.toString());
         ProviderExecutionPolicy policy = new ProviderExecutionPolicy("openai", "gpt-test", 1);
         String response = responseBody("{\"summary\":\"Add the result file\",\"changes\":["
                 + "{\"path\":\"src/result.txt\",\"content\":\"replayed result\",\"message\":\"write result\"}]}");
@@ -92,6 +93,8 @@ class ReplayWorkerTest {
         GuardedPatchResult original = worker.execute(policy, new RecordingProviderClient(parsedOpenAi(response), policy, recordedJournal),
                 "IMPLEMENTATION", "Add a result", "Write the requested result file", originalRepository,
                 List.of("src"), List.of(), "patch-run", WriteBoundary.any(), recordedJournal);
+        assertEquals(Files.readString(originalRepository.resolve("README.md")),
+                Files.readString(replayRepository.resolve("README.md")));
         StepJournal replayJournal = new StepJournal(temporary.resolve("patch-replay-state"), "patch-task", "patch-lease", Clock.systemUTC());
         GuardedPatchResult replayed = worker.execute(policy,
                 new ReplayProviderClient("openai", JournalFile.open(recordedJournal.path())),
@@ -134,7 +137,7 @@ class ReplayWorkerTest {
     void agentLoopReplaysRecordedToolCallsAndProducesTheSameRepositoryChange() throws Exception {
         Path originalRepository = gitRepository("loop-original");
         Path replayRepository = temporary.resolve("loop-replay");
-        runCommand("git", "clone", "--quiet", originalRepository.toString(), replayRepository.toString());
+        runCommand("git", "clone", "--quiet", "-c", "core.autocrlf=false", originalRepository.toString(), replayRepository.toString());
         String response = JSON.writeValueAsString(Map.of(
                 "id", "resp-loop", "model", "gpt-test", "status", "completed",
                 "usage", Map.of("input_tokens", 20, "output_tokens", 10),
