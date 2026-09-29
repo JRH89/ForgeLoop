@@ -58,7 +58,9 @@ forgeloop:
   artifacts:
     storage-uri: "${FORGELOOP_ARTIFACT_STORAGE_URI:}"
     retention-days: "${FORGELOOP_ARTIFACT_RETENTION_DAYS:30}"
+    record-retention-days: "${FORGELOOP_ARTIFACT_RECORD_RETENTION_DAYS:365}"
     max-bytes: "${FORGELOOP_ARTIFACT_MAX_BYTES:1048576}"
+    journal-max-expanded-bytes: "${FORGELOOP_ARTIFACT_JOURNAL_MAX_EXPANDED_BYTES:33554432}"
     s3-endpoint: "${FORGELOOP_ARTIFACT_S3_ENDPOINT:}"
     s3-region: "${FORGELOOP_ARTIFACT_S3_REGION:us-east-1}"
   http:

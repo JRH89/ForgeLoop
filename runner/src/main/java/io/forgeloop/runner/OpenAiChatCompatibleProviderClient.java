@@ -22,15 +22,7 @@ public final class OpenAiChatCompatibleProviderClient implements ProviderClient,
     }
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
         try {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("model", request.model());
-            payload.put("max_tokens", request.maxOutputTokens());
-            payload.put("messages", List.of(Map.of("role", "system", "content", request.instructions()), Map.of("role", "user", "content", request.input())));
-            if (request.outputSchema() != null) {
-                payload.put("response_format", Map.of("type", "json_schema", "json_schema", Map.of(
-                        "name", "forgeloop_output", "strict", true, "schema", request.outputSchema())));
-            }
-            String body = JSON.writeValueAsString(payload);
+            String body = requestBody(request);
             HttpRequest.Builder builder = HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5)).header("content-type", "application/json");
             if (!apiKey.isBlank()) builder.header("authorization", "Bearer " + apiKey);
             HttpResponse<String> response = http.send(builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
@@ -40,11 +32,20 @@ public final class OpenAiChatCompatibleProviderClient implements ProviderClient,
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("Local provider request was interrupted", true, exception);
         } catch (Exception exception) { throw new ProviderException("Local provider request failed", true, exception); }
     }
+    static String requestBody(ProviderRequest request) throws Exception {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", request.model());
+        payload.put("max_tokens", request.maxOutputTokens());
+        payload.put("messages", List.of(Map.of("role", "system", "content", request.instructions()), Map.of("role", "user", "content", request.input())));
+        if (request.outputSchema() != null) payload.put("response_format", Map.of("type", "json_schema", "json_schema", Map.of(
+                "name", "forgeloop_output", "strict", true, "schema", request.outputSchema())));
+        return JSON.writeValueAsString(payload);
+    }
     static ProviderResult parse(String body) throws Exception {
         JsonNode response = JSON.readTree(body); StringBuilder output = new StringBuilder();
         for (JsonNode choice : response.path("choices")) if (choice.path("message").hasNonNull("content")) output.append(choice.path("message").path("content").asText());
         JsonNode usage = response.path("usage");
-        return new ProviderResult(output.toString(), usage.path("prompt_tokens").asLong(), usage.path("completion_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null));
+        return new ProviderResult(output.toString(), usage.path("prompt_tokens").asLong(), usage.path("completion_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null), body);
     }
 
     @Override public String serialize(ConversationRequest request) {

@@ -45,6 +45,7 @@ public class RepositoryConnection {
   @Column(name = "enforcement_protected_paths", columnDefinition = "text") private String enforcementProtectedPaths;
   @Column(name = "enforcement_allow_workflow_changes", nullable = false) private boolean enforcementAllowWorkflowChanges;
   @Column(name = "enforcement_finish_gate", length = 80) private String enforcementFinishGate;
+  @Column(name = "run_record_enabled", nullable = false) private boolean runRecordEnabled;
   public String getRequiredAssignee() { return requiredAssignee; }
   public boolean isRequireAssignee() { return requireAssignee || requiredAssignee != null; }
   /** Null disables assignment gating; usernames are compared case-insensitively. */
@@ -69,6 +70,11 @@ public class RepositoryConnection {
   /** Null disables loop dispatch; every mutation advances the repository policy revision. */
   public void configureAgentLoop(AgentLoopBudget budget) {
     agentLoopBudget = budget == null ? null : budget.copy();
+    policyRevision++;
+  }
+  /** Opts this repository into uploading verbatim, redacted run-record segments. */
+  public void configureRunRecord(boolean enabled) {
+    runRecordEnabled = enabled;
     policyRevision++;
   }
   /** Stores only validated, repository-owned enforcement settings and advances the policy revision. */
@@ -156,6 +162,7 @@ public class RepositoryConnection {
   public String getTestFirstGate() { return testFirstGate; }
   public List<String> getTestPathGlobs() { return testPathGlobs == null || testPathGlobs.isBlank() ? List.of() : testPathGlobs.lines().toList(); }
   public AgentLoopBudget getAgentLoopBudget() { return agentLoopBudget == null ? null : agentLoopBudget.copy(); }
+  public boolean isRunRecordEnabled() { return runRecordEnabled; }
   public LoopEnforcement getEnforcement() {
     return new LoopEnforcement(enforcementProtectedPaths == null || enforcementProtectedPaths.isBlank()
             ? List.of() : enforcementProtectedPaths.lines().toList(), enforcementAllowWorkflowChanges, enforcementFinishGate);

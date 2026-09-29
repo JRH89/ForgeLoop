@@ -70,6 +70,22 @@ class FeatureRunServiceTest {
     assertEquals("unit", run.getTestFirstGate());
     assertEquals(List.of("src/test/**", "**/*.test.ts"), run.getTestPathGlobs());
   }
+  @Test void submissionPinsRunRecordOptInIntoRunAndCanonicalPolicySnapshot() {
+    String image = "node@sha256:" + "a".repeat(64);
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/records", 1, "main", "forgeloop", "GENERIC", List.of(
+            new VerificationPolicySpec("compile", "CONTAINER", image, List.of("npm", "test"), "NONE", 300, true, "ALL")), 25, true);
+    connection.configureRunRecord(true);
+    when(connections.requireEnabled("acme/records")).thenReturn(connection);
+    when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
+
+    FeatureRun run = service.submit(new FeatureSubmission("acme/records", "issue-5", "Record", "Specification", 20));
+
+    assertEquals(true, run.isRunRecordEnabled());
+    assertEquals(true, run.getPolicySnapshot().contains("\"runRecordEnabled\":true"));
+    connection.configureRunRecord(false);
+    assertEquals(true, run.isRunRecordEnabled(), "active runs retain the switch value captured at submission");
+    assertEquals(true, run.getPolicySnapshot().contains("\"runRecordEnabled\":true"));
+  }
   @Test void submissionUsesDefaultEnforcementWhenRepositoryHasNoOverrides() {
     String image = "node@sha256:" + "a".repeat(64);
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "GENERIC", List.of(

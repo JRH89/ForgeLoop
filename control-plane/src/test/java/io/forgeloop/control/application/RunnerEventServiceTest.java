@@ -44,4 +44,18 @@ class RunnerEventServiceTest {
             assertEquals(types[index], event.getEventType());
         }
     }
+
+    @Test void acceptsRecordUploadFailureMetadata() {
+        TaskLease lease = mock(TaskLease.class); DeliveryTask task = mock(DeliveryTask.class); FeatureRun run = mock(FeatureRun.class);
+        when(leaseValidation.requireActiveTaskId("lease", "runner", "nonce")).thenReturn("task");
+        when(leases.findById("lease")).thenReturn(Optional.of(lease)); when(lease.getId()).thenReturn("lease");
+        when(tasks.findById("task")).thenReturn(Optional.of(task)); when(task.getRun()).thenReturn(run);
+        when(run.getOrganizationId()).thenReturn("org"); when(run.getId()).thenReturn("run");
+        when(events.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        RunnerEvent event = service.append("lease", "runner", "nonce", 1, "WARN", "RECORD_UPLOAD_FAILED",
+                "Journal segment upload failed after retry", Instant.now());
+
+        assertEquals("RECORD_UPLOAD_FAILED", event.getEventType());
+    }
 }

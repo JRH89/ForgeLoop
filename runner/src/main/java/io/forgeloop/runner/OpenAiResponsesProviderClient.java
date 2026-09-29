@@ -26,17 +26,7 @@ public final class OpenAiResponsesProviderClient implements ProviderClient, Conv
 
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
         try {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("model", request.model());
-            payload.put("instructions", request.instructions());
-            payload.put("input", request.input());
-            payload.put("max_output_tokens", request.maxOutputTokens());
-            payload.put("store", false);
-            if (request.outputSchema() != null) {
-                payload.put("text", Map.of("format", Map.of("type", "json_schema", "name", "forgeloop_output",
-                        "strict", true, "schema", request.outputSchema())));
-            }
-            String body = JSON.writeValueAsString(payload);
+            String body = requestBody(request);
             HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5))
                     .header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
@@ -47,11 +37,23 @@ public final class OpenAiResponsesProviderClient implements ProviderClient, Conv
         } catch (Exception exception) { throw new ProviderException("OpenAI provider request failed", true, exception); }
     }
 
+    static String requestBody(ProviderRequest request) throws Exception {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", request.model());
+        payload.put("instructions", request.instructions());
+        payload.put("input", request.input());
+        payload.put("max_output_tokens", request.maxOutputTokens());
+        payload.put("store", false);
+        if (request.outputSchema() != null) payload.put("text", Map.of("format", Map.of("type", "json_schema",
+                "name", "forgeloop_output", "strict", true, "schema", request.outputSchema())));
+        return JSON.writeValueAsString(payload);
+    }
+
     static ProviderResult parse(String body) throws Exception {
         JsonNode response = JSON.readTree(body); StringBuilder output = new StringBuilder();
         for (JsonNode item : response.path("output")) for (JsonNode content : item.path("content")) if ("output_text".equals(content.path("type").asText())) output.append(content.path("text").asText());
         JsonNode usage = response.path("usage");
-        return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null));
+        return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null), body);
     }
 
     @Override public String serialize(ConversationRequest request) {

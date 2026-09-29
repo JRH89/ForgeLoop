@@ -35,6 +35,15 @@ public class RepositoryConnectionService {
     audit.record("REPOSITORY_AGENT_LOOP_UPDATED", "REPOSITORY_CONNECTION", saved.getId(), "revision=" + saved.getPolicyRevision());
     return saved;
   }
+  @Transactional public RepositoryConnection configureRunRecord(String repository, boolean enabled) {
+    operators.requireAdministrator();
+    RepositoryConnection connection = requireEnabled(repository);
+    connection.configureRunRecord(enabled);
+    RepositoryConnection saved = connections.save(connection);
+    audit.record("REPOSITORY_RUN_RECORD_UPDATED", "REPOSITORY_CONNECTION", saved.getId(),
+            "enabled=" + enabled + "|revision=" + saved.getPolicyRevision());
+    return saved;
+  }
   @Transactional public RepositoryConnection configureEnforcement(String repository, List<String> protectedPaths,
                                                                      boolean allowWorkflowChanges, String finishGate) {
     operators.requireAdministrator();

@@ -31,10 +31,15 @@ public class ArtifactMetadata {
     public ArtifactMetadata(DeliveryTask task, String leaseId, String storageReference, String contentType,
                             String artifactType, String displayName,
                             long sizeBytes, String sha256, Instant retainUntil) {
+        this(task, leaseId, storageReference, contentType, artifactType, displayName, sizeBytes, sha256, "EVIDENCE", retainUntil);
+    }
+    public ArtifactMetadata(DeliveryTask task, String leaseId, String storageReference, String contentType,
+                            String artifactType, String displayName,
+                            long sizeBytes, String sha256, String retentionClass, Instant retainUntil) {
         this.organizationId = task.getRun().getOrganizationId(); this.runId = task.getRun().getId(); this.taskId = task.getId();
         this.leaseId = leaseId; this.storageReference = storageReference; this.contentType = contentType;
         this.artifactType = artifactType; this.displayName = displayName;
-        this.sizeBytes = sizeBytes; this.sha256 = sha256; this.retentionClass = "EVIDENCE";
+        this.sizeBytes = sizeBytes; this.sha256 = sha256; this.retentionClass = retentionClass;
         this.retainUntil = retainUntil; this.createdAt = Instant.now();
     }
     public String getId() { return id; } public String getOrganizationId() { return organizationId; }

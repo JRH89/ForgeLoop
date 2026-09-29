@@ -24,6 +24,7 @@ public class FeatureRunService {
     FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
     run.snapshotTestFirst(connection.getTestFirstGate(), connection.getTestPathGlobs());
     run.adoptAgentLoop(connection.getAgentLoopBudget());
+    run.snapshotRunRecord(connection.isRunRecordEnabled());
     run.snapshotEnforcement(connection.getEnforcement());
     RunPolicySnapshot.Captured policySnapshot = RunPolicySnapshot.capture(connection, organizationPolicy, harness,
             platform.enabledMcpConfigurations(connection.getOrganizationId()));

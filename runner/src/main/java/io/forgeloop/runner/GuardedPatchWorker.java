@@ -34,6 +34,15 @@ public final class GuardedPatchWorker {
                                       String title, String specification, Path worktree,
                                       List<String> allowedPrefixes, List<String> preferredContextPaths,
                                       String correlationId, WriteBoundary boundary) throws Exception {
+        return execute(policy, provider, role, title, specification, worktree, allowedPrefixes,
+                preferredContextPaths, correlationId, boundary, null);
+    }
+
+    /** Optional journal records the exact context identity before an opted-in provider call. */
+    public GuardedPatchResult execute(ProviderExecutionPolicy policy, ProviderClient provider, String role,
+                                      String title, String specification, Path worktree,
+                                      List<String> allowedPrefixes, List<String> preferredContextPaths,
+                                      String correlationId, WriteBoundary boundary, StepJournal journal) throws Exception {
         if (!supports(role)) {
             throw new IllegalArgumentException("Task role is not permitted to modify repository files");
         }
@@ -41,9 +50,11 @@ public final class GuardedPatchWorker {
                 + "{summary:string,changes:[{path:string,content:string,message:string}]}. "
                 + "Propose complete file contents only. Do not use paths outside the allowed prefixes."
                 + boundaryInstructions(boundary);
+        String repositoryContext = new RepositoryContextBuilder().build(worktree, preferredContextPaths);
+        if (journal != null) journal.append("CONTEXT_BUILT", java.util.Map.of("kind", "REPOSITORY",
+                "sha256", EvidenceDigests.sha256(repositoryContext.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
         String input = "Task: " + title + "\nAllowed prefixes: " + String.join(",", allowedPrefixes)
-                + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n"
-                + new RepositoryContextBuilder().build(worktree, preferredContextPaths);
+                + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n" + repositoryContext;
         ProviderExecutionResult execution = new ProviderExecutionService().executeDetailed(provider,
                 new ProviderRequest(policy.model(), instructions, input, 8192, StructuredOutputSchemas.patch()), policy.maxAttempts());
         ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution,

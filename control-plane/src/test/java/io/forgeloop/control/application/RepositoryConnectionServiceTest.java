@@ -54,6 +54,31 @@ class RepositoryConnectionServiceTest {
     assertEquals(3, disabled.getPolicyRevision());
     assertEquals(null, disabled.getAgentLoopBudget());
   }
+  @Test void runRecordIsOffByDefaultAndConfigurationIsAuditedAndRevisioned() {
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20);
+    assertFalse(connection.isRunRecordEnabled());
+    when(repository.findByRepository("acme/support")).thenReturn(Optional.of(connection));
+    when(repository.save(any(RepositoryConnection.class))).thenAnswer(call -> call.getArgument(0));
+    int initialRevision = connection.getPolicyRevision();
+
+    RepositoryConnection enabled = service.configureRunRecord("acme/support", true);
+
+    assertTrue(enabled.isRunRecordEnabled());
+    assertEquals(initialRevision + 1, enabled.getPolicyRevision());
+    verify(repository).save(connection);
+    verify(audit).record("REPOSITORY_RUN_RECORD_UPDATED", "REPOSITORY_CONNECTION", connection.getId(),
+            "enabled=true|revision=" + enabled.getPolicyRevision());
+  }
+  @Test void runRecordMutationRequiresAdministratorBeforeLoadingRepository() {
+    OperatorContext viewer = Mockito.mock(OperatorContext.class);
+    doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))
+            .when(viewer).requireAdministrator();
+    RepositoryConnectionService restricted = new RepositoryConnectionService(repository, viewer, audit);
+
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> restricted.configureRunRecord("acme/support", true));
+    verify(repository, never()).findByRepository("acme/support");
+  }
   @Test void configuresAuditedEnforcementAndCanRestoreRepositoryDefaults() {
     RepositoryConnection connection = connectionWithPolicies();
     when(repository.findByRepository("acme/support")).thenReturn(Optional.of(connection));

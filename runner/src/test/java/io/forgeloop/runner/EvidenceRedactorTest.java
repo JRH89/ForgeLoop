@@ -36,4 +36,13 @@ class EvidenceRedactorTest {
         String redacted = EvidenceRedactor.redact("api_key=abc123");
         assertEquals("api_key=[REDACTED]", redacted);
     }
+
+    @Test void runRecordRedactionPreservesSourceAssignmentsButRemovesTokenAndPrivateKeyPatterns() {
+        String source = "apiKey: source-code-value ghp_abcdefghijklmnopqrstuvwxyz123456 "
+                + "-----BEGIN RSA PRIVATE KEY-----\nsecret-material\n-----END RSA PRIVATE KEY-----";
+        String redacted = EvidenceRedactor.redactTokens(source);
+        assertTrue(redacted.contains("apiKey: source-code-value"));
+        assertFalse(redacted.contains("ghp_abcdefghijklmnopqrstuvwxyz123456"));
+        assertFalse(redacted.contains("secret-material"));
+    }
 }

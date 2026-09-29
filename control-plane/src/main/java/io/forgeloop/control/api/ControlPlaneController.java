@@ -31,6 +31,8 @@ public class ControlPlaneController {
   @QueryMapping public List<HumanEscalation> featureRunEscalations(@Argument String runId) { runs.get(runId); return escalations.list(runId); }
   @QueryMapping public GithubPublication featureRunPublication(@Argument String runId) { runs.get(runId); return publications.findByFeatureRunId(runId).orElse(null); }
   @SchemaMapping(typeName = "FeatureRun", field = "publication") public GithubPublication publication(FeatureRun run) { runs.get(run.getId()); return publications.findByFeatureRunId(run.getId()).orElse(null); }
+  @SchemaMapping(typeName = "FeatureRun", field = "runRecord") public boolean runRecord(FeatureRun run) { runs.get(run.getId()); return run.isRunRecordEnabled(); }
+  @SchemaMapping(typeName = "RepositoryConnection", field = "runRecord") public boolean runRecord(RepositoryConnection connection) { return connection.isRunRecordEnabled(); }
   @SchemaMapping(typeName = "GithubPublication", field = "pullRequestState") public String pullRequestState(GithubPublication publication) { return publicationStatus.state(publication); }
   @QueryMapping public OperatorSession currentOperator() { return new OperatorSession(operators.subject(), operators.organizationId(), operators.role()); }
   @MutationMapping public FeatureRun submitFeature(@Argument SubmitFeatureInput input) { return runs.submit(new FeatureSubmission(input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd())); }
@@ -38,6 +40,7 @@ public class ControlPlaneController {
   @MutationMapping public RepositoryConnection configureRepositoryVerification(@Argument String repository, @Argument List<VerificationPolicyInput> policies) { operators.requireAdministrator(); return connections.configureVerification(repository, policies.stream().map(VerificationPolicyInput::toSpec).toList()); }
   @MutationMapping public RepositoryConnection configureRepositoryTestFirst(@Argument String repository, @Argument String testGate, @Argument List<String> testPaths) { return connections.configureTestFirst(repository, testGate, testPaths); }
   @MutationMapping public RepositoryConnection configureRepositoryAgentLoop(@Argument String repository, @Argument AgentLoopBudgetInput budget) { return connections.configureAgentLoop(repository, budget == null ? null : budget.toBudget()); }
+  @MutationMapping public RepositoryConnection configureRepositoryRunRecord(@Argument String repository, @Argument boolean enabled) { return connections.configureRunRecord(repository, enabled); }
   @MutationMapping public RepositoryConnection configureRepositoryEnforcement(@Argument String repository,
           @Argument RepositoryEnforcementInput input) {
     return connections.configureEnforcement(repository, input.protectedPaths(), input.allowWorkflowChanges(), input.finishGate());

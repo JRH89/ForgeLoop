@@ -29,5 +29,10 @@ final class EvidenceRedactor {
         return new CredentialRedaction(redacted, count[0]);
     }
 
+    /** Redacts only standalone tokens and private-key blocks for opt-in run-record uploads. */
+    static String redactTokens(String value) {
+        return redactCredentialTokens(value).content();
+    }
+
     record CredentialRedaction(String content, int count) { }
 }

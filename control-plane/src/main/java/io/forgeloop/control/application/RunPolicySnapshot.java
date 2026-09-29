@@ -36,7 +36,7 @@ public final class RunPolicySnapshot {
                 connection.getRequiredGates().stream().sorted().toList(),
                 connection.getVerificationPolicies().stream().sorted(Comparator.comparing(VerificationPolicySpec::name)).toList(),
                 connection.getTestFirstGate(), connection.getTestPathGlobs(), connection.getAgentLoopBudget(),
-                connection.getEnforcement());
+                connection.getEnforcement(), connection.isRunRecordEnabled());
         var org = new Organization(organization.getRevision(), organization.getMaxRunBudgetUsd(),
                 organization.getMaxParallelTasks(), organization.getAllowedProviders().stream().sorted().toList(),
                 organization.isRequireHumanApproval(), organization.isAutoMergeEnabled());
@@ -71,7 +71,7 @@ public final class RunPolicySnapshot {
                               double maxBudgetUsd, String issueLabel, boolean requireAssignee, String requiredAssignee,
                               List<String> requiredGates, List<VerificationPolicySpec> verificationPolicies,
                               String testFirstGate, List<String> testPathGlobs, AgentLoopBudget agentLoopBudget,
-                              LoopEnforcement enforcement) { }
+                              LoopEnforcement enforcement, boolean runRecordEnabled) { }
     private record Organization(int revision, double maxRunBudgetUsd, int maxParallelTasks, List<String> allowedProviders,
                                 boolean requireHumanApproval, boolean autoMergeEnabled) { }
     private record Harness(String id, String name, int revision, String description, List<String> allowedRoles,

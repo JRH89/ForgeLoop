@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class RunnerArtifactController {
     private final RunnerService runners; private final ArtifactUploadService artifacts;
     public RunnerArtifactController(RunnerService runners, ArtifactUploadService artifacts) { this.runners=runners;this.artifacts=artifacts; }
-    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.IMAGE_PNG_VALUE}, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.IMAGE_PNG_VALUE, "application/gzip"}, produces = MediaType.APPLICATION_JSON_VALUE)
     public ArtifactReceipt upload(@RequestHeader("X-ForgeLoop-Runner-Id") String runnerId,
                                   @RequestHeader("X-ForgeLoop-Runner-Credential") String credential,
                                   @RequestHeader("X-ForgeLoop-Lease-Id") String leaseId,

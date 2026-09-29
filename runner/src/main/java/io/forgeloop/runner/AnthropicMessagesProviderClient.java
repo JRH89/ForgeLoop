@@ -53,7 +53,7 @@ public final class AnthropicMessagesProviderClient implements ProviderClient, Co
         StringBuilder output = new StringBuilder();
         for (JsonNode content : response.path("content")) if ("text".equals(content.path("type").asText())) output.append(content.path("text").asText());
         JsonNode usage = response.path("usage");
-        return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null));
+        return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null), body);
     }
 
     @Override public String serialize(ConversationRequest request) {

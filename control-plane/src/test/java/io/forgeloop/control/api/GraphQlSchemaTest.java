@@ -22,16 +22,20 @@ class GraphQlSchemaTest {
                 new SchemaParser().parse(schemaSource), RuntimeWiring.newRuntimeWiring().build());
 
         assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryAgentLoop"));
+        assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryRunRecord"));
         assertNotNull(schema.getMutationType().getFieldDefinition("renewTaskLease"));
         assertNotNull(schema.getMutationType().getFieldDefinition("holdTaskLease"));
         assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryEnforcement"));
         assertNotNull(schema.getMutationType().getFieldDefinition("completeTaskLease"));
         assertNotNull(schema.getObjectType("Task").getFieldDefinition("agentLoop"));
         assertNotNull(schema.getObjectType("Task").getFieldDefinition("redPrerequisite"));
+        assertNotNull(schema.getObjectType("Task").getFieldDefinition("runRecord"));
         assertNotNull(schema.getObjectType("TaskAgentLoop").getFieldDefinition("enforcement"));
         assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("agentLoop"));
+        assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("runRecord"));
         assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("enforcement"));
         assertNotNull(schema.getObjectType("FeatureRun").getFieldDefinition("exitMeaning"));
+        assertNotNull(schema.getObjectType("FeatureRun").getFieldDefinition("runRecord"));
         assertNotNull(schema.getObjectType("FeatureRun").getFieldDefinition("exitReason"));
     }
 }

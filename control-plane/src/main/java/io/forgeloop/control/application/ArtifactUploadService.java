@@ -9,6 +9,15 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.GZIPInputStream;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,22 +27,37 @@ import org.springframework.transaction.annotation.Transactional;
 public class ArtifactUploadService {
     private final TaskLeaseService leases; private final DeliveryTaskRepository tasks;
     private final ArtifactMetadataRepository metadata; private final ArtifactStore store;
-    private final long maxBytes; private final int retentionDays;
+    private final long maxBytes; private final int retentionDays; private final int recordRetentionDays;
+    private final long maxJournalExpandedBytes;
+    private static final ObjectMapper JSON = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     public ArtifactUploadService(TaskLeaseService leases, DeliveryTaskRepository tasks, ArtifactMetadataRepository metadata,
                                  ArtifactStore store, @Value("${forgeloop.artifacts.max-bytes:1048576}") long maxBytes,
-                                 @Value("${forgeloop.artifacts.retention-days:30}") int retentionDays) {
+                                 @Value("${forgeloop.artifacts.retention-days:30}") int retentionDays,
+                                 @Value("${forgeloop.artifacts.record-retention-days:365}") int recordRetentionDays,
+                                 @Value("${forgeloop.artifacts.journal-max-expanded-bytes:33554432}") long maxJournalExpandedBytes) {
         if (maxBytes < 1 || maxBytes > 10 * 1024 * 1024) throw new IllegalArgumentException("Artifact size limit is invalid");
-        if (retentionDays < 1 || retentionDays > 3650) throw new IllegalArgumentException("Artifact retention is invalid");
-        this.leases=leases;this.tasks=tasks;this.metadata=metadata;this.store=store;this.maxBytes=maxBytes;this.retentionDays=retentionDays;
+        if (retentionDays < 1 || retentionDays > 3650 || recordRetentionDays < 1 || recordRetentionDays > 3650)
+            throw new IllegalArgumentException("Artifact retention is invalid");
+        if (maxJournalExpandedBytes < 1 || maxJournalExpandedBytes > 256L * 1024 * 1024)
+            throw new IllegalArgumentException("Run journal expanded-size bound is invalid");
+        this.leases=leases;this.tasks=tasks;this.metadata=metadata;this.store=store;this.maxBytes=maxBytes;
+        this.retentionDays=retentionDays;this.recordRetentionDays=recordRetentionDays;this.maxJournalExpandedBytes=maxJournalExpandedBytes;
     }
     @Transactional public ArtifactMetadata upload(String leaseId, String runnerId, String nonce, String contentType,
                                                     String artifactType, String displayName, String claimedSha256, byte[] content) {
         String taskId = leases.requireActiveTaskId(leaseId, runnerId, nonce);
         if (content == null || content.length == 0 || content.length > maxBytes) throw new IllegalArgumentException("Artifact size is outside policy bounds");
-        if (!java.util.Set.of("application/json", "image/png").contains(contentType)) throw new IllegalArgumentException("Artifact content type is not allowed");
-        if (!java.util.Set.of("VERIFICATION_BUNDLE", "SCREENSHOT").contains(artifactType)) throw new IllegalArgumentException("Artifact type is not allowed");
+        boolean journal = "RUN_JOURNAL".equals(artifactType);
+        if (journal) {
+            if (!"application/gzip".equals(contentType) || displayName == null
+                    || !displayName.matches("journal-[0-9]{1,10}-[0-9]{1,10}\\.jsonl\\.gz"))
+                throw new IllegalArgumentException("Artifact type is not allowed");
+        } else {
+            if (!java.util.Set.of("application/json", "image/png").contains(contentType)) throw new IllegalArgumentException("Artifact content type is not allowed");
+            if (!java.util.Set.of("VERIFICATION_BUNDLE", "SCREENSHOT").contains(artifactType)) throw new IllegalArgumentException("Artifact type is not allowed");
+        }
         if (displayName == null || !displayName.matches("[A-Za-z0-9][A-Za-z0-9_.-]{0,159}")) throw new IllegalArgumentException("Artifact display name is invalid");
-        if ("SCREENSHOT".equals(artifactType) != "image/png".equals(contentType)) throw new IllegalArgumentException("Artifact type does not match its content type");
+        if (!journal && "SCREENSHOT".equals(artifactType) != "image/png".equals(contentType)) throw new IllegalArgumentException("Artifact type does not match its content type");
         if ("image/png".equals(contentType) && !isPng(content)) throw new IllegalArgumentException("Screenshot is not a valid PNG payload");
         String actual = digest(content);
         if (claimedSha256 == null || !claimedSha256.matches("[0-9a-f]{64}") || !actual.equals(claimedSha256)) throw new IllegalArgumentException("Artifact checksum mismatch");
@@ -43,11 +67,52 @@ public class ArtifactUploadService {
             return existing;
         }
         DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        if (journal) {
+            if (!task.getRun().isRunRecordEnabled()) throw new IllegalArgumentException("Artifact type is not allowed");
+            validateJournal(content, leaseId);
+        }
         String key = task.getRun().getOrganizationId() + "/" + task.getRun().getId() + "/" + taskId + "/" + leaseId + "/" + displayName;
         ArtifactStore.StoredObject stored = store.putVerified(key, content, contentType, actual);
         String reference = "artifact://" + key;
         return metadata.save(new ArtifactMetadata(task, leaseId, reference, contentType, artifactType, displayName,
-                stored.sizeBytes(), stored.sha256(), Instant.now().plus(Duration.ofDays(retentionDays))));
+                stored.sizeBytes(), stored.sha256(), journal ? "RUN_RECORD" : "EVIDENCE",
+                Instant.now().plus(Duration.ofDays(journal ? recordRetentionDays : retentionDays))));
+    }
+    private void validateJournal(byte[] compressed, String expectedLeaseId) {
+        byte[] expanded;
+        try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(compressed));
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            long total = 0;
+            for (int count; (count = gzip.read(buffer)) != -1; ) {
+                total += count;
+                if (total > maxJournalExpandedBytes) throw new IllegalArgumentException("Run journal exceeds the expanded-size bound");
+                output.write(buffer, 0, count);
+            }
+            expanded = output.toByteArray();
+        } catch (IllegalArgumentException invalid) { throw invalid;
+        } catch (IOException invalid) { throw new IllegalArgumentException("Run journal is not valid gzip content", invalid); }
+        String text;
+        try {
+            text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(expanded)).toString();
+        } catch (Exception invalid) { throw new IllegalArgumentException("Run journal is not valid UTF-8", invalid); }
+        if (text.isBlank() || !text.endsWith("\n")) throw new IllegalArgumentException("Run journal must contain complete JSON lines");
+        long previousSequence = 0;
+        for (String line : text.substring(0, text.length() - 1).split("\n", -1)) {
+            if (line.isBlank()) throw new IllegalArgumentException("Run journal contains an invalid JSON line");
+            try {
+                var record = JSON.readTree(line);
+                if (record == null || !record.isObject() || !record.path("seq").canConvertToLong()
+                        || !record.path("type").isTextual() || !record.path("leaseId").isTextual()
+                        || !expectedLeaseId.equals(record.path("leaseId").asText())
+                        || record.path("seq").asLong() <= previousSequence)
+                    throw new IllegalArgumentException("Run journal contains an invalid JSON line");
+                previousSequence = record.path("seq").asLong();
+            } catch (IllegalArgumentException invalid) { throw invalid;
+            } catch (Exception invalid) { throw new IllegalArgumentException("Run journal contains an invalid JSON line", invalid); }
+            if (RecordSecretPolicy.containsPossibleSecret(line)) throw new IllegalArgumentException("Run journal contains a possible raw secret");
+        }
     }
     private static String digest(byte[] content) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)); }

@@ -5,6 +5,28 @@ import java.net.http.HttpClient;
 
 /** Builds only allow-listed providers and reads credentials exclusively from the runner environment. */
 public final class ProviderClientFactory {
+    /** Stable adapter identifier for execution records; contains no credential or endpoint data. */
+    public String adapterId(String provider) {
+        return switch (provider) {
+            case "anthropic" -> "anthropic-messages/1";
+            case "openai" -> "openai-responses/1";
+            case "gemini" -> "gemini-generate-content/1";
+            case "local" -> "openai-chat-compatible/1";
+            default -> throw new IllegalArgumentException("Unsupported provider policy");
+        };
+    }
+
+    /** Rebuilds the exact provider HTTP payload without creating a client or reading credentials. */
+    public String requestBody(String provider, ProviderRequest request) throws Exception {
+        if (request == null) throw new IllegalArgumentException("Provider request is required");
+        return switch (provider) {
+            case "anthropic" -> AnthropicMessagesProviderClient.requestBody(request);
+            case "openai" -> OpenAiResponsesProviderClient.requestBody(request);
+            case "gemini" -> GeminiGenerateContentProviderClient.requestBody(request);
+            case "local" -> OpenAiChatCompatibleProviderClient.requestBody(request);
+            default -> throw new IllegalArgumentException("Unsupported provider policy");
+        };
+    }
     public ProviderClient create(ProviderExecutionPolicy policy) {
         HttpClient client = HttpClient.newHttpClient();
         return switch (policy.provider()) {
