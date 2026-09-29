@@ -4,7 +4,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 5d-i, run-record export and core integrity checks; issue [#91](https://github.com/JRH89/ForgeLoop/issues/91), verified locally and being prepared as a separate PR. Slice 5e's offline implementation merged in PR [#99](https://github.com/JRH89/ForgeLoop/pull/99); #90 remains open only for canonical live-provider fixtures and optional paid drift validation.
+- **Active work:** Slice 5d-i, run-record export and core integrity checks; issue [#91](https://github.com/JRH89/ForgeLoop/issues/91), in PR [#100](https://github.com/JRH89/ForgeLoop/pull/100). Slice 5e's offline implementation merged in PR [#99](https://github.com/JRH89/ForgeLoop/pull/99); #90 remains open only for canonical live-provider fixtures and optional paid drift validation.
 - **Delivery branch:** PRs are prepared from the merged prerequisite chain and delivered one at a time.
 - **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, #93, #94, #95, #96, #97, #98, and #99 are merged to `master` (2026-09-29). Only one PR is open at a time.
 - **Issue provenance:** #83-#86 decompose design 04 into slices 4a-4d; #87-#90 track design 05 slices 5a, 5b, 5c, and 5e; #91 tracks 5d-i. Slice 5d-ii is still planned without an issue.
@@ -33,7 +33,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) / [#97](https://github.com/JRH89/ForgeLoop/pull/97) | Merged to `master`; issue closed; hosted checks passed |
 | 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) / [#98](https://github.com/JRH89/ForgeLoop/pull/98) | Merged to `master` (2026-09-29); hosted checks passed |
 | 17 | 5e - Provider replay and drift probe | 3a, 5c fixtures | [#90](https://github.com/JRH89/ForgeLoop/issues/90) / [#99](https://github.com/JRH89/ForgeLoop/pull/99) | Offline implementation merged to `master`; canonical live fixtures and drift probe pending, so #90 remains open |
-| 18 | 5d-i - Run-record export and core integrity checks | 5a, 5b, 5c, 5e | [#91](https://github.com/JRH89/ForgeLoop/issues/91) | Implementation locally verified; linked PR being prepared; no paid provider calls or live fixture capture |
+| 18 | 5d-i - Run-record export and core integrity checks | 5a, 5b, 5c, 5e | [#91](https://github.com/JRH89/ForgeLoop/issues/91) / [#100](https://github.com/JRH89/ForgeLoop/pull/100) | Implementation locally verified; hosted checks pending; no paid provider calls or live fixture capture |
 | 19 | 5d-ii - Deterministic re-execution checks | 5d-i | Not opened | Planned |
 | 20 | 6a - Pull-request rounds and lifecycle | 2-5 | Not opened | Planned |
 | 21 | 6b-i - GitHub feedback sweep and evidence | 6a | Not opened | Planned |
@@ -160,7 +160,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Issue:** [#91](https://github.com/JRH89/ForgeLoop/issues/91).
 - **Result:** adds an on-demand, tenant-checked, operator-only `GET /api/runs/{runId}/record` ZIP export with canonical `forgeloop.run-record/1` metadata, a SHA-256 sidecar, verified archived artifacts, and a digest-only export audit event. The runner adds keyless `verify-run` and `verify-journal` commands with PASS / FAIL / UNVERIFIABLE results and defined exit codes. Verification covers bounded safe archives, file and artifact digests, ordered journal segment metadata, hash-chain gaps and redaction, attempt/lease/task links, provider request and response evidence using production serializers/parsers, verifier-version skew, and Section 19 counters/consistency. The implementation stops at 5d-i: it does not reconstruct worktrees, replay integration, or execute gates.
 - **Verification:** control-plane `mvn -q verify` passed (345 tests, 0 failures/errors); runner `mvn -q -Dforgeloop.revision=deadbeef0 verify` passed (308 tests, 0 failures/errors, 9 skipped: 5 platform-dependent and 4 live-fixture agreement checks); harness `mvn -q verify` passed (2 tests, 0 failures/errors). `git diff --check` passed. No paid provider call, live fixture capture, or deployment change.
-- **Delivery:** implementation is isolated on `feat/5d1-run-record-verification`; keep #91 open until its PR passes hosted checks and merges.
+- **Delivery:** implementation is in [PR #100](https://github.com/JRH89/ForgeLoop/pull/100); keep #91 open until hosted checks pass and the change merges.
 
 ## Update protocol
 
