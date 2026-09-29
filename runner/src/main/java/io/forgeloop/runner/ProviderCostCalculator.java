@@ -6,6 +6,15 @@ import java.util.Locale;
 
 /** Calculates costs from operator-managed model rates; ForgeLoop does not hard-code changeable vendor prices. */
 public final class ProviderCostCalculator {
+    /** Computes a turn estimate from the explicitly configured policy rates, or returns unknown. */
+    public ProviderCostEstimate fromTokens(ProviderExecutionPolicy policy, long inputTokens, long outputTokens) {
+        if (policy == null || inputTokens < 0 || outputTokens < 0) throw new IllegalArgumentException("Provider token usage is invalid");
+        if (policy.inputUsdPerMillion() == null) return ProviderCostEstimate.unknown();
+        BigDecimal micros = BigDecimal.valueOf(inputTokens).multiply(policy.inputUsdPerMillion())
+                .add(BigDecimal.valueOf(outputTokens).multiply(policy.outputUsdPerMillion()));
+        return new ProviderCostEstimate(micros.setScale(0, RoundingMode.CEILING).longValueExact(), true);
+    }
+
     public ProviderCostEstimate fromEnvironment(ProviderExecutionPolicy policy, ProviderResult result) {
         // Human-readable per-model policy rates take precedence over legacy environment rates.
         if (policy.inputUsdPerMillion() != null) {

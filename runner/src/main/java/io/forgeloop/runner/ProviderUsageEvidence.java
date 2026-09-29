@@ -26,6 +26,17 @@ public record ProviderUsageEvidence(String provider, String model, String reques
         String digestInput = providerRequestId == null || providerRequestId.isBlank() ? correlationId : providerRequestId;
         return new ProviderUsageEvidence(policy.provider(), policy.model(), digest(digestInput), result.inputTokens(), result.outputTokens(), execution.attemptCount(), cost.estimatedCostMicros(), cost.known());
     }
+
+    public static ProviderUsageEvidence fromTurn(ProviderExecutionPolicy policy, ConversationExecution execution,
+                                                  ProviderCostEstimate cost, String correlationId) {
+        if (policy == null || execution == null || cost == null || correlationId == null || correlationId.isBlank())
+            throw new IllegalArgumentException("Provider conversation usage inputs are invalid");
+        ConversationTurn turn = execution.turn();
+        String requestId = turn.providerRequestId();
+        String digestInput = requestId == null || requestId.isBlank() ? correlationId : requestId;
+        return new ProviderUsageEvidence(policy.provider(), policy.model(), digest(digestInput), turn.inputTokens(), turn.outputTokens(),
+                execution.attemptCount(), cost.estimatedCostMicros(), cost.known());
+    }
     private static String digest(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((value == null ? "" : value).getBytes(StandardCharsets.UTF_8))); }
         catch (Exception exception) { throw new IllegalStateException("SHA-256 unavailable", exception); }

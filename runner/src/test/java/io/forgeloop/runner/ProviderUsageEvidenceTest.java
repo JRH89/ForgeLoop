@@ -3,6 +3,9 @@ package io.forgeloop.runner;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ProviderUsageEvidenceTest {
@@ -23,5 +26,19 @@ class ProviderUsageEvidenceTest {
         String second = ProviderUsageEvidence.from(policy, result, ProviderCostEstimate.unknown(), "lease-2").requestIdDigest();
 
         assertNotEquals(first, second);
+    }
+
+    @Test void conversationTurnEvidenceUsesOnlyDigestedProviderIdsAndCarriesAttemptsAndCost() {
+        var turn = new ConversationTurn("", List.of(), StopReason.TOOL_USE, 12, 34, "response_secret",
+                new ObjectMapper().createArrayNode(), "private raw response");
+        var policy = new ProviderExecutionPolicy("gemini", "model", 3);
+        var usage = ProviderUsageEvidence.fromTurn(policy, new ConversationExecution(turn, 2), new ProviderCostEstimate(7, true), "corr");
+        assertEquals(12, usage.inputTokens());
+        assertEquals(34, usage.outputTokens());
+        assertEquals(2, usage.attemptCount());
+        assertEquals(7, usage.estimatedCostMicros());
+        assertTrue(usage.costKnown());
+        assertFalse(usage.requestIdDigest().contains("response_secret"));
+        assertFalse(usage.requestIdDigest().contains("private raw response"));
     }
 }
