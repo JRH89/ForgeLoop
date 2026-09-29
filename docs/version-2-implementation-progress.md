@@ -4,9 +4,9 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 4c, repository-scoped agent-loop enforcement policy; issue [#85](https://github.com/JRH89/ForgeLoop/issues/85).
-- **Delivery branch:** `feat/4c-repository-enforcement-pr` contains only the 4c slice plus this tracker update, based directly on the merged prerequisite chain.
-- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, and #93 are merged to `master` (2026-09-29). Only one PR is opened at a time.
+- **Active work:** Slice 4d, shared spend reservation before agent-loop turns; issue [#86](https://github.com/JRH89/ForgeLoop/issues/86).
+- **Delivery branch:** `feat/4d-spend-reservations-pr` contains only 4d plus this tracker update, based directly on the merged prerequisite chain.
+- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, #93, and #94 are merged to `master` (2026-09-29). Only one PR is open at a time.
 - **Issue provenance:** #83-#86 decompose design 04 into slices 4a-4d; #87-#90 track design 05 slices 5a, 5b, 5c, and 5e; #91 tracks 5d-i. Slice 5d-ii is still planned without an issue.
 - **Safety boundary:** the agent loop remains dormant. Slices 4a–4c add enforcement contracts only; they must not enable or wire dispatch.
 - **External validation:** no paid provider-backed run is included. Local HTTP fixtures and hosted CI are not provider-backed evidence.
@@ -27,8 +27,8 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 9 | 3e - Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
 | 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / [#92](https://github.com/JRH89/ForgeLoop/pull/92) | Merged to `master` (2026-09-29); dispatch remains dormant |
 | 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Merged to `master` (2026-09-29) |
-| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / [#94](https://github.com/JRH89/ForgeLoop/pull/94) | Full local verification passed; hosted checks pending |
-| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) | Implemented locally; queued behind 4c |
+| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / [#94](https://github.com/JRH89/ForgeLoop/pull/94) | Merged to `master` (2026-09-29); hosted checks passed |
+| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) / PR pending | Full local verification passed; hosted checks pending |
 | 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) | Implemented locally; queued behind 4d |
 | 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) | Implemented locally; queued behind 5a |
 | 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) | Implemented locally; queued behind 5b |
@@ -113,14 +113,14 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Result:** administrator-only repository enforcement settings validate and audit custom protected globs, the default-deny workflow opt-out, and an optional repository verification finish gate. Settings are persisted on repositories and snapshotted immutably on feature runs, then exposed to writing tasks through GraphQL. The runner fingerprints and validates the policy before any provider request, enforces custom paths and opt-out semantics, and redirects finish until a qualifying post-write gate run exists. The loop remains dormant.
 - **Additional safety fix:** safe dot-prefixed paths such as `.github/workflows/ci.yml` are accepted by structured patch validation; empty, dot, parent/traversal segments remain rejected. This makes the audited workflow opt-out usable without widening repository confinement.
 - **Verification:** focused control-plane (18 tests) and runner (37 tests) suites passed. Re-run against merged `master`: control-plane `mvn -B verify` passed (316 tests), runner `mvn -B verify` passed (286 tests, 9 existing platform/live-fixture skips), and harness `mvn -B verify` passed (2 tests). `git diff --check` passed. No provider-backed work was run.
-- **Delivery:** linked [PR #94](https://github.com/JRH89/ForgeLoop/pull/94) implements issue #85 from `feat/4c-repository-enforcement-pr`. Full local verification passed against the merged prerequisite chain; hosted checks are pending.
+- **Delivery:** merged as [PR #94](https://github.com/JRH89/ForgeLoop/pull/94) on 2026-09-29; issue #85 is closed. Full hosted checks passed, including end-to-end after an infrastructure-only retry.
 
 ## Slice 4d - Shared spend reservation
 
 - **Issue:** [#86](https://github.com/JRH89/ForgeLoop/issues/86).
 - **Result:** priced agent-loop turns now reserve a conservative worst-case cost with the control plane before the runner journals or sends the request. Run-scoped task locks serialize concurrent reservations; task and run known spend plus active sibling reservations must remain within budget. Reservations replace earlier values on retry, settle when provider usage is recorded, and are released when leases close or expire. Unknown pricing skips reservation; refusal stops before the provider call; control-plane transport failure retries with bounded backoff and then fails closed.
 - **Verification:** the original full suites passed (control-plane 307 tests; runner 244 tests with 5 platform-dependent skips; harness 2 tests). Re-run on the #85 PR stack: control-plane 322 tests, runner 288 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
-- **Delivery:** implementation commit `288871d` is being validated on a preparation branch based on PR #94; issue #86 is linked. No #86 PR will open until #85 merges, preserving one open PR at a time.
+- **Delivery:** implementation commit `288871d` is isolated on `feat/4d-spend-reservations-pr`; issue #86 is linked. Full local verification passed on the merged #85 base; the linked PR is pending creation.
 
 ## Update protocol
 
