@@ -71,11 +71,16 @@ public final class ProviderClientFactory {
     }
 
     public ProviderClient create(ProviderExecutionPolicy policy) {
+        return create(policy, null);
+    }
+
+    /** Builds a client with a caller-supplied secret without copying it into process environment. */
+    ProviderClient create(ProviderExecutionPolicy policy, String credential) {
         HttpClient client = HttpClient.newHttpClient();
         return switch (policy.provider()) {
-            case "anthropic" -> new AnthropicMessagesProviderClient(client, URI.create(ANTHROPIC_ENDPOINT), required("ANTHROPIC_API_KEY"));
-            case "openai" -> new OpenAiResponsesProviderClient(client, URI.create(OPENAI_ENDPOINT), required("OPENAI_API_KEY"));
-            case "gemini" -> new GeminiGenerateContentProviderClient(client, URI.create(GEMINI_ENDPOINT), required("GEMINI_API_KEY"));
+            case "anthropic" -> new AnthropicMessagesProviderClient(client, URI.create(ANTHROPIC_ENDPOINT), credentialOrEnvironment(credential, "ANTHROPIC_API_KEY"));
+            case "openai" -> new OpenAiResponsesProviderClient(client, URI.create(OPENAI_ENDPOINT), credentialOrEnvironment(credential, "OPENAI_API_KEY"));
+            case "gemini" -> new GeminiGenerateContentProviderClient(client, URI.create(GEMINI_ENDPOINT), credentialOrEnvironment(credential, "GEMINI_API_KEY"));
             case "local" -> new OpenAiChatCompatibleProviderClient(client, localEndpoint(), optional("FORGELOOP_LOCAL_PROVIDER_API_KEY"));
             default -> throw new IllegalStateException("Unsupported provider policy");
         };
@@ -104,6 +109,11 @@ public final class ProviderClientFactory {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) throw new IllegalStateException(name + " is not set in this runner process");
         return value;
+    }
+    private static String credentialOrEnvironment(String credential, String name) {
+        if (credential == null) return required(name);
+        if (credential.isBlank()) throw new IllegalArgumentException("Provider credential is unavailable");
+        return credential;
     }
     private static String optional(String name) { String value = System.getenv(name); return value == null ? "" : value; }
     private static URI localEndpoint() {

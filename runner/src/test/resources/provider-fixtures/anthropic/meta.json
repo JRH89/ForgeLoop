@@ -1,0 +1,7 @@
+{
+  "recordedAt" : "2026-09-29T19:10:23.407243900Z",
+  "endpoint" : "https://api.anthropic.com/v1/messages",
+  "apiVersion" : "2023-06-01",
+  "model" : "claude-sonnet-5",
+  "adapter" : "anthropic-messages/1"
+}
