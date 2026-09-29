@@ -123,7 +123,9 @@ public class TaskLeaseService {
     @Transactional public TaskLease hold(String leaseId, String runnerId, String nonce, String reason, String summary) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalArgumentException("Lease is not active");
-        if (reason == null || !List.of("LOOP_BUDGET_EXHAUSTED", "BUDGET_EXHAUSTED", "WORKER_DECLINED").contains(reason))
+        if (reason == null || !List.of("LOOP_BUDGET_EXHAUSTED", "BUDGET_EXHAUSTED", "WORKER_DECLINED",
+                "ENFORCEMENT_RULE_INPUT_MISSING", "ENFORCEMENT_PREREQUISITE_MISSING",
+                "ENFORCEMENT_RULE_FAILED", "ENFORCEMENT_BOUNDARY_BREACHED").contains(reason))
             throw new IllegalArgumentException("Hold reason is invalid");
         if (summary == null || summary.isBlank() || summary.length() > 1000) throw new IllegalArgumentException("Hold summary is invalid");
         EvidenceSecretPolicy.requireRedacted(summary);

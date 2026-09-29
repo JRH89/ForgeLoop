@@ -245,6 +245,30 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void testBoundaryViolationHoldsIntegrationBlocksRunAndClosesLease() throws Exception {
+        FeatureRun run = new FeatureRun("org", "acme/project", "issue-1", "Build feature", "spec", 1,
+                "GENERIC", "main", 1);
+        DeliveryTask integration = run.addPlannedTask("integration", "INTEGRATION", "Integrate", "git", List.of(), 1, 0);
+        run.beginPlanning();
+        run.queuePlannedWork();
+        run.startExecution();
+        Runner runner = mock(Runner.class);
+        when(runner.getId()).thenReturn("runner");
+        String nonceHash = java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest("nonce".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        TaskLease lease = new TaskLease(integration, runner, nonceHash, Instant.now().plusSeconds(600));
+        lease.acknowledge();
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+
+        service.holdIntegrationForTestBoundaryViolation("lease", "runner", "nonce", "test file changed");
+
+        assertEquals(TaskState.HELD, integration.getState());
+        assertEquals(RunState.BLOCKED, run.getState());
+        org.junit.jupiter.api.Assertions.assertTrue(lease.isCompleted());
+        verify(escalations).escalate(integration, "TEST_BOUNDARY_VIOLATION", "test file changed");
+    }
+
+    @Test
     void renewalRequiresLoopPolicyAndUsesTheClaimTimeWallCap() {
         FeatureRun run = activeLoopRun();
         DeliveryTask task = run.getTasks().getFirst();
@@ -309,6 +333,22 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void holdAcceptsEveryEnforcementClassReason() {
+        for (String reason : List.of("ENFORCEMENT_RULE_INPUT_MISSING", "ENFORCEMENT_PREREQUISITE_MISSING",
+                "ENFORCEMENT_RULE_FAILED", "ENFORCEMENT_BOUNDARY_BREACHED")) {
+            FeatureRun run = activeLoopRun();
+            DeliveryTask task = run.getTasks().getFirst();
+            authorizedLease(task);
+
+            service.hold("lease", "runner", "nonce", reason, "Policy held this task for operator review.");
+
+            assertEquals(TaskState.HELD, task.getState());
+            assertEquals(RunState.BLOCKED, run.getState());
+            verify(escalations).escalate(task, reason, "Policy held this task for operator review.");
+        }
+    }
+
+    @Test
     void explicitFailureCategoryIsUsedOnlyForGeneralExecutionFailures() {
         FeatureRun run = activeRun();
         DeliveryTask task = run.getTasks().getFirst();
@@ -351,29 +391,5 @@ class TaskLeaseServiceTest {
         when(lease.getTaskId()).thenReturn("task");
         when(tasks.findById("task")).thenReturn(Optional.of(task));
         return lease;
-    }
-
-    @Test
-    void testBoundaryViolationHoldsIntegrationBlocksRunAndClosesLease() throws Exception {
-        FeatureRun run = new FeatureRun("org", "acme/project", "issue-1", "Build feature", "spec", 1,
-                "GENERIC", "main", 1);
-        DeliveryTask integration = run.addPlannedTask("integration", "INTEGRATION", "Integrate", "git", List.of(), 1, 0);
-        run.beginPlanning();
-        run.queuePlannedWork();
-        run.startExecution();
-        Runner runner = mock(Runner.class);
-        when(runner.getId()).thenReturn("runner");
-        String nonceHash = java.util.HexFormat.of().formatHex(
-                java.security.MessageDigest.getInstance("SHA-256").digest("nonce".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        TaskLease lease = new TaskLease(integration, runner, nonceHash, Instant.now().plusSeconds(600));
-        lease.acknowledge();
-        when(leases.findById("lease")).thenReturn(Optional.of(lease));
-
-        service.holdIntegrationForTestBoundaryViolation("lease", "runner", "nonce", "test file changed");
-
-        assertEquals(TaskState.HELD, integration.getState());
-        assertEquals(RunState.BLOCKED, run.getState());
-        org.junit.jupiter.api.Assertions.assertTrue(lease.isCompleted());
-        verify(escalations).escalate(integration, "TEST_BOUNDARY_VIOLATION", "test file changed");
     }
 }

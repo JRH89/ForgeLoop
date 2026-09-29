@@ -39,17 +39,25 @@ public final class AgentLoop {
         try {
             Set<String> declaredTools = ToolGrants.forRole(setup.role(), !setup.gates().isEmpty());
             List<ToolSpec> toolSpecs = setup.toolRegistry().specifications(declaredTools);
+            journalStarted(setup, declaredTools);
+            reportEvent(setup, "LOOP_STARTED", "Agent loop started; tools=" + declaredTools.size());
+            var preflightHold = EnforcementPreflight.check(setup.enforcementDescriptor(), setup.baseSha());
+            if (preflightHold.isPresent()) {
+                PolicyHold hold = preflightHold.get();
+                return endPolicyHold(setup, meter, hold.holdClass(), hold.check(), hold.reason());
+            }
+            ToolGateway toolGateway = setup.toolGateway().withInterceptors(
+                    ToolInterceptors.forDescriptor(setup.enforcementDescriptor()));
             String manifest = boundedManifest(contexts.manifest(setup.worktree(), priorities(setup)),
                     Math.min(24 * 1024, setup.budget().maxConversationBytes() / 3));
             String userMessage = initialMessage(setup, manifest);
-            journalStarted(setup, declaredTools);
-            reportEvent(setup, "LOOP_STARTED", "Agent loop started; tools=" + declaredTools.size());
             setup.journal().append("USER_MESSAGE", Map.of("content", userMessage));
             UserText initial = new UserText(userMessage);
             if (!append(meter, initial, setup.budget().maxConversationBytes()))
                 return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.CONTEXT, null, null, 0);
             List<ConversationItem> items = new ArrayList<>(List.of(initial));
             Map<String, ToolOutcome> gateOutcomes = new HashMap<>();
+            int lastWriteStep = 0;
             int consecutiveNoToolTurns = 0;
             int turnNumber = 0;
 
@@ -141,6 +149,10 @@ public final class AgentLoop {
                 List<ToolResultItem> toolResults = new ArrayList<>();
                 BudgetKind turnBudgetStop = null;
                 boolean finishSucceeded = false;
+                boolean held = false;
+                HoldClass holdClass = null;
+                String holdRule = null;
+                String holdReason = null;
                 String changeSha = null;
                 int changedFileCount = 0;
                 int step = 0;
@@ -148,6 +160,7 @@ public final class AgentLoop {
                     step++;
                     String notRunReason = null;
                     if (finishSucceeded) notRunReason = "finish already succeeded";
+                    else if (held) notRunReason = "the task is held for a person";
                     else if (setup.leaseLost().get()) notRunReason = "runner lease was lost";
                     else if (remainingMillis(setup, started) <= 0) { notRunReason = "wall-time budget reached"; turnBudgetStop = BudgetKind.WALL_TIME; }
                     else if (!call.name().equals("finish") && meter.counters.toolCalls() >= setup.budget().maxToolCalls()) {
@@ -156,11 +169,11 @@ public final class AgentLoop {
                     long wallLeft = remainingMillis(setup, started);
                     ToolContext context = new ToolContext(setup.taskId(), setup.leaseId(), setup.role(), setup.worktree(),
                             declaredTools, setup.ownedPrefixes(), setup.gates(), turnNumber, step, wallLeft,
-                            meter.counters, gateOutcomes, notRunReason);
+                            meter.counters, gateOutcomes, notRunReason, setup.baseSha(), lastWriteStep);
                     ToolOutcome outcome;
                     long toolStartedNanos = System.nanoTime();
                     try {
-                        outcome = setup.toolGateway().invoke(call, context);
+                        outcome = toolGateway.invoke(call, context);
                     } catch (LoopHarnessFailure failure) {
                         return end(setup, meter, LoopOutcome.HARNESS_FAILURE, null, failure.category(), null, 0);
                     } catch (IOException | InterruptedException failure) {
@@ -171,7 +184,20 @@ public final class AgentLoop {
                     }
                     if (notRunReason == null) {
                         if (!call.name().equals("finish")) meter.call();
-                        if (call.name().equals("run_gate")) gateOutcomes.put(String.valueOf(outcome.meta().getOrDefault("gate", "")), outcome);
+                        if (("write_file".equals(call.name()) || "edit_file".equals(call.name())) && outcome.status() == ToolStatus.OK)
+                            lastWriteStep = step;
+                        if (call.name().equals("run_gate")) {
+                            Map<String, Object> gateMeta = new LinkedHashMap<>(outcome.meta());
+                            gateMeta.put("step", step);
+                            outcome = new ToolOutcome(outcome.status(), outcome.category(), outcome.content(), gateMeta, outcome.postImages());
+                            gateOutcomes.put(String.valueOf(outcome.meta().getOrDefault("gate", "")), outcome);
+                        }
+                        if ("HOLD".equals(outcome.meta().get("decision"))) {
+                            held = true;
+                            holdClass = HoldClass.valueOf(String.valueOf(outcome.meta().get("holdClass")));
+                            holdRule = String.valueOf(outcome.meta().getOrDefault("holdRule", ""));
+                            holdReason = String.valueOf(outcome.meta().getOrDefault("holdReason", "Enforcement held the task."));
+                        }
                         if (call.name().equals("finish") && outcome.status() == ToolStatus.OK) {
                             finishSucceeded = true;
                             changeSha = String.valueOf(outcome.meta().getOrDefault("changeSha", ""));
@@ -200,6 +226,7 @@ public final class AgentLoop {
                 meter.addConversationBytes(itemBytes(results));
                 items.add(results);
                 if (setup.leaseLost().get()) return end(setup, meter, LoopOutcome.LEASE_LOST, null, null, null, 0);
+                if (held) return endPolicyHold(setup, meter, holdClass, holdRule, holdReason);
                 if (finishSucceeded) return end(setup, meter, LoopOutcome.FINISHED, null, null, changeSha, changedFileCount);
                 if (turnBudgetStop != null) return end(setup, meter, LoopOutcome.BUDGET_STOP, turnBudgetStop, null, null, 0);
             }
@@ -277,6 +304,7 @@ public final class AgentLoop {
         start.put("instructionsSha256", Hashing.sha256(instructions));
         start.put("toolsSha256", toolsHash); start.put("tools", specs); start.put("budget", setup.budget());
         start.put("gates", setup.gates());
+        start.put("enforcement", setup.enforcementDescriptor().journalValue());
         start.put("startedAt", setup.clock().instant().toString()); start.put("runnerVersion", "0.1.0");
         setup.journal().append("LOOP_STARTED", start);
     }
@@ -284,7 +312,10 @@ public final class AgentLoop {
     private static String toolEvent(String name, ToolOutcome outcome, long durationMillis, LoopCounters counters) {
         String category = outcome.category() == null ? "" : outcome.category().name();
         int bytes = outcome.content().getBytes(StandardCharsets.UTF_8).length;
+        String decision = String.valueOf(outcome.meta().getOrDefault("decision", outcome.status() == ToolStatus.OK ? "ALLOW" : "DENY"));
+        String rule = String.valueOf(outcome.meta().getOrDefault("interceptor", outcome.meta().getOrDefault("holdRule", "")));
         return "tool=" + name + "; status=" + outcome.status() + "; category=" + category
+                + ("ALLOW".equals(decision) ? "" : "; decision=" + decision + (rule.isBlank() ? "" : "; rule=" + rule))
                 + "; bytes=" + bytes + "; durationMs=" + durationMillis + "; turns=" + counters.turns()
                 + "; toolCalls=" + counters.toolCalls() + "; tokens=" + counters.tokens();
     }
@@ -318,6 +349,25 @@ public final class AgentLoop {
         }
         try { setup.reporter().event("LOOP_ENDED", outcome.name() + (budgetKind == null ? "" : "; budget=" + budgetKind)); }
         catch (Exception ignored) { /* Metadata event delivery is best-effort and cannot change a terminal result. */ }
+        return result;
+    }
+
+    private LoopResult endPolicyHold(LoopSetup setup, Meter meter, HoldClass holdClass, String holdRule, String reason) {
+        LoopResult result = new LoopResult(LoopOutcome.POLICY_HOLD, null, meter.counters, null, null, 0,
+                holdClass, holdRule == null || holdRule.isBlank() ? "enforcement-config" : holdRule);
+        try {
+            Map<String, Object> ended = new LinkedHashMap<>();
+            ended.put("outcome", LoopOutcome.POLICY_HOLD.name());
+            ended.put("holdClass", holdClass.name());
+            ended.put("holdRule", result.holdRule());
+            if (reason != null && !reason.isBlank()) ended.put("reason", reason);
+            ended.put("counters", meter.counters);
+            setup.journal().append("LOOP_ENDED", ended);
+        } catch (IOException journalFailure) {
+            return new LoopResult(LoopOutcome.HARNESS_FAILURE, null, meter.counters, null, "LOOP_HARNESS_FAILURE", 0);
+        }
+        try { setup.reporter().event("LOOP_ENDED", "POLICY_HOLD; hold=" + holdClass.name()); }
+        catch (Exception ignored) { /* Local durable records remain authoritative; telemetry is best-effort. */ }
         return result;
     }
 

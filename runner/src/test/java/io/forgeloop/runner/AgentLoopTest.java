@@ -221,6 +221,62 @@ class AgentLoopTest {
         assertTrue(client.requests.isEmpty());
     }
 
+    @Test
+    void invalidEnforcementConfigHoldsBeforeProviderSpendAndIsFingerprinted() throws Exception {
+        Path repo = gitRepository("preflight-hold");
+        String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
+        ScriptedClient client = new ScriptedClient();
+        RecordingReporter reporter = new RecordingReporter();
+        StepJournal journal = new StepJournal(temporaryDirectory.resolve("preflight-hold-state"), "task-1", "lease-1", Clock.systemUTC());
+        ToolRegistry registry = ToolRegistry.standard(new GitWorktreeManager(), null);
+        ToolGateway gateway = new ToolGateway(registry, journal, List.of());
+        EnforcementDescriptor invalid = EnforcementDescriptor.fromDispatched("ANY", List.of("**/*Test.java"),
+                null, List.of(), false, null, List.of());
+        LoopSetup setup = new LoopSetup("task-1", "JRH89/agent-loop-test", "lease-1", "IMPLEMENTATION", "Implement a small feature", "small specification",
+                List.of("src/"), List.of(), repo, baseSha, new ProviderExecutionPolicy("openai", "test-model", 1), client,
+                standardBudget(10, 50_000, 65_536), List.of(), gateway, registry, journal, Clock.systemUTC(), reporter,
+                new AtomicBoolean(), 0, 0, invalid);
+
+        LoopResult result = new AgentLoop().run(setup);
+
+        assertEquals(LoopOutcome.POLICY_HOLD, result.outcome());
+        assertEquals(HoldClass.RULE_INPUT_MISSING, result.holdClass());
+        assertEquals("enforcement-config", result.holdRule());
+        assertTrue(client.requests.isEmpty());
+        assertTrue(reporter.reports.isEmpty());
+        List<JsonNode> records = journal.records();
+        JsonNode started = records.stream().filter(row -> row.path("type").asText().equals("LOOP_STARTED")).findFirst().orElseThrow();
+        assertEquals(invalid.sha256(), started.path("enforcement").path("sha256").asText());
+        assertTrue(records.stream().anyMatch(row -> row.path("type").asText().equals("LOOP_ENDED")
+                && row.path("outcome").asText().equals("POLICY_HOLD") && row.path("holdClass").asText().equals("RULE_INPUT_MISSING")));
+        assertTrue(records.stream().noneMatch(row -> row.path("type").asText().equals("TURN_REQUESTED")));
+    }
+
+    @Test
+    void holdAtFinishLeavesForbiddenChangeUncommittedAndSkipsRemainingCalls() throws Exception {
+        Path repo = gitRepository("boundary-hold");
+        String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
+        Files.createDirectories(repo.resolve(".GitHub/Workflows"));
+        Files.writeString(repo.resolve(".GitHub/Workflows/injected.yml"), "name: injected\n");
+        ScriptedClient client = new ScriptedClient(turn(List.of(
+                call("finish", "{\"summary\":\"try to finish\"}"),
+                call("write_file", "{\"path\":\"src/AfterHold.java\",\"content\":\"must not run\"}")), StopReason.TOOL_USE));
+        RecordingReporter reporter = new RecordingReporter();
+
+        LoopResult result = run("boundary-hold", repo, client, reporter, new AtomicBoolean(),
+                standardBudget(10, 50_000, 65_536), new ProviderExecutionPolicy("openai", "test-model", 1), "small specification");
+
+        assertEquals(LoopOutcome.POLICY_HOLD, result.outcome());
+        assertEquals(HoldClass.BOUNDARY_BREACHED, result.holdClass());
+        assertEquals("protected-paths", result.holdRule());
+        assertEquals(baseSha, command("git", "-C", repo.toString(), "rev-parse", "HEAD"));
+        assertTrue(Files.exists(repo.resolve(".GitHub/Workflows/injected.yml")));
+        assertFalse(Files.exists(repo.resolve("src/AfterHold.java")));
+        StepJournal journal = new StepJournal(temporaryDirectory.resolve("boundary-hold-state"), "task-1", "lease-1", Clock.systemUTC());
+        assertTrue(journal.records().stream().anyMatch(row -> row.path("type").asText().equals("TOOL_COMPLETED")
+                && row.path("decision").asText().equals("HOLD") && row.path("holdClass").asText().equals("BOUNDARY_BREACHED")));
+    }
+
     private LoopResult run(String directory, Path repo, ScriptedClient client, RecordingReporter reporter, AtomicBoolean lost,
                            LoopBudget budget, ProviderExecutionPolicy policy, String specification) throws Exception {
         return run(directory, repo, client, reporter, lost, budget, policy, specification, 0, 0, Clock.systemUTC());

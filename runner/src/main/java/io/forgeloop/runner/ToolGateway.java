@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Objects;
 
 /** Sole authority boundary for invoking loop tools. */
 public final class ToolGateway {
@@ -18,6 +20,14 @@ public final class ToolGateway {
 
     public ToolGateway(ToolRegistry registry, LoopJournal journal, List<ToolCallInterceptor> interceptors) {
         this(registry, journal, interceptors, duration -> Thread.sleep(duration.toMillis()));
+    }
+
+    /** Keeps policy after-hooks last so caller hooks cannot undo redaction or credential filtering. */
+    public ToolGateway withInterceptors(List<ToolCallInterceptor> policyInterceptors) {
+        if (policyInterceptors == null) throw new IllegalArgumentException("Policy interceptors are required");
+        List<ToolCallInterceptor> combined = new ArrayList<>(interceptors);
+        combined.addAll(policyInterceptors);
+        return new ToolGateway(registry, journal, combined, sleeper);
     }
 
     ToolGateway(ToolRegistry registry, LoopJournal journal, List<ToolCallInterceptor> interceptors, ToolSleeper sleeper) {
@@ -42,6 +52,11 @@ public final class ToolGateway {
         String decisionName = "none";
         String decisionResult = "allow";
         String decision = "ALLOW";
+        String redirectTool = null;
+        HoldClass holdClass = null;
+        String holdReason = null;
+        String holdRule = null;
+        List<String> rewrittenBy = new ArrayList<>();
         LoopTool tool = registry.find(call.name());
         boolean roleAllows = ToolGrants.forRole(context.role(), !context.gates().isEmpty()).contains(call.name());
         if (context.notExecutedReason() != null) {
@@ -52,7 +67,7 @@ public final class ToolGateway {
         } else if (!roleAllows || !context.declaredTools().contains(call.name())) {
             outcome = ToolOutcome.failed(FailureCategory.PERMISSION, "Tool " + call.name() + " is not available to this worker");
             decisionResult = "grant-denied";
-            decisionName = "tool-grants";
+            decisionName = "tool-grant";
             decision = "DENY";
         } else if (tool == null) {
             outcome = ToolOutcome.failed(FailureCategory.PERMISSION, "Tool " + call.name() + " is not registered");
@@ -64,22 +79,38 @@ public final class ToolGateway {
                 tool.validateArguments(call.arguments());
                 ToolCallInterceptor.Decision intercepted = null;
                 for (ToolCallInterceptor interceptor : interceptors) {
-                    ToolCallInterceptor.Decision current = interceptor.before(call, context);
-                    if (current == null) throw new IllegalStateException("Tool interceptor returned no decision");
+                    ToolCallInterceptor.Decision current;
+                    try {
+                        current = interceptor.before(call, context);
+                    } catch (Exception ruleFailure) {
+                        if (ruleFailure instanceof InterruptedException) Thread.currentThread().interrupt();
+                        current = ToolCallInterceptor.Decision.hold(HoldClass.RULE_FAILED, "An enforcement rule failed closed.");
+                    }
+                    if (current == null) current = ToolCallInterceptor.Decision.hold(HoldClass.RULE_FAILED,
+                            "An enforcement rule returned no decision.");
                     if (current.kind() != ToolCallInterceptor.Decision.Kind.ALLOW) {
                         intercepted = current;
                         decisionName = interceptor.name();
                         decisionResult = current.kind().name().toLowerCase(java.util.Locale.ROOT);
                         decision = current.kind().name();
+                        redirectTool = current.toolName();
+                        holdClass = current.holdClass();
+                        holdReason = current.kind() == ToolCallInterceptor.Decision.Kind.HOLD ? current.message() : null;
+                        holdRule = current.kind() == ToolCallInterceptor.Decision.Kind.HOLD ? interceptor.name() : null;
                         break;
                     }
                 }
                 if (intercepted == null) outcome = executeWithOneTransientRetry(tool, call, context);
                 else {
-                    String message = intercepted.message();
-                    if (intercepted.kind() == ToolCallInterceptor.Decision.Kind.REDIRECT)
+                    String message = intercepted.kind() == ToolCallInterceptor.Decision.Kind.HOLD
+                            ? "Not executed: this task is now held for a person (" + intercepted.holdClass().name() + ")."
+                            : intercepted.message();
+                    if (intercepted.kind() == ToolCallInterceptor.Decision.Kind.REDIRECT) {
                         message = "Suggested tool " + intercepted.toolName() + ": " + message;
-                    outcome = ToolOutcome.failed(intercepted.category(), message);
+                    }
+                    outcome = intercepted.kind() == ToolCallInterceptor.Decision.Kind.HOLD
+                            ? ToolOutcome.held(intercepted.holdClass(), decisionName, holdReason)
+                            : ToolOutcome.failed(intercepted.category(), message);
                 }
             } catch (LoopToolFailure expected) {
                 outcome = ToolOutcome.failed(expected.category(), expected.getMessage());
@@ -87,15 +118,51 @@ public final class ToolGateway {
         }
 
         for (ToolCallInterceptor interceptor : interceptors) {
-            ToolOutcome after = interceptor.after(call, outcome, context);
-            if (after == null) throw new IllegalStateException("Tool interceptor returned no outcome");
-            outcome = after;
+            ToolOutcome beforeAfter = outcome;
+            ToolOutcome after;
+            try {
+                after = interceptor.after(call, beforeAfter, context);
+            } catch (Exception ruleFailure) {
+                if (ruleFailure instanceof InterruptedException) Thread.currentThread().interrupt();
+                after = null;
+            }
+            if (after == null || after.status() != beforeAfter.status() || after.category() != beforeAfter.category()
+                    || !Objects.equals(after.postImages(), beforeAfter.postImages())) {
+                decision = "HOLD";
+                decisionResult = "hold";
+                decisionName = interceptor.name();
+                holdClass = HoldClass.RULE_FAILED;
+                holdReason = "An enforcement after-hook failed or changed immutable tool output.";
+                holdRule = interceptor.name();
+                outcome = ToolOutcome.held(holdClass, holdRule, holdReason);
+            } else {
+                if (!Objects.equals(after.content(), beforeAfter.content())) rewrittenBy.add(interceptor.name());
+                outcome = after;
+            }
         }
+        Map<String, Object> outcomeMeta = new LinkedHashMap<>(outcome.meta());
+        outcomeMeta.put("decision", decision);
+        if (!"none".equals(decisionName)) outcomeMeta.put("interceptor", decisionName);
+        if (redirectTool != null) outcomeMeta.put("redirectTool", redirectTool);
+        if (holdClass != null) {
+            outcomeMeta.put("holdClass", holdClass.name());
+            outcomeMeta.put("holdRule", holdRule == null ? "" : holdRule);
+            outcomeMeta.put("holdReason", holdReason == null ? "" : holdReason);
+        }
+        outcome = new ToolOutcome(outcome.status(), outcome.category(), outcome.content(), outcomeMeta, outcome.postImages());
         Map<String, Object> completed = new LinkedHashMap<>();
         completed.put("turn", context.turn()); completed.put("step", context.step());
         completed.put("callId", call.id()); completed.put("tool", call.name());
         completed.put("decision", decision); completed.put("decisionDetail", decisionResult);
         completed.put("interceptor", decisionName);
+        if (redirectTool != null) completed.put("redirectTool", redirectTool);
+        completed.put("content", outcome.content());
+        completed.put("rewrittenBy", List.copyOf(rewrittenBy));
+        if (holdClass != null) {
+            completed.put("holdClass", holdClass.name());
+            completed.put("holdRule", holdRule == null ? "" : holdRule);
+            completed.put("holdReason", holdReason == null ? "" : holdReason);
+        }
         completed.put("durationMs", Duration.ofNanos(Math.max(0, System.nanoTime() - startedNanos)).toMillis());
         completed.put("outcome", JSON.valueToTree(outcome));
         journal.append("TOOL_COMPLETED", completed);

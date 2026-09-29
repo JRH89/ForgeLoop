@@ -32,6 +32,8 @@ public class RepositoryConnection {
   @Column(nullable = false) private int policyRevision;
   private String requiredAssignee;
   @Column(nullable = false) private boolean requireAssignee;
+  @Column(length = 80) private String testFirstGate;
+  @Column(length = 8000) private String testPathGlobs;
   @Embedded
   @AttributeOverrides({
       @AttributeOverride(name = "maxToolCalls", column = @Column(name = "agent_loop_max_tool_calls")),
@@ -40,8 +42,6 @@ public class RepositoryConnection {
       @AttributeOverride(name = "maxConversationBytes", column = @Column(name = "agent_loop_max_conversation_bytes"))
   })
   private AgentLoopBudget agentLoopBudget;
-  @Column(length = 80) private String testFirstGate;
-  @Column(length = 8000) private String testPathGlobs;
   public String getRequiredAssignee() { return requiredAssignee; }
   public boolean isRequireAssignee() { return requireAssignee || requiredAssignee != null; }
   /** Null disables assignment gating; usernames are compared case-insensitively. */
@@ -134,7 +134,7 @@ public class RepositoryConnection {
   public String getHarnessProfile() { return harnessProfile; } public double getMaxBudgetUsd() { return maxBudgetUsd; } public int getPolicyRevision() { return policyRevision; }
   public List<String> getRequiredGates() { return Arrays.stream(requiredGates.split(",")).filter(gate -> !gate.isBlank()).toList(); }
   public List<VerificationPolicySpec> getVerificationPolicies() { return verificationPolicies.stream().map(RepositoryVerificationPolicy::toSpec).toList(); }
-  public AgentLoopBudget getAgentLoopBudget() { return agentLoopBudget == null ? null : agentLoopBudget.copy(); }
   public String getTestFirstGate() { return testFirstGate; }
   public List<String> getTestPathGlobs() { return testPathGlobs == null || testPathGlobs.isBlank() ? List.of() : testPathGlobs.lines().toList(); }
+  public AgentLoopBudget getAgentLoopBudget() { return agentLoopBudget == null ? null : agentLoopBudget.copy(); }
 }
