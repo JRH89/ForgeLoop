@@ -4,14 +4,16 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Piece 1 — sequenced writers.
-- **Branch:** `feat/sequenced-writers`, based on `origin/master` after merged PR #68 (`0fb7a9c`).
-- **Issue:** [#69 — Allow writers to build on a predecessor task commit](https://github.com/JRH89/ForgeLoop/issues/69).
-- **Code state:** implemented and cross-checked against Slice 2a's dependency contract. An additional compatibility fix is locally verified and being committed; the hosted PR will rerun after it is pushed.
-- **Commits:** `9f6f21f` control-plane scheduling and validation; `f90d03b` runner chaining, context, and worktree setup; `e3fa9d2` role-select chained predecessors alongside server-added checks.
-- **PR:** [#70 — Sequence dependent writer tasks](https://github.com/JRH89/ForgeLoop/pull/70), linked to #69. No merge has been performed.
+- **Active work:** Piece 2a — test boundary.
+- **Branch:** `feat/test-boundary`, rebasing the Slice 2a work onto `master` after prerequisite PR #70 merged.
+- **Issue:** [#71 — Enforce test-first write boundaries per repository](https://github.com/JRH89/ForgeLoop/issues/71).
+- **Code state:** Slice 2a is implemented and locally verified across control-plane, runner, and harness; implementation commits are prepared and the branch is being rebased onto merged `master` before PR creation.
+- **Slice 1 commits:** `9f6f21f` control-plane scheduling and validation; `f90d03b` runner chaining, context, and worktree setup; `e3fa9d2` role-select chained predecessors alongside server-added checks.
+- **Slice 2a commits:** `1cb76b2` control-plane test-first policy and graph enforcement; `a6520cc` runner write-boundary and JUnit report enforcement.
+- **PR:** [#70 — Sequence dependent writer tasks](https://github.com/JRH89/ForgeLoop/pull/70), linked to #69. Merged into `master` on 2026-09-29; hosted checks passed.
 - **Local test toolchain:** portable Temurin 21 and Maven 3.9.12 under the user-local ForgeLoop tools directory; no project files added for tooling.
 - **External validation:** Docker Engine is available. A real provider-backed chained run has not been attempted because it incurs provider spend; do not treat unit/CI checks as that evidence.
+- **Outline:** `docs/original_outline.md` is present and remains the project-level direction; the approved `docs/Version_2/` designs define this implementation sequence.
 
 ## Planned issue-linked PR slices
 
@@ -19,8 +21,8 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 
 | Order | Slice | Dependency | Issue / PR | Status |
 |---:|---|---|---|---|
-| 1 | 1 — Sequenced writers | — | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Local verification passed; compatibility fix pending push |
-| 2 | 2a — Test boundary | 1 | Not opened | Planned |
+| 1 | 1 — Sequenced writers | — | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Merged; local and hosted verification passed |
+| 2 | 2a — Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / not opened | Implementation, local verification, and code commits complete; rebasing before PR |
 | 3 | 2b — RED/GREEN checks | 2a | Not opened | Planned |
 | 4 | 2c — GitHub branch check | 2b | Not opened | Planned |
 | 5 | 3a — Provider conversations and tool calling | 1 | Not opened | Planned |
@@ -57,9 +59,21 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 - **Focused final reruns:** control-plane `mvn -B -Dtest=TaskGraphValidatorTest,DeliveryTaskSequencingTest,RunnerDispatchServiceTest,TaskLeaseServiceTest test` — 19 tests, 0 failures/errors; runner `mvn -B -Dtest=PlannerPlanTest,PlannerWorkerTest,GitWorktreeManagerTest,RepositoryContextBuilderTest,GuardedPatchWorkerTest,RunnerMainTest test` — 22 tests, 0 failures/errors. These cover the added cycle cases.
 - **Full verification:** `mvn -B verify` in `control-plane` — 228 tests, 0 failures/errors; in `runner` — 126 tests, 0 failures/errors; in `harness` — 2 tests, 0 failures/errors. Only tests/comments changed after the full runs; the final changed test sets then passed above.
 - **Inter-slice compatibility check:** the 2a design adds a verified RED-check dependency to implementation writers. Slice 1 now explicitly filters writing dependencies by role in execution-base and affinity selection, with dispatch, claim, readiness, and base-ref tests covering the combined graph.
-- **Latest focused result:** control-plane affinity/readiness/base-ref subset — 13 tests, 0 failures/errors. The complete focused set and all hosted checks will be rerun after the compatibility-fix commit is pushed.
-- **Remaining:** record hosted CI results and complete the provider-backed end-to-end check when a provider budget is available. Provider-backed evidence remains unrun and is not implied by CI.
+- **Latest local results:** control-plane `mvn -B verify` — 241 tests, 0 failures/errors; runner `mvn -B verify` — 138 tests, 0 failures/errors; harness `mvn -B verify` — 2 tests, 0 failures/errors. The control-plane suite includes GraphQL SDL construction and repository/run policy tests; runner tests pin the unchanged no-report Docker argv and the new JUnit mount.
+- **Hosted checks:** all check runs on PR #70 passed; PR #70 merged into `master` on 2026-09-29. Slice 2a hosted checks will start after its branch is pushed.
+- **Remaining:** complete the provider-backed end-to-end check when a provider budget is available. Provider-backed evidence remains unrun and is not implied by local or hosted tests.
 - **Known limits kept in scope:** no cross-runner commit transfer or recovery of a vanished producer runner; these are out of this slice.
+
+## Slice 2a log — Test boundary
+
+- **Issue:** [#71 — Enforce test-first write boundaries per repository](https://github.com/JRH89/ForgeLoop/issues/71).
+- **Depends on:** Slice 1 / PR #70, now merged into `master`.
+- **Scope:** repository opt-in and run snapshot, report-enabled verification policy and external JUnit output mount, path-glob matcher in both Java modules, stored-role-derived patch write boundaries, test-first graph and prompt rules, and Docker capability requirements for test-first root writers.
+- **Progress:** implemented: nullable `JUNIT_XML` policy snapshots and repository configuration mutation; enabled-repository/admin/gate/glob validation; immutable run snapshot; the two-module test-path matcher; stored-role-derived `ANY` / `TESTS_ONLY` / `NO_TESTS` task contract; atomic patch-boundary enforcement with a distinct failure category; conditional test-first planner contract and graph validation; Docker-capability dispatch/claim checks for root test writers and scaffolds; and an isolated report bind mount that leaves old verification argv unchanged when disabled.
+- **Documentation:** expanded `docs/verification-policy-and-evidence.md` with the generic repository setup, the admin test-first mutation, glob semantics, and JUnit command guidance; removed the demo repository name from the example.
+- **Verification:** `mvn -B verify` passed in `control-plane` (241 tests), `runner` (138 tests), and `harness` (2 tests); `git diff --check` passed. No paid provider request or actual Docker policy execution was made.
+- **Commits / PR:** `1cb76b2` control-plane and `a6520cc` runner; documentation/progress commit and PR creation follow rebase. PR targets `master` and links to #71.
+- **Validation boundaries:** hosted CI starts after push. Full RED/GREEN evidence belongs to Slice 2b.
 
 ## Update protocol
 
