@@ -23,6 +23,7 @@ public class FeatureRunService {
     FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
     run.snapshotTestFirst(connection.getTestFirstGate(), connection.getTestPathGlobs());
     run.adoptAgentLoop(connection.getAgentLoopBudget());
+    run.snapshotEnforcement(connection.getEnforcement());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
     if (connection.getVerificationPolicies().isEmpty()) throw new IllegalStateException("Repository verification policy is not configured");
     connection.getVerificationPolicies().forEach(run::addGate);

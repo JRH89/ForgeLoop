@@ -28,6 +28,7 @@ public final class ToolInterceptors {
         chain.add(new ProtectedPathsRule(descriptor, git));
         if (!"ANY".equals(descriptor.writeBoundary())) chain.add(new WriteBoundaryRule(descriptor, git));
         chain.add(new SecretContentRule());
+        if (descriptor.finishGate() != null && !descriptor.finishGate().isBlank()) chain.add(new FinishGateRule(descriptor));
         chain.add(new ResultRedactionRule());
         return List.copyOf(chain);
     }
@@ -94,8 +95,39 @@ public final class ToolInterceptors {
         }
 
         private boolean protectedPath(String path) {
-            if (!descriptor.allowWorkflowChanges() && matchesIgnoreCase(WORKFLOW_GLOB, path)) return true;
-            return descriptor.protectedPathGlobs().stream().anyMatch(glob -> matchesIgnoreCase(glob, path));
+            if (!Boolean.TRUE.equals(descriptor.allowWorkflowChanges()) && matchesIgnoreCase(WORKFLOW_GLOB, path)) return true;
+            return descriptor.protectedPathGlobs() != null
+                    && descriptor.protectedPathGlobs().stream().anyMatch(glob -> TestPathGlobs.matches(glob, path));
+        }
+    }
+
+    private static final class FinishGateRule implements ToolCallInterceptor {
+        private final EnforcementDescriptor descriptor;
+
+        private FinishGateRule(EnforcementDescriptor descriptor) { this.descriptor = descriptor; }
+
+        @Override public String name() { return "finish-gate"; }
+        @Override public ToolOutcome after(ToolCall call, ToolOutcome outcome, ToolContext context) { return outcome; }
+
+        @Override public Decision before(ToolCall call, ToolContext context) {
+            if (!"finish".equals(call.name())) return Decision.allow();
+            String gate = descriptor.finishGate();
+            ToolOutcome outcome = context.gateOutcomes().get(gate);
+            if (!passedAfterLastWrite(outcome, context.lastWriteStep(), "TESTS_ONLY".equals(descriptor.writeBoundary()))) {
+                String requirement = "TESTS_ONLY".equals(descriptor.writeBoundary()) ? "after your last change"
+                        : "after your last change that passes";
+                return Decision.redirect(FailureCategory.BUSINESS_RULE, "run_gate",
+                        "finish needs a run of gate " + gate + " " + requirement + ". Call run_gate with name " + gate + " first.");
+            }
+            return Decision.allow();
+        }
+
+        private static boolean passedAfterLastWrite(ToolOutcome outcome, int lastWriteStep, boolean testsOnly) {
+            if (outcome == null || outcome.status() != ToolStatus.OK
+                    || !(outcome.meta().get("timedOut") instanceof Boolean timedOut) || timedOut
+                    || !(outcome.meta().get("step") instanceof Number step) || step.intValue() <= lastWriteStep) return false;
+            if (testsOnly) return true;
+            return outcome.meta().get("exitCode") instanceof Number exitCode && exitCode.intValue() == 0;
         }
     }
 

@@ -163,7 +163,7 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence redPrerequisite{testTaskId targetSha evidenceDigest} mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence redPrerequisite{testTaskId targetSha evidenceDigest} agentLoop{enforcement{protectedPaths allowWorkflowChanges finishGate}} mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
         if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
@@ -181,7 +181,7 @@ public final class RunnerClient {
                     nullableText(task, "testReportFormat"),
                     JSON.convertValue(task.path("expectedTests"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
                     task.path("expectedTestsOverflow").asBoolean(false), nullableText(task, "testFirstEvidence"),
-                    redPrerequisite(task.path("redPrerequisite"))));
+                    redPrerequisite(task.path("redPrerequisite")), loopEnforcement(task.path("agentLoop"))));
         }
         return List.copyOf(tasks);
     }
@@ -324,6 +324,31 @@ public final class RunnerClient {
         if (node == null || node.isMissingNode() || node.isNull()) return null;
         return new RunnerRedPrerequisite(nullableText(node, "testTaskId"), nullableText(node, "targetSha"),
                 nullableText(node, "evidenceDigest"));
+    }
+    private static RunnerLoopEnforcement loopEnforcement(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return null;
+        JsonNode policy = node.path("enforcement");
+        if (policy.isMissingNode() || policy.isNull()) return new RunnerLoopEnforcement(null, null, null);
+        JsonNode protectedPaths = policy.get("protectedPaths");
+        List<String> paths = null;
+        if (protectedPaths != null && !protectedPaths.isNull() && protectedPaths.isArray()) {
+            List<String> parsed = new ArrayList<>();
+            for (JsonNode path : protectedPaths) {
+                if (!path.isTextual()) {
+                    parsed = null;
+                    break;
+                }
+                parsed.add(path.asText());
+            }
+            paths = parsed;
+        }
+        JsonNode allowWorkflowChanges = policy.get("allowWorkflowChanges");
+        Boolean allow = allowWorkflowChanges != null && allowWorkflowChanges.isBoolean()
+                ? allowWorkflowChanges.booleanValue() : null;
+        JsonNode finishGate = policy.get("finishGate");
+        String gate = finishGate == null ? "" : finishGate.isNull() ? null
+                : finishGate.isTextual() ? finishGate.textValue() : "";
+        return new RunnerLoopEnforcement(paths, allow, gate);
     }
     private static String escape(String value) {
         StringBuilder escaped = new StringBuilder(value.length() + 16);

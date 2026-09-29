@@ -89,6 +89,43 @@ class EnforcementDescriptorTest {
 
         assertEquals(prerequisite, descriptor.redPrerequisite());
         assertEquals(List.of("enforcement-config", "red-prerequisite"), descriptor.checkNames());
-        assertEquals("2", descriptor.journalValue().get("rulesVersion"));
+        assertEquals(List.of(), descriptor.protectedPathGlobs());
+        assertEquals(Boolean.FALSE, descriptor.allowWorkflowChanges());
+        assertEquals("3", descriptor.journalValue().get("rulesVersion"));
+    }
+
+    @Test
+    void rejectsMissingOrUnknownRepositoryEnforcementBeforeExecution() {
+        String baseSha = "a".repeat(40);
+        EnforcementDescriptor missingWorkflowSetting = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), null, null, List.of());
+        assertEquals(HoldClass.RULE_INPUT_MISSING,
+                EnforcementPreflight.check(missingWorkflowSetting, baseSha).orElseThrow().holdClass());
+
+        EnforcementDescriptor missingProtectedPaths = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                null, false, null, List.of());
+        assertEquals(HoldClass.RULE_INPUT_MISSING,
+                EnforcementPreflight.check(missingProtectedPaths, baseSha).orElseThrow().holdClass());
+
+        EnforcementDescriptor unknownFinishGate = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), false, "verify", List.of("lint"));
+        assertEquals(HoldClass.RULE_INPUT_MISSING,
+                EnforcementPreflight.check(unknownFinishGate, baseSha).orElseThrow().holdClass());
+    }
+
+    @Test
+    void fingerprintsEveryRepositoryEnforcementAuthorityField() {
+        EnforcementDescriptor defaults = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), false, null, List.of("verify"));
+        EnforcementDescriptor protectedPaths = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of("src/generated/**"), false, null, List.of("verify"));
+        EnforcementDescriptor workflowOptOut = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), true, null, List.of("verify"));
+        EnforcementDescriptor finishGate = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), false, "verify", List.of("verify"));
+
+        assertNotEquals(defaults.sha256(), protectedPaths.sha256());
+        assertNotEquals(defaults.sha256(), workflowOptOut.sha256());
+        assertNotEquals(defaults.sha256(), finishGate.sha256());
     }
 }

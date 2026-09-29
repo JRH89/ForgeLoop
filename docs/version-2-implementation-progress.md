@@ -4,12 +4,11 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 4b, RED prerequisite validation before test-first implementation loops; issue [#84](https://github.com/JRH89/ForgeLoop/issues/84), PR [#93](https://github.com/JRH89/ForgeLoop/pull/93).
-- **Local integration branch:** `feat/4b-red-prerequisite` is isolated against the updated `master`. Only one PR is open at a time; later slices remain on local dependent branches until prerequisites merge.
-- **Commits:** PR #92 added 4a after the merged 3b/3c stack. The remaining issue slices have their own local implementation commits; migration ordering is documented in their entries.
-- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, and #92 are merged to `master` (2026-09-29). PR #93 is the only open PR.
+- **Active work:** Slice 4c, repository-scoped agent-loop enforcement policy; issue [#85](https://github.com/JRH89/ForgeLoop/issues/85).
+- **Delivery branch:** `feat/4c-repository-enforcement-pr` contains only the 4c slice plus this tracker update, based directly on the merged prerequisite chain.
+- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, and #93 are merged to `master` (2026-09-29). Only one PR is opened at a time.
 - **Issue provenance:** #83-#86 decompose design 04 into slices 4a-4d; #87-#90 track design 05 slices 5a, 5b, 5c, and 5e; #91 tracks 5d-i. Slice 5d-ii is still planned without an issue.
-- **Safety boundary:** the agent loop remains dormant. Slices 4a and 4b add enforcement contracts only; they must not enable or wire dispatch.
+- **Safety boundary:** the agent loop remains dormant. Slices 4a–4c add enforcement contracts only; they must not enable or wire dispatch.
 - **External validation:** no paid provider-backed run is included. Local HTTP fixtures and hosted CI are not provider-backed evidence.
 - **Project direction:** `docs/original_outline.md`; approved design order is in `docs/Version_2/`.
 
@@ -27,14 +26,14 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 8 | 3d - Runner loop wiring behind a default-off switch | 3b, 3c, 4a | Not opened | Planned; remain disabled until 4a is complete |
 | 9 | 3e - Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
 | 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / [#92](https://github.com/JRH89/ForgeLoop/pull/92) | Merged to `master` (2026-09-29); dispatch remains dormant |
-| 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Open; hosted checks pending |
-| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) | Implemented locally; queued behind 4b |
+| 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Merged to `master` (2026-09-29) |
+| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / Not opened | Implementation isolated; local and hosted verification in progress |
 | 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) | Implemented locally; queued behind 4c |
 | 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) | Implemented locally; queued behind 4d |
 | 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) | Implemented locally; queued behind 5a |
 | 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) | Implemented locally; queued behind 5b |
 | 17 | 5e - Provider replay and drift probe | 3a, 5c fixtures | [#90](https://github.com/JRH89/ForgeLoop/issues/90) | Offline replay verified; live canonical fixtures and paid drift calls pending |
-| 18 | 5d-i - Run-record export and core integrity checks | 5a, 5b, 5c, 5e | [#91](https://github.com/JRH89/ForgeLoop/issues/91) | Next planned slice; no paid provider calls or live fixture capture |
+| 18 | 5d-i - Run-record export and core integrity checks | 5a, 5b, 5c, 5e | [#91](https://github.com/JRH89/ForgeLoop/issues/91) | Planned after prerequisite slices; no paid provider calls or live fixture capture |
 | 19 | 5d-ii - Deterministic re-execution checks | 5d-i | Not opened | Planned |
 | 20 | 6a - Pull-request rounds and lifecycle | 2-5 | Not opened | Planned |
 | 21 | 6b-i - GitHub feedback sweep and evidence | 6a | Not opened | Planned |
@@ -106,7 +105,15 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Scope:** derive the RED proof from the implementation task's `RED_CHECK` edge and the check's test writer; dispatch the test task ID, target SHA, and evidence digest; reject missing, malformed, stale, or mismatched proof before the first provider turn.
 - **Result:** control-plane derives the current passing record from the exact RED-check/test-writer edges without calling the base-ref helper; GraphQL and runner transport preserve the test ID, target SHA, and evidence digest; absent, malformed, stale, and mismatched proof holds before a provider turn. Dispatch caches the materialized value before lazy persistence state leaves the transaction.
 - **Verification:** focused runner suite passed (23 tests); focused control-plane suite passed (11 tests); full runner `mvn -B verify` passed (226 tests, 1 existing symlink-permission skip); full control-plane `mvn -B verify` passed (294 tests); harness `mvn -B verify` passed (2 tests). No paid provider run.
-- **Delivery:** issue #84 is linked to [PR #93](https://github.com/JRH89/ForgeLoop/pull/93), opened after 4a merged. Hosted checks are pending; the PR contains only 4b changes plus the progress-tracker update.
+- **Delivery:** merged as [PR #93](https://github.com/JRH89/ForgeLoop/pull/93) on 2026-09-29; issue #84 is closed. Hosted checks passed; no paid provider run.
+
+## Slice 4c - Repository enforcement policy
+
+- **Issue:** [#85](https://github.com/JRH89/ForgeLoop/issues/85).
+- **Result:** administrator-only repository enforcement settings validate and audit custom protected globs, the default-deny workflow opt-out, and an optional repository verification finish gate. Settings are persisted on repositories and snapshotted immutably on feature runs, then exposed to writing tasks through GraphQL. The runner fingerprints and validates the policy before any provider request, enforces custom paths and opt-out semantics, and redirects finish until a qualifying post-write gate run exists. The loop remains dormant.
+- **Additional safety fix:** safe dot-prefixed paths such as `.github/workflows/ci.yml` are accepted by structured patch validation; empty, dot, parent/traversal segments remain rejected. This makes the audited workflow opt-out usable without widening repository confinement.
+- **Verification:** focused control-plane (18 tests) and runner (37 tests) suites passed. Full control-plane `mvn -B verify` passed (299 tests); runner `mvn -B verify` passed (233 tests, 1 existing symlink-permission skip); harness `mvn -B verify` passed (2 tests). No provider-backed work was run.
+- **Delivery:** implementation and documentation are isolated on `feat/4c-repository-enforcement-pr`; issue #85 is linked. Local and hosted verification are being run against the merged prerequisite chain before opening its PR.
 
 ## Update protocol
 

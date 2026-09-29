@@ -28,17 +28,22 @@ class FeatureRunServiceTest {
             new VerificationPolicySpec("compile", "CONTAINER", image, List.of("npm", "run", "build"), "NONE", 300, true, "ALL"),
             new VerificationPolicySpec("browser", "BROWSER", image, List.of("npm", "run", "e2e"), "NONE", 600, true, "ALL")), 25, true);
     connection.configureAgentLoop(new AgentLoopBudget(25, 250_000, 600, 524_288));
+    connection.configureEnforcement(List.of("src/generated/**", "docs/private/**"), true, "compile");
     when(connections.requireEnabled("acme/support")).thenReturn(connection); when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
     FeatureRun run = service.submit(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- Admin can assign\n- Cross org is denied", 25));
-    assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(2, run.getPolicyRevision()); assertEquals(1, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(0, run.getCriteria().size()); assertEquals(io.forgeloop.control.domain.RunState.PLANNING, run.getState());
+    assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(3, run.getPolicyRevision()); assertEquals(1, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(0, run.getCriteria().size()); assertEquals(io.forgeloop.control.domain.RunState.PLANNING, run.getState());
     assertEquals(600, run.getAgentLoopBudget().getMaxWallSeconds());
+    assertEquals(new io.forgeloop.control.domain.LoopEnforcement(List.of("src/generated/**", "docs/private/**"), true, "compile"), run.getEnforcement());
     DeliveryTask planner = run.getTasks().getFirst();
     assertEquals(null, planner.getAgentLoop());
     DeliveryTask writer = run.addPlannedTask("backend", "BACKEND", "Backend", "provider", List.of("src"), 2, 100_000);
     assertEquals(2, writer.getAgentLoop().gates().size());
     assertEquals(image, writer.getAgentLoop().gates().getFirst().imageDigest());
+    assertEquals(run.getEnforcement(), writer.getAgentLoop().enforcement());
     connection.configureAgentLoop(new AgentLoopBudget(10, 100_000, 120, 65_536));
+    connection.configureEnforcement(List.of(), false, null);
     assertEquals(600, run.getAgentLoopBudget().getMaxWallSeconds(), "the submitted run keeps its policy snapshot");
+    assertEquals(new io.forgeloop.control.domain.LoopEnforcement(List.of("src/generated/**", "docs/private/**"), true, "compile"), run.getEnforcement());
     verify(runs).save(run);
   }
   @Test void rejectsBudgetAboveRepositoryPolicy() {
@@ -57,6 +62,17 @@ class FeatureRunServiceTest {
     assertEquals(true, run.isTestFirst());
     assertEquals("unit", run.getTestFirstGate());
     assertEquals(List.of("src/test/**", "**/*.test.ts"), run.getTestPathGlobs());
+  }
+  @Test void submissionUsesDefaultEnforcementWhenRepositoryHasNoOverrides() {
+    String image = "node@sha256:" + "a".repeat(64);
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "GENERIC", List.of(
+            new VerificationPolicySpec("compile", "CONTAINER", image, List.of("npm", "run", "build"), "NONE", 300, true, "ALL")), 25, true);
+    when(connections.requireEnabled("acme/support")).thenReturn(connection);
+    when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
+
+    FeatureRun run = service.submit(new FeatureSubmission("acme/support", "issue-defaults", "Defaults", "- Defaults", 10));
+
+    assertEquals(io.forgeloop.control.domain.LoopEnforcement.defaults(), run.getEnforcement());
   }
   @Test void issueIntakeReusesExistingSourceRun() {
     FeatureRun existing = new FeatureRun("acme/support", "issue-142", "Assignment", "- criterion", 10, "JVM_REACT", 1);

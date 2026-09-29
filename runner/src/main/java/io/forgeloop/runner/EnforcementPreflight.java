@@ -22,13 +22,13 @@ public final class EnforcementPreflight {
                 || protectedPaths.stream().anyMatch(glob -> !TestPathGlobs.isValid(glob))) {
             return Optional.of(missing("Dispatched protected-path globs are invalid"));
         }
+        if (descriptor.allowWorkflowChanges() == null) {
+            return Optional.of(missing("Dispatched workflow-path policy is missing"));
+        }
         if (descriptor.gateNames() == null) return Optional.of(missing("Dispatched gate names are missing"));
         if (descriptor.finishGate() != null && (descriptor.finishGate().isBlank()
                 || !descriptor.gateNames().contains(descriptor.finishGate()))) {
             return Optional.of(missing("Configured finish gate was not dispatched"));
-        }
-        if (descriptor.finishGate() != null) {
-            return Optional.of(missing("Configured finish gate is not supported by this enforcement version"));
         }
         RunnerRedPrerequisite prerequisite = descriptor.redPrerequisite();
         if (prerequisite != null) {
