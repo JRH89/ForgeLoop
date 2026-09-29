@@ -27,6 +27,8 @@ public class FeatureRun {
   @Column(name = "enforcement_protected_paths", columnDefinition = "text") private String enforcementProtectedPaths;
   @Column(name = "enforcement_allow_workflow_changes", nullable = false) private boolean enforcementAllowWorkflowChanges;
   @Column(name = "enforcement_finish_gate", length = 80) private String enforcementFinishGate;
+  @Column(name = "policy_snapshot", columnDefinition = "text") private String policySnapshot;
+  @Column(name = "policy_snapshot_sha256", length = 64) private String policySnapshotSha256;
   private boolean archived;
   public boolean isArchived() { return archived; }
   /** Archive is reversible and never cancels work or erases its evidence. */
@@ -74,6 +76,21 @@ public class FeatureRun {
     enforcementProtectedPaths = String.join("\n", snapshot.protectedPaths());
     enforcementAllowWorkflowChanges = snapshot.allowWorkflowChanges();
     enforcementFinishGate = snapshot.finishGate();
+  }
+  /** Pins canonical run policy content and its digest at submission time. */
+  public void snapshotPolicy(String canonicalJson, String sha256) {
+    if (canonicalJson == null || canonicalJson.isBlank())
+      throw new IllegalArgumentException("Run policy snapshot is invalid");
+    if (canonicalJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 65_536)
+      throw new IllegalArgumentException("Run policy snapshot is too large");
+    if (sha256 == null || !sha256.matches("[0-9a-f]{64}") || !sha256.equals(hash(canonicalJson)))
+      throw new IllegalArgumentException("Run policy snapshot digest is invalid");
+    policySnapshot = canonicalJson;
+    policySnapshotSha256 = sha256;
+  }
+  private static String hash(String value) {
+    try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
+    catch (Exception failure) { throw new IllegalStateException("SHA-256 unavailable", failure); }
   }
   public void addCriterion(String statement){criteria.add(new AcceptanceCriterion(this,statement));}
   public void addPolicyVerificationTasks(){List<DeliveryTask> prerequisites=tasks.stream().filter(task->!"PLANNER".equals(task.getRole())&&!"VERIFICATION".equals(task.getRole())).toList();DeliveryTask previous=null;for(VerificationGate gate:gates){if(gate.getKind()==null)continue;if(!gate.isRequired()){gate.skipByPolicy();continue;}DeliveryTask verification=new DeliveryTask(this,"verify-"+gate.getName(),"VERIFICATION","Verify "+gate.getName(),"docker",List.of(),2,0);verification.attachVerificationGate(gate);prerequisites.forEach(verification::dependsOn);if(previous!=null)verification.dependsOn(previous);tasks.add(verification);previous=verification;}}
@@ -153,5 +170,5 @@ public class FeatureRun {
   public void resumeAfterRetry(DeliveryTask task){if(state!=RunState.BLOCKED&&state!=RunState.FAILED)throw new IllegalStateException("Run is not blocked");if(task.getRun()!=this)throw new IllegalArgumentException("Retry task does not belong to run");state="PLANNER".equals(task.getRole())?RunState.PLANNING:RunState.EXECUTING;approvedAt=null;approvedBy=null;}
   public long getSpentCostMicros(){return tasks.stream().mapToLong(DeliveryTask::getSpentCostMicros).sum();}
   public boolean hasBudgetRemaining(){return !archived && getSpentCostMicros()<Math.round(budgetUsd*1_000_000d);}
-  public String getId(){return id;} public String getOrganizationId(){return organizationId;} public String getRepository(){return repository;} public String getSourceRef(){return sourceRef;} public String getTitle(){return title;} public String getSpecification(){return specification;} public double getBudgetUsd(){return budgetUsd;} public String getHarnessProfile(){return harnessProfile;} public String getBaseBranch(){return baseBranch;} public int getPolicyRevision(){return policyRevision;} public AgentLoopBudget getAgentLoopBudget(){return agentLoopBudget == null ? null : agentLoopBudget.copy();} public LoopEnforcement getEnforcement(){return new LoopEnforcement(enforcementProtectedPaths == null || enforcementProtectedPaths.isBlank() ? List.of() : enforcementProtectedPaths.lines().toList(), enforcementAllowWorkflowChanges, enforcementFinishGate);} public RunState getState(){return state;} public String getCreatedAt(){return createdAt.toString();} public List<DeliveryTask> getTasks(){return List.copyOf(tasks);} public List<VerificationGate> getGates(){return List.copyOf(gates);} public List<AcceptanceCriterion> getCriteria(){return List.copyOf(criteria);} public boolean isApproved(){return approvedAt!=null;} public String getApprovedAt(){return approvedAt==null?null:approvedAt.toString();} public String getApprovedBy(){return approvedBy;}
+  public String getId(){return id;} public String getOrganizationId(){return organizationId;} public String getRepository(){return repository;} public String getSourceRef(){return sourceRef;} public String getTitle(){return title;} public String getSpecification(){return specification;} public double getBudgetUsd(){return budgetUsd;} public String getHarnessProfile(){return harnessProfile;} public String getBaseBranch(){return baseBranch;} public int getPolicyRevision(){return policyRevision;} public String getPolicySnapshot(){return policySnapshot;} public String getPolicySnapshotSha256(){return policySnapshotSha256;} public AgentLoopBudget getAgentLoopBudget(){return agentLoopBudget == null ? null : agentLoopBudget.copy();} public LoopEnforcement getEnforcement(){return new LoopEnforcement(enforcementProtectedPaths == null || enforcementProtectedPaths.isBlank() ? List.of() : enforcementProtectedPaths.lines().toList(), enforcementAllowWorkflowChanges, enforcementFinishGate);} public RunState getState(){return state;} public String getCreatedAt(){return createdAt.toString();} public List<DeliveryTask> getTasks(){return List.copyOf(tasks);} public List<VerificationGate> getGates(){return List.copyOf(gates);} public List<AcceptanceCriterion> getCriteria(){return List.copyOf(criteria);} public boolean isApproved(){return approvedAt!=null;} public String getApprovedAt(){return approvedAt==null?null:approvedAt.toString();} public String getApprovedBy(){return approvedBy;}
 }

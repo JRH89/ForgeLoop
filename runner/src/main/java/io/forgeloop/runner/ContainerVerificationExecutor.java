@@ -77,9 +77,9 @@ public final class ContainerVerificationExecutor {
         Process process = new ProcessBuilder(dockerCommand).redirectErrorStream(true).start();
         // Drain concurrently: package managers can exceed the OS pipe buffer long before exit.
         // Capturing remains bounded, while excess bytes are discarded instead of blocking Docker.
-        CompletableFuture<byte[]> outputFuture = CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<BoundedOutput> outputFuture = CompletableFuture.supplyAsync(() -> {
             try {
-                return readBounded(process.getInputStream(), MAX_OUTPUT_BYTES);
+                return readBoundedWithTruncation(process.getInputStream(), MAX_OUTPUT_BYTES);
             } catch (IOException failure) {
                 throw new UncheckedIOException(failure);
             }
@@ -89,7 +89,7 @@ public final class ContainerVerificationExecutor {
             process.destroyForcibly();
             process.waitFor();
         }
-        byte[] output;
+        BoundedOutput output;
         try {
             output = outputFuture.join();
         } catch (CompletionException failure) {
@@ -99,9 +99,7 @@ public final class ContainerVerificationExecutor {
         return new VerificationResult(
                 completed ? process.exitValue() : -1,
                 !completed,
-                new String(output, StandardCharsets.UTF_8),
-                startedAt,
-                Instant.now());
+                new String(output.content(), StandardCharsets.UTF_8), startedAt, Instant.now(), output.truncated());
     }
 
     List<String> buildDockerCommand(Path dockerVisibleWorktree, Path dockerVisibleEvidenceDirectory,
@@ -146,18 +144,54 @@ public final class ContainerVerificationExecutor {
     }
 
     static byte[] readBounded(InputStream input, int limit) throws IOException {
+        return readBoundedWithTruncation(input, limit).content();
+    }
+
+    static BoundedOutput readBoundedWithTruncation(InputStream input, int limit) throws IOException {
         if (limit < 1) throw new IllegalArgumentException("Output limit must be positive");
         byte[] captured = new byte[limit];
         byte[] buffer = new byte[8192];
         int capturedBytes = 0;
+        boolean truncated = false;
         for (int read; (read = input.read(buffer)) != -1; ) {
             int copy = Math.min(read, limit - capturedBytes);
             if (copy > 0) {
                 System.arraycopy(buffer, 0, captured, capturedBytes, copy);
                 capturedBytes += copy;
             }
+            if (read > copy) truncated = true;
         }
-        return java.util.Arrays.copyOf(captured, capturedBytes);
+        return new BoundedOutput(java.util.Arrays.copyOf(captured, capturedBytes), truncated);
+    }
+
+    record BoundedOutput(byte[] content, boolean truncated) { }
+
+    /** Resolves the local platform-specific image ID without making verification depend on Docker inspection. */
+    public String resolveImageId(String image) {
+        if (image == null || !IMAGE_REFERENCE.matcher(image).matches()) return null;
+        Process process = null;
+        try {
+            process = new ProcessBuilder("docker", "image", "inspect", "--format", "{{.Id}}", image)
+                    .redirectErrorStream(true).start();
+            Process inspecting = process;
+            CompletableFuture<byte[]> output = CompletableFuture.supplyAsync(() -> {
+                try { return inspecting.getInputStream().readNBytes(256); }
+                catch (IOException ignored) { return new byte[0]; }
+            });
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return null;
+            }
+            String id = new String(output.get(1, TimeUnit.SECONDS), StandardCharsets.UTF_8).strip();
+            return process.exitValue() == 0 && id.matches("sha256:[0-9a-f]{64}") ? id : null;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            if (process != null) process.destroyForcibly();
+            return null;
+        } catch (Exception ignored) {
+            if (process != null) process.destroyForcibly();
+            return null;
+        }
     }
 
     private void validate(Path worktree, Path dockerVisibleWorktree, String image, List<String> command, Duration timeout) throws IOException {

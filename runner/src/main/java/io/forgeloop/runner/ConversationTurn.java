@@ -5,7 +5,13 @@ import java.util.List;
 
 /** Normalized turn result plus private vendor replay and response data for the next request. */
 public record ConversationTurn(String text, List<ToolCall> toolCalls, StopReason stopReason, long inputTokens,
-                               long outputTokens, String providerRequestId, JsonNode replay, String responseBody) {
+                               long outputTokens, String providerRequestId, JsonNode replay, String responseBody,
+                               String answeredModel) {
+    public ConversationTurn(String text, List<ToolCall> toolCalls, StopReason stopReason, long inputTokens,
+                            long outputTokens, String providerRequestId, JsonNode replay, String responseBody) {
+        this(text, toolCalls, stopReason, inputTokens, outputTokens, providerRequestId, replay, responseBody, null);
+    }
+
     public ConversationTurn {
         text = text == null ? "" : text;
         toolCalls = List.copyOf(toolCalls == null ? List.of() : toolCalls);

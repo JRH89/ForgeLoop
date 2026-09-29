@@ -1,9 +1,10 @@
 FROM maven:3.9.12-eclipse-temurin-21-alpine AS runner-package
 RUN apk add --no-cache git zip
 WORKDIR /runner
+ARG FORGELOOP_REVISION=unknown
 COPY runner/pom.xml .
 COPY runner/src src
-RUN mvn -q verify
+RUN mvn -q "-Dforgeloop.revision=${FORGELOOP_REVISION}" verify
 COPY runner/install /package
 COPY runner/provider-policy.example.json /package/provider-policy.example.json
 RUN cp target/runner-0.1.0.jar /package/runner.jar && mkdir /downloads && cd /package && zip -q -r /downloads/forgeloop-runner.zip . && cd /downloads && sha256sum forgeloop-runner.zip > forgeloop-runner.zip.sha256

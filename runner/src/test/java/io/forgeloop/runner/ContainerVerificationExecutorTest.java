@@ -44,6 +44,18 @@ class ContainerVerificationExecutorTest {
     }
 
     @Test
+    void flagsWhetherBoundedOutputWasTruncated() throws Exception {
+        var truncated = ContainerVerificationExecutor.readBoundedWithTruncation(
+                new ByteArrayInputStream("abcdef".getBytes(java.nio.charset.StandardCharsets.UTF_8)), 3);
+        var complete = ContainerVerificationExecutor.readBoundedWithTruncation(
+                new ByteArrayInputStream("abc".getBytes(java.nio.charset.StandardCharsets.UTF_8)), 3);
+
+        assertEquals("abc", new String(truncated.content(), java.nio.charset.StandardCharsets.UTF_8));
+        assertTrue(truncated.truncated());
+        assertFalse(complete.truncated());
+    }
+
+    @Test
     void leavesOrdinaryVerificationDockerArgvUnchangedWithoutReports() {
         Path repo = Path.of("/repo");
         Path evidence = Path.of("/evidence");

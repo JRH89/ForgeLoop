@@ -16,7 +16,18 @@ public record VerificationEvidenceSubmission(
         Instant finishedAt,
         String artifactReference,
         String outputDigest,
-        String bundleDigest) {
+        String bundleDigest,
+        String targetSha,
+        String imageId,
+        Boolean outputTruncated) {
+    public VerificationEvidenceSubmission(String kind, String gate, String image, List<String> command,
+                                          int exitCode, boolean timedOut, String output, Instant startedAt,
+                                          Instant finishedAt, String artifactReference, String outputDigest,
+                                          String bundleDigest) {
+        this(kind, gate, image, command, exitCode, timedOut, output, startedAt, finishedAt,
+                artifactReference, outputDigest, bundleDigest, null, null, null);
+    }
+
     public VerificationEvidenceSubmission {
         if (kind == null || kind.isBlank() || kind.length() > 80) throw new IllegalArgumentException("Evidence kind is required");
         if (gate != null && (gate.isBlank() || gate.length() > 120)) throw new IllegalArgumentException("Evidence gate is invalid");
@@ -27,5 +38,7 @@ public record VerificationEvidenceSubmission(
         if (startedAt == null || finishedAt == null || finishedAt.isBefore(startedAt)) throw new IllegalArgumentException("Evidence timestamps are invalid");
         if (artifactReference != null && !artifactReference.matches("[A-Za-z0-9_./:-]{1,1000}")) throw new IllegalArgumentException("Artifact reference is invalid");
         if (outputDigest == null || !outputDigest.matches("[0-9a-f]{64}") || bundleDigest == null || !bundleDigest.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Evidence checksums are invalid");
+        if (targetSha != null && !targetSha.matches("[0-9a-f]{40,64}")) throw new IllegalArgumentException("Evidence target SHA is invalid");
+        if (imageId != null && !imageId.matches("sha256:[0-9a-f]{64}")) throw new IllegalArgumentException("Evidence image ID is invalid");
     }
 }

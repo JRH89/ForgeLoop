@@ -16,6 +16,10 @@ public class TaskLease {
     private Instant completedAt;
     @Column(nullable = false)
     private long reservedMicros;
+    @Column(length = 64) private String runnerRevision;
+    @Column(length = 64) private String runnerJarSha256;
+    @Column(columnDefinition = "text") private String inputRefs;
+    @Column(length = 64) private String resultSha;
 
     protected TaskLease() { }
     public TaskLease(DeliveryTask task, Runner runner, String nonceHash, Instant expiresAt) {
@@ -26,7 +30,31 @@ public class TaskLease {
     public boolean matchesNonceHash(String hash) {
         return java.security.MessageDigest.isEqual(nonceHash.getBytes(java.nio.charset.StandardCharsets.US_ASCII), hash.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
     }
-    public void acknowledge() { if (!active()) throw new IllegalStateException("Lease is expired"); acknowledgedAt = Instant.now(); }
+    public void acknowledge() { acknowledge(null, null); }
+    /** Pins the runner build on first acknowledgement; old runner clients may omit both optional values. */
+    public void acknowledge(String revision, String jarSha256) {
+        if (!active()) throw new IllegalStateException("Lease is expired");
+        if ((revision == null) != (jarSha256 == null)) throw new IllegalArgumentException("Runner build is invalid");
+        if (revision != null && !("unknown".equals(revision) || revision.matches("[0-9a-f]{7,64}")))
+            throw new IllegalArgumentException("Runner build is invalid");
+        if (jarSha256 != null && !("unpackaged".equals(jarSha256) || jarSha256.matches("[0-9a-f]{64}")))
+            throw new IllegalArgumentException("Runner build is invalid");
+        if (acknowledgedAt != null) {
+            if (!java.util.Objects.equals(runnerRevision, revision) || !java.util.Objects.equals(runnerJarSha256, jarSha256))
+                throw new IllegalStateException("Runner build identity is already pinned");
+            return;
+        }
+        runnerRevision = revision;
+        runnerJarSha256 = jarSha256;
+        acknowledgedAt = Instant.now();
+    }
+    /** Captures the immutable refs before any runner action can change the repository state. */
+    public void captureInputRefs(String canonicalJson) {
+        if (canonicalJson == null || canonicalJson.isBlank() || canonicalJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 65_536)
+            throw new IllegalArgumentException("Lease input refs are invalid");
+        if (inputRefs != null && !inputRefs.equals(canonicalJson)) throw new IllegalStateException("Lease input refs are already pinned");
+        inputRefs = canonicalJson;
+    }
     /** Replaces, rather than increments, the active lease's worst-case provider-spend reservation. */
     public void reserve(long micros) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before reserving spend");
@@ -75,6 +103,7 @@ public class TaskLease {
     public void completeChangeReady(String changeSha) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         task.recordChangeSha(changeSha);
+        resultSha = changeSha;
         task.transition(TaskState.CHANGE_READY); close();
     }
     /** Closes a planner lease after its graph was materialized in the same transaction. */
@@ -89,6 +118,7 @@ public class TaskLease {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         task.integrateDependencies();
         task.recordChangeSha(integratedSha);
+        resultSha = integratedSha;
         task.transition(TaskState.INTEGRATED);
         close();
     }
@@ -107,6 +137,10 @@ public class TaskLease {
     }
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public long getReservedMicros() { return reservedMicros; }
+    public String getRunnerRevision() { return runnerRevision; }
+    public String getRunnerJarSha256() { return runnerJarSha256; }
+    public String getInputRefs() { return inputRefs; }
+    public String getResultSha() { return resultSha; }
     public DeliveryTask getTask() { return task; }
     public String getRunnerId() { return runner.getId(); } public String getExpiresAt() { return expiresAt.toString(); }
     public Instant getClaimedAt() { return claimedAt; }

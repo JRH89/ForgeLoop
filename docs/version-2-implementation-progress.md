@@ -122,6 +122,14 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Verification:** the original full suites passed (control-plane 307 tests; runner 244 tests with 5 platform-dependent skips; harness 2 tests). Re-run on the #85 PR stack: control-plane 322 tests, runner 288 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
 - **Delivery:** linked [PR #95](https://github.com/JRH89/ForgeLoop/pull/95) implements issue #86 from `feat/4d-spend-reservations-pr`. Full local verification passed on the merged #85 base; hosted checks are pending.
 
+## Slice 5a - Run-record identity and input pins
+
+- **Issue:** [#87](https://github.com/JRH89/ForgeLoop/issues/87).
+- **Result:** provider adapters now report the model that actually answered; acknowledged leases pin runner revision and JAR SHA-256; gate evidence records the checked commit, resolved platform image ID, output-truncation flag, and validated lease link without changing existing evidence bundle digests. Claims capture immutable execution/verification refs and dependency commit order, while code-ready and integration closes pin their result SHA. Run submission stores canonical, SHA-256-addressed JSON for repository, organization, harness, and enabled local MCP policy; only the digest is exposed in GraphQL.
+- **Compatibility:** new GraphQL inputs are optional, the database migration is nullable with no backfill, and legacy/unpackaged runner builds are explicitly represented.
+- **Verification:** control-plane `mvn -B verify` passed (317 tests); runner `mvn -B -Dforgeloop.revision=deadbeef0 verify` passed (255 tests, 5 existing platform-dependent skips); harness `mvn -B verify` passed (2 tests). V42 applied successfully against an isolated PostgreSQL 18 instance; all 12 new columns and both lease indexes were present. `git diff --check` passed. No provider-backed call was made.
+- **Delivery:** implementation commit `99a27ce` is being validated on a preparation branch stacked on issue #86; issue #87 is linked. No #87 PR will open until #85 and #86 merge, preserving one open PR at a time.
+
 ## Update protocol
 
 For each slice, record its linked issue/PR, meaningful commits, behavior, exact verification outcomes, and remaining external or paid validation. Mark complete only after all slice-local work is complete. Keep hosted CI and provider-backed evidence distinct. The product agent loop must stay dormant until the plan explicitly enables it.

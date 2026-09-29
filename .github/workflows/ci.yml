@@ -48,7 +48,7 @@ jobs:
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'
       - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: '21', cache: maven }
-      - run: mvn -B verify
+      - run: mvn -B -Dforgeloop.revision=${{ github.sha }} verify
         working-directory: runner
   mcp:
     runs-on: ubuntu-latest
@@ -67,6 +67,7 @@ jobs:
     env:
       FORGELOOP_SECURITY_MODE: development
       FORGELOOP_SUPPORT_E2E: '1'
+      FORGELOOP_REVISION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v6
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'

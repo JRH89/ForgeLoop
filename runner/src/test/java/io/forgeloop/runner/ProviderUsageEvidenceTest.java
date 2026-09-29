@@ -10,12 +10,13 @@ import org.junit.jupiter.api.Test;
 
 class ProviderUsageEvidenceTest {
     @Test void retainsUsageButOnlyDigestsTheProviderRequestIdentifier() {
-        ProviderUsageEvidence evidence = ProviderUsageEvidence.from(new ProviderExecutionPolicy("anthropic", "claude", 2), new ProviderExecutionResult(new ProviderResult("secret output", 12, 34, "msg_secret"), 2));
+        ProviderUsageEvidence evidence = ProviderUsageEvidence.from(new ProviderExecutionPolicy("anthropic", "claude", 2), new ProviderExecutionResult(new ProviderResult("secret output", 12, 34, "msg_secret", "claude-actual"), 2));
         assertEquals(12, evidence.inputTokens());
         assertEquals(34, evidence.outputTokens());
         assertEquals(2, evidence.attemptCount());
         assertFalse(evidence.costKnown());
         assertFalse(evidence.requestIdDigest().contains("msg_secret"));
+        assertEquals("claude-actual", evidence.answeredModel());
     }
 
     @Test void missingProviderRequestIdentifiersRemainUniquePerLease() {

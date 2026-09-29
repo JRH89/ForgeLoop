@@ -105,10 +105,10 @@ class RunnerExecutionControllerTest {
 
     @Test
     void authenticatesRunnerBeforeAcknowledgingLease() {
-        controller.acknowledgeTaskLease("lease-1", "runner-1", "nonce", "runner-credential");
+        controller.acknowledgeTaskLease("lease-1", "runner-1", "nonce", "runner-credential", "abcdef0", "a".repeat(64));
 
         verify(runners).authenticated("runner-1", "runner-credential");
-        verify(leases).acknowledge("lease-1", "runner-1", "nonce");
+        verify(leases).acknowledge("lease-1", "runner-1", "nonce", "abcdef0", "a".repeat(64));
     }
 
     @Test

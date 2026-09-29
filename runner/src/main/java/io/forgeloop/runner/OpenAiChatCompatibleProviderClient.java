@@ -44,7 +44,7 @@ public final class OpenAiChatCompatibleProviderClient implements ProviderClient,
         JsonNode response = JSON.readTree(body); StringBuilder output = new StringBuilder();
         for (JsonNode choice : response.path("choices")) if (choice.path("message").hasNonNull("content")) output.append(choice.path("message").path("content").asText());
         JsonNode usage = response.path("usage");
-        return new ProviderResult(output.toString(), usage.path("prompt_tokens").asLong(), usage.path("completion_tokens").asLong(), response.path("id").asText(null));
+        return new ProviderResult(output.toString(), usage.path("prompt_tokens").asLong(), usage.path("completion_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null));
     }
 
     @Override public String serialize(ConversationRequest request) {
@@ -113,6 +113,6 @@ public final class OpenAiChatCompatibleProviderClient implements ProviderClient,
         };
         JsonNode usage = response.path("usage");
         return new ConversationTurn(text, calls, reason, usage.path("prompt_tokens").asLong(), usage.path("completion_tokens").asLong(),
-                response.path("id").asText(null), message, body);
+                response.path("id").asText(null), message, body, response.path("model").asText(null));
     }
 }

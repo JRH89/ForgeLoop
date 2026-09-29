@@ -187,7 +187,13 @@ public final class RunnerClient {
     }
     public RunnerLease claimTask(RunnerIdentity identity, String taskId) throws Exception { Matcher match = LEASE_GRANT.matcher(post("mutation($taskId:ID!,$runnerId:ID!,$credential:String!){claimTaskLease(taskId:$taskId,runnerId:$runnerId,credential:$credential){lease{id} nonce}}", "{\"taskId\":\"" + escape(taskId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}")); if (!match.find()) throw new IllegalStateException("Control-plane lease response was malformed"); return new RunnerLease(match.group(1), match.group(2)); }
     /** Acknowledges a one-time lease nonce with the enrolled runner credential. */
-    public String acknowledgeLease(RunnerIdentity identity, String leaseId, String nonce) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!){acknowledgeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential){id acknowledged}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}"); }
+    public String acknowledgeLease(RunnerIdentity identity, String leaseId, String nonce) throws Exception {
+        RunnerBuild build = RunnerBuild.current();
+        String variables = "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"runnerRevision\":\"" + build.revision() + "\",\"runnerJarSha256\":\"" + build.jarSha256() + "\"}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$runnerRevision:String,$runnerJarSha256:String){acknowledgeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,runnerRevision:$runnerRevision,runnerJarSha256:$runnerJarSha256){id acknowledged runnerRevision runnerJarSha256}}", variables);
+    }
     /** Completes an acknowledged lease and records whether its runner verification passed. */
     public String completeLease(RunnerIdentity identity, String leaseId, String nonce, boolean passed) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$passed:Boolean!){completeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,passed:$passed){id completed}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"passed\":" + passed + "}"); }
     /** Marks agent-authored work ready for independent integration and verification, never verified. */
@@ -207,7 +213,8 @@ public final class RunnerClient {
                 + ",\"timedOut\":" + result.timedOut() + ",\"output\":\"" + escape(result.output())
                 + "\",\"startedAt\":\"" + result.startedAt() + "\",\"finishedAt\":\"" + result.finishedAt()
                 + "\",\"artifactReference\":" + nullable(report.artifactReference()) + ",\"outputDigest\":\"" + report.outputDigest()
-                + "\",\"bundleDigest\":\"" + report.bundleDigest() + "\"}}";
+                + "\",\"bundleDigest\":\"" + report.bundleDigest() + "\",\"targetSha\":" + nullable(report.targetSha())
+                + ",\"imageId\":" + nullable(report.imageId()) + ",\"outputTruncated\":" + result.outputTruncated() + "}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);
     }
     /** Records an uploaded RED/GREEN bundle; the server derives the verdict from the artifact bytes. */
@@ -266,7 +273,7 @@ public final class RunnerClient {
                 + ",\"outputTokens\":" + report.outputTokens() + ",\"attemptCount\":" + report.attemptCount()
                 + ",\"estimatedCostMicros\":" + report.estimatedCostMicros() + ",\"costKnown\":" + report.costKnown()
                 + ",\"outcome\":\"" + escape(report.outcome()) + "\",\"retryable\":" + report.retryable()
-                + ",\"category\":\"" + escape(report.category()) + "\"}}";
+                + ",\"category\":\"" + escape(report.category()) + "\",\"answeredModel\":" + nullable(report.answeredModel()) + "}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:ProviderAttemptInput!){recordProviderAttempt(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id requestIdDigest outcome}}", variables);
     }
     /** Reserves the exact worst-case turn amount; retries are safe because the lease reservation is replaceable. */

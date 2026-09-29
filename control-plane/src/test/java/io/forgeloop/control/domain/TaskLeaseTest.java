@@ -22,6 +22,23 @@ class TaskLeaseTest {
 
         assertEquals(TaskState.CHANGE_READY, task.getState());
         assertEquals("a".repeat(40), task.getChangeSha());
+        assertEquals("a".repeat(40), lease.getResultSha());
+    }
+
+    @Test
+    void inputReferencesAreWriteOnce() {
+        FeatureRun run = new FeatureRun("owner/repository", "issue-1", "Feature", "criterion", 5, "GENERIC", 1);
+        run.addTask("IMPLEMENTATION", "Implement feature", "git");
+        DeliveryTask task = run.getTasks().getFirst();
+        Runner runner = new Runner("organization", "runner", "1", List.of("git"), "credential-hash");
+        TaskLease lease = new TaskLease(task, runner, "nonce-hash", Instant.now().plusSeconds(60));
+
+        lease.captureInputRefs("{\"executionBaseRef\":\"main\"}");
+        lease.captureInputRefs("{\"executionBaseRef\":\"main\"}");
+
+        assertThrows(IllegalStateException.class,
+                () -> lease.captureInputRefs("{\"executionBaseRef\":\"changed\"}"));
+        assertEquals("{\"executionBaseRef\":\"main\"}", lease.getInputRefs());
     }
 
     @Test
@@ -105,6 +122,41 @@ class TaskLeaseTest {
         assertThrows(IllegalArgumentException.class, () -> lease.renew(renewAt, renewAt));
         lease.closeForHold();
         assertEquals(true, lease.isCompleted());
+    }
+
+    @Test
+    void runnerBuildIsValidatedAndCannotBeChangedAfterAcknowledgement() {
+        FeatureRun run = new FeatureRun("owner/repository", "issue-build", "Feature", "criterion", 5, "GENERIC", 1);
+        run.addTask("IMPLEMENTATION", "Implement", "git");
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = new TaskLease(task, new Runner("organization", "runner", "1", List.of("git"), "hash"),
+                "nonce", Instant.now().plusSeconds(60));
+
+        assertThrows(IllegalArgumentException.class, () -> lease.acknowledge("branch", "not-a-digest"));
+        lease.acknowledge("abcdef0123456", "a".repeat(64));
+
+        assertEquals("abcdef0123456", lease.getRunnerRevision());
+        assertEquals("a".repeat(64), lease.getRunnerJarSha256());
+        assertThrows(IllegalStateException.class, () -> lease.acknowledge("abcdef0", "b".repeat(64)));
+    }
+
+    @Test
+    void integrationPinsItsResultSha() {
+        FeatureRun run = new FeatureRun("owner/repository", "issue-result", "Feature", "criterion", 5, "GENERIC", 1);
+        DeliveryTask writer = run.addPlannedTask("writer", "BACKEND", "Write", "git", List.of("src"), 2, 1);
+        DeliveryTask integration = run.addPlannedTask("integrate", "INTEGRATION", "Integrate", "git", List.of(), 2, 1);
+        integration.dependsOn(writer);
+        writer.transition(TaskState.LEASED);
+        writer.recordChangeSha("a".repeat(40));
+        writer.transition(TaskState.CHANGE_READY);
+        integration.transition(TaskState.LEASED);
+        TaskLease lease = new TaskLease(integration, new Runner("organization", "runner", "1", List.of("git"), "hash"),
+                "nonce", Instant.now().plusSeconds(60));
+        lease.acknowledge();
+
+        lease.completeIntegration("b".repeat(40));
+
+        assertEquals("b".repeat(40), lease.getResultSha());
     }
 
     @Test

@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinColumn;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -18,6 +19,7 @@ public class VerificationEvidence {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
     @ManyToOne(optional = false) private DeliveryTask task;
     @ManyToOne(optional = false) private Runner runner;
+    @ManyToOne @JoinColumn(name = "lease_id") private TaskLease lease;
     @Column(nullable = false, length = 80) private String kind;
     @Column(length = 120) private String gate;
     @Column(length = 255) private String image;
@@ -32,18 +34,31 @@ public class VerificationEvidence {
     @Column(length = 1000) private String artifactReference;
     @Column(nullable = false, length = 64) private String outputDigest;
     @Column(nullable = false, length = 64) private String bundleDigest;
+    @Column(length = 64) private String targetSha;
+    @Column(length = 71) private String imageId;
+    private Boolean outputTruncated;
 
     protected VerificationEvidence() { }
 
     public VerificationEvidence(DeliveryTask task, Runner runner, String kind, String gate, String image, List<String> command,
                                 int exitCode, boolean timedOut, String output, Instant startedAt, Instant finishedAt,
                                 String artifactReference, String outputDigest, String bundleDigest) {
+        this(task, runner, null, kind, gate, image, command, exitCode, timedOut, output, startedAt, finishedAt,
+                artifactReference, outputDigest, bundleDigest, null, null, null);
+    }
+
+    public VerificationEvidence(DeliveryTask task, Runner runner, TaskLease lease, String kind, String gate, String image,
+                                List<String> command, int exitCode, boolean timedOut, String output,
+                                Instant startedAt, Instant finishedAt, String artifactReference,
+                                String outputDigest, String bundleDigest, String targetSha, String imageId,
+                                Boolean outputTruncated) {
         String calculatedOutput = digest(output);
         String calculatedBundle = bundleDigest(kind, gate, image, command, exitCode, timedOut, calculatedOutput, startedAt, finishedAt, artifactReference);
         if (!calculatedOutput.equals(outputDigest) || !calculatedBundle.equals(bundleDigest)) throw new IllegalArgumentException("Evidence checksum mismatch");
-        this.task = task; this.runner = runner; this.kind = kind; this.gate = gate; this.image = image; this.command = String.join("\n", command);
+        this.task = task; this.runner = runner; this.lease = lease; this.kind = kind; this.gate = gate; this.image = image; this.command = String.join("\n", command);
         this.exitCode = exitCode; this.timedOut = timedOut; this.output = output; this.startedAt = startedAt; this.finishedAt = finishedAt;
         this.artifactReference = artifactReference; this.outputDigest = outputDigest; this.bundleDigest = bundleDigest; this.recordedAt = Instant.now();
+        this.targetSha = targetSha; this.imageId = imageId; this.outputTruncated = outputTruncated;
         this.digest = digest(task.getId() + "\u0000" + runner.getId() + "\u0000" + bundleDigest);
     }
 
@@ -58,6 +73,7 @@ public class VerificationEvidence {
 
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
     public String getRunnerId() { return runner.getId(); } public String getKind() { return kind; }
+    public String getLeaseId() { return lease == null ? null : lease.getId(); }
     public String getGate() { return gate; }
     public String getImage() { return image; } public List<String> getCommand() { return command.lines().toList(); }
     public int getExitCode() { return exitCode; } public boolean isTimedOut() { return timedOut; }
@@ -65,4 +81,5 @@ public class VerificationEvidence {
     public String getRecordedAt() { return recordedAt.toString(); }
     public String getStartedAt() { return startedAt.toString(); } public String getFinishedAt() { return finishedAt.toString(); }
     public String getArtifactReference() { return artifactReference; } public String getOutputDigest() { return outputDigest; } public String getBundleDigest() { return bundleDigest; }
+    public String getTargetSha() { return targetSha; } public String getImageId() { return imageId; } public Boolean getOutputTruncated() { return outputTruncated; }
 }

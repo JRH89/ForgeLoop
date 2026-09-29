@@ -59,6 +59,7 @@ class TaskLeaseServiceTest {
 
         assertEquals(64, grant.nonce().length());
         assertEquals(TaskState.LEASED, task.getState());
+        assertEquals("{\"executionBaseRef\":\"main\",\"verificationBaseRef\":\"main\",\"dependencyChangeShas\":[]}", grant.lease().getInputRefs());
     }
 
     @Test
@@ -109,10 +110,14 @@ class TaskLeaseServiceTest {
     @Test
     void namedGateEvidenceUpdatesTheOwningRun() {
         FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "- x", 1, "GENERIC", 1);
+        DeliveryTask integration = run.addPlannedTask("integrate", "INTEGRATION", "Integrate", "git", List.of(), 2, 0);
+        integration.transition(TaskState.LEASED);
+        integration.recordChangeSha("a".repeat(40));
+        integration.transition(TaskState.CHANGE_READY);
         String image = "node@sha256:" + "a".repeat(64);
         run.addGate(new VerificationPolicySpec("unit", "CONTAINER", image, List.of("npm", "test"), "NONE", 300, true, "ALL"));
         run.addPolicyVerificationTasks();
-        DeliveryTask task = run.getTasks().getFirst();
+        DeliveryTask task = run.getTasks().stream().filter(candidate -> "VERIFICATION".equals(candidate.getRole())).findFirst().orElseThrow();
         TaskLease lease = mock(TaskLease.class);
         Runner runner = mock(Runner.class);
         when(leases.findById("lease")).thenReturn(Optional.of(lease));
@@ -128,10 +133,52 @@ class TaskLeaseServiceTest {
         Instant time = Instant.parse("2026-01-01T00:00:00Z");
         String outputDigest = VerificationEvidence.digest("passed");
         String bundleDigest = VerificationEvidence.bundleDigest("CONTAINER", "unit", image, List.of("npm", "test"), 0, false, outputDigest, time, time, null);
-        service.recordEvidence("lease", "runner", "nonce",
-                new VerificationEvidenceSubmission("CONTAINER", "unit", image, List.of("npm", "test"), 0, false, "passed", time, time, null, outputDigest, bundleDigest));
+        when(lease.getId()).thenReturn("lease");
+        VerificationEvidence recorded = service.recordEvidence("lease", "runner", "nonce",
+                new VerificationEvidenceSubmission("CONTAINER", "unit", image, List.of("npm", "test"), 0, false, "passed", time, time, null, outputDigest, bundleDigest,
+                        "a".repeat(40), "sha256:" + "b".repeat(64), true));
 
         assertEquals(RunState.RECEIVED, run.getState());
+        assertEquals("lease", recorded.getLeaseId());
+        assertEquals("a".repeat(40), recorded.getTargetSha());
+        assertEquals("sha256:" + "b".repeat(64), recorded.getImageId());
+        assertEquals(true, recorded.getOutputTruncated());
+    }
+
+    @Test
+    void namedGateEvidenceRejectsACommitOtherThanThePinnedVerificationBase() {
+        FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "- x", 1, "GENERIC", 1);
+        DeliveryTask integration = run.addPlannedTask("integrate", "INTEGRATION", "Integrate", "git", List.of(), 2, 0);
+        integration.transition(TaskState.LEASED);
+        integration.recordChangeSha("a".repeat(40));
+        integration.transition(TaskState.CHANGE_READY);
+        String image = "node@sha256:" + "a".repeat(64);
+        run.addGate(new VerificationPolicySpec("unit", "CONTAINER", image, List.of("npm", "test"), "NONE", 300, true, "ALL"));
+        run.addPolicyVerificationTasks();
+        DeliveryTask task = run.getTasks().stream().filter(candidate -> "VERIFICATION".equals(candidate.getRole())).findFirst().orElseThrow();
+        TaskLease lease = mock(TaskLease.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(true);
+        when(lease.getTaskId()).thenReturn(task.getId());
+        when(tasks.findById(task.getId())).thenReturn(Optional.of(task));
+        when(runners.findById("runner")).thenReturn(Optional.of(mock(Runner.class)));
+
+        Instant time = Instant.parse("2026-01-01T00:00:00Z");
+        String outputDigest = VerificationEvidence.digest("passed");
+        String bundleDigest = VerificationEvidence.bundleDigest("CONTAINER", "unit", image, List.of("npm", "test"),
+                0, false, outputDigest, time, time, null);
+        VerificationEvidenceSubmission submission = new VerificationEvidenceSubmission("CONTAINER", "unit", image,
+                List.of("npm", "test"), 0, false, "passed", time, time, null, outputDigest, bundleDigest,
+                "b".repeat(40), null, false);
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+                () -> service.recordEvidence("lease", "runner", "nonce", submission));
+
+        assertEquals("Evidence target does not match the verification commit", failure.getMessage());
+        verify(evidence, never()).save(any());
     }
 
     @Test
@@ -190,6 +237,7 @@ class TaskLeaseServiceTest {
         when(lease.active()).thenReturn(true);
         when(lease.isAcknowledged()).thenReturn(true);
         when(lease.getTaskId()).thenReturn("task");
+        when(lease.getId()).thenReturn("lease");
         when(task.getId()).thenReturn("task");
         when(task.getRun()).thenReturn(run);
         when(run.getId()).thenReturn("run");
@@ -200,11 +248,13 @@ class TaskLeaseServiceTest {
         when(providerAttempts.save(any())).thenAnswer(call -> call.getArgument(0));
 
         var recorded = service.recordProviderAttempt("lease", "runner", "nonce",
-                new ProviderAttemptSubmission("anthropic", "claude", "a".repeat(64), 10, 4, 2, "SUCCEEDED", 42, true, false, "COMPLETED"));
+                new ProviderAttemptSubmission("anthropic", "claude", "a".repeat(64), 10, 4, 2, "SUCCEEDED", 42, true, false, "COMPLETED", "claude-actual-2026-09"));
 
         assertEquals("anthropic", recorded.getProvider());
         assertEquals(2, recorded.getAttemptCount());
         assertEquals(42, recorded.getEstimatedCostMicros());
+        assertEquals("lease", recorded.getLeaseId());
+        assertEquals("claude-actual-2026-09", recorded.getAnsweredModel());
         verify(lease).settleReservation();
     }
 
