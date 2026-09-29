@@ -4,10 +4,11 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 3a - provider conversations and tool calling.
-- **Branch:** `feat/provider-conversations`, based on `master` after merged PR #70.
-- **Issue / PR:** [#77 - Provider conversation contracts](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78).
-- **Code state:** Slice 3a is implemented and locally verified at commit `0f4a2b4`; PR #78 is open and hosted checks are pending.
+- **Active work:** Slice 3b - agent-loop core and journal write path.
+- **Branch:** `feat/agent-loop-core`, stacked on `feat/provider-conversations` / PR #78.
+- **Issue / PR:** [#79 - Implement the runner agent loop, tools, and durable step journal](https://github.com/JRH89/ForgeLoop/issues/79) / PR not opened yet.
+- **Code state:** Core loop, guarded tools, grants, result shaping, and journal are implemented locally. Full runner verification passed (180 tests, zero failures/errors/skips); final review and PR packaging are in progress. The loop is not wired into production dispatch.
+- **Previous slice:** 3a is implemented at code commit `0f4a2b4`; docs progress commit `04ae22b`; PR #78 remains open with all hosted checks passing.
 - **Earlier slices:** PR #70 is merged. PR #72 (2a), #74 (2b), and #76 (2c) are open; #74 and #76 remain stacked while PR #72 awaits merge. All hosted checks on #76 passed.
 - **Local test toolchain:** portable Temurin 21 and Maven 3.9.12 under the user-local ForgeLoop tools directory; no project files added for tooling.
 - **External validation:** live provider-backed runs have not been attempted because they incur provider spend. Local HTTP-server fixtures and hosted CI are not paid-provider evidence.
@@ -23,8 +24,8 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 | 2 | 2a - Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Local and hosted verification passed; PR open |
 | 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Hosted checks passed; open and stacked on PR #72 |
 | 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Hosted checks passed; open and stacked on PR #74 |
-| 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Open against `master`; hosted checks pending |
-| 6 | 3b — Agent loop core and journal write path | 3a | Not opened | Planned |
+| 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Open against `master`; all hosted checks passing |
+| 6 | 3b - Agent loop core and journal write path | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / PR not opened | Local implementation and full runner verification complete; final review and PR packaging in progress on `feat/agent-loop-core`, stacked on PR #78 |
 | 7 | 3c — Control-plane loop policy and lease lifecycle | 3a; can proceed alongside 3b | Not opened | Planned |
 | 8 | 3d — Runner loop wiring behind a default-off switch | 3b, 3c, 4a; keep disabled until 4a | Not opened | Planned |
 | 9 | 3e — Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
@@ -92,6 +93,15 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 - **Commit:** `0f4a2b4` — conversation API, four adapters, policy, diagnostic command, and tests.
 - **Hosted checks:** pending on PR #78 (2026-09-28).
 - **Paid validation boundary:** the diagnostic calls the selected provider twice and may incur charges. It was not run. No model loop or task execution was enabled.
+
+## Slice 3b log - Agent loop core and journal write path
+
+- **Issue / PR:** [#79](https://github.com/JRH89/ForgeLoop/issues/79) / PR not opened yet; branch `feat/agent-loop-core`, stacked on PR #78 (`feat/provider-conversations`).
+- **Scope:** provider-neutral loop, role-derived grants, guarded list/read/search/write/edit tools, advisory gate execution seam, single tool gateway with interceptor hooks and one transient retry, context/result shaping, call/token/wall/context/money/output budgets, finish validation and commit, and runner-local write-ahead journal.
+- **Implementation:** added `AgentLoop`, immutable loop contracts, fixed loop instructions and paths-only context manifest; centralized `.git`, symlink, worktree-root and owned-prefix checks; bounded regex/file traversal and atomic writes; added durable sequenced/hash-linked JSONL records, owner-only POSIX permissions, torn-tail recovery, and complete loop/request/response/tool/post-image records. Journal start records now pin repository identity, provider/model/attempt limit, adapter and serializer versions, exact instructions, tool specifications, gates, budget and base SHA. Exact model-visible tool results and metadata-only `LOOP_TOOL_CALLED` events are recorded for later replay and progress reporting.
+- **Dormant boundary:** no dispatch path invokes this loop. Control-plane policy and lease renewal are 3c; runner wiring and Docker gate execution are 3d; journal resume is 3e. No hosted-provider calls were made and no cost was incurred.
+- **Verification:** runner `mvn -B verify` passed after the implementation and review hardening: 180 tests, 0 failures, 0 errors, 0 skipped. `git diff --check` passed. Hosted checks for dependency PR #78 are all green.
+- **Remaining before handoff:** final diff review, meaningful commits, push branch, open issue-linked PR #79 targeting `feat/provider-conversations`; do not merge.
 
 ## Update protocol
 
