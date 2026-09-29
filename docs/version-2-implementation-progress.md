@@ -5,9 +5,9 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 ## Current status
 
 - **Active work:** Slice 2b — RED/GREEN checks.
-- **Branch:** `feat/test-checks`, stacked on Slice 2a / PR #72; local implementation is complete, but the prerequisite is still open on GitHub.
+- **Branch:** `feat/test-checks`, stacked on Slice 2a / PR #72; implementation is pushed and PR #74 is open.
 - **Issue:** [#73 — Implement RED/GREEN test-first verification evidence](https://github.com/JRH89/ForgeLoop/issues/73).
-- **Code state:** Slice 2a and 2b implementations are locally complete. Slice 2b's issue-linked PR is pending the prerequisite PR #72 merge so it can target `master` cleanly.
+- **Code state:** Slice 2a and 2b implementations are complete. Slice 2b PR #74 targets `feat/test-boundary` while prerequisite PR #72 remains open; retarget or rebase after #72 merges.
 - **Slice 1 commits:** `9f6f21f` control-plane scheduling and validation; `f90d03b` runner chaining, context, and worktree setup; `e3fa9d2` role-select chained predecessors alongside server-added checks.
 - **Slice 2a commits:** `8a367de` control-plane test-first policy and graph enforcement; `527d01f` runner write-boundary and JUnit report enforcement. They are part of the open PR #72 branch, based on merged PR #70.
 - **Prerequisite PR:** [#70 — Sequence dependent writer tasks](https://github.com/JRH89/ForgeLoop/pull/70), linked to #69. Merged into `master` on 2026-09-29; hosted checks passed.
@@ -24,7 +24,7 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 |---:|---|---|---|---|
 | 1 | 1 — Sequenced writers | — | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Merged; local and hosted verification passed |
 | 2 | 2a — Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Local and hosted verification passed; PR remains open |
-| 3 | 2b — RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / not opened | Locally implemented and verified on `feat/test-checks`; awaiting PR #72 merge |
+| 3 | 2b — RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Open; stacked on PR #72; hosted checks pending |
 | 4 | 2c — GitHub branch check | 2b | Not opened | Planned |
 | 5 | 3a — Provider conversations and tool calling | 1 | Not opened | Planned |
 | 6 | 3b — Agent loop core and journal write path | 3a | Not opened | Planned |
@@ -79,11 +79,12 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 ## Slice 2b log — RED/GREEN checks
 
 - **Issue:** [#73 — Implement RED/GREEN test-first verification evidence](https://github.com/JRH89/ForgeLoop/issues/73).
-- **Depends on:** Slice 2a / PR #72. Work is isolated on `feat/test-checks`; GitHub currently reports #72 open despite all hosted checks passing, so #73's PR is not opened or rebased yet.
+- **Depends on:** Slice 2a / PR #72. PR #72 remains open despite all hosted checks passing, so [PR #74](https://github.com/JRH89/ForgeLoop/pull/74) is stacked on `feat/test-boundary`; retarget or rebase it after #72 merges.
 - **Scope:** secure bounded JUnit parsing; server-created RED and GREEN check tasks; authoritative verdict rules and immutable evidence bindings; retry/idempotency and routing; runner affinity/execution bases; bounded failing-test repair context; review evidence; and computed lease lengths.
 - **Implemented:** bounded secure JUnit parsing; server-owned RED/GREEN tasks and gate bindings; deterministic control-plane verdicts; immutable lease-bound evidence with digest verification and idempotent replay; test-writer retries and GREEN quality repairs; `UNVERIFIABLE` hold/escalation; runner affinity and extended leases; report upload and evidence query; bounded repair/review context; and integration dependencies that prevent a RED-unchecked test commit from reaching the head.
 - **Verification:** `mvn -B verify` passed in `control-plane` (260 tests), `runner` (153 tests, 1 symlink-permission skip), and `harness` (2 tests). The runner suite included a passing Docker-backed parent/test-commit report-mount test against local Docker Engine. Focused route, idempotency, parser-bound, oversized-artifact, and lease-bypass tests also passed. `git diff --check` passed.
-- **Commits:** `0872763` control-plane verdict, evidence, and lifecycle; `913e6a5` runner checks, artifacts, and Docker report execution.
+- **Commits:** `0872763` control-plane verdict, evidence, and lifecycle; `913e6a5` runner checks, artifacts, and Docker report execution; `1cdd879` progress tracker update.
+- **Hosted checks:** PR #74 opened against `feat/test-boundary`; GitHub checks were queued or in progress when last checked (2026-09-28). No hosted result is claimed yet.
 - **Validation boundary:** no provider-backed or paid full-stack run was attempted. Local Docker verifies container report mounting and parsing only; it is not end-to-end repository delivery evidence.
 
 ## Update protocol
