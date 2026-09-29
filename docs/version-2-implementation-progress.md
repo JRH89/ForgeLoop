@@ -28,7 +28,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / [#92](https://github.com/JRH89/ForgeLoop/pull/92) | Merged to `master` (2026-09-29); dispatch remains dormant |
 | 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Merged to `master` (2026-09-29) |
 | 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / [#94](https://github.com/JRH89/ForgeLoop/pull/94) | Merged to `master` (2026-09-29); hosted checks passed |
-| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) / PR pending | Full local verification passed; hosted checks pending |
+| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) / [#95](https://github.com/JRH89/ForgeLoop/pull/95) | Full local verification passed; hosted checks pending |
 | 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) | Implemented locally; queued behind 4d |
 | 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) | Implemented locally; queued behind 5a |
 | 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) | Implemented locally; queued behind 5b |
@@ -120,7 +120,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Issue:** [#86](https://github.com/JRH89/ForgeLoop/issues/86).
 - **Result:** priced agent-loop turns now reserve a conservative worst-case cost with the control plane before the runner journals or sends the request. Run-scoped task locks serialize concurrent reservations; task and run known spend plus active sibling reservations must remain within budget. Reservations replace earlier values on retry, settle when provider usage is recorded, and are released when leases close or expire. Unknown pricing skips reservation; refusal stops before the provider call; control-plane transport failure retries with bounded backoff and then fails closed.
 - **Verification:** the original full suites passed (control-plane 307 tests; runner 244 tests with 5 platform-dependent skips; harness 2 tests). Re-run on the #85 PR stack: control-plane 322 tests, runner 288 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
-- **Delivery:** implementation commit `288871d` is isolated on `feat/4d-spend-reservations-pr`; issue #86 is linked. Full local verification passed on the merged #85 base; the linked PR is pending creation.
+- **Delivery:** linked [PR #95](https://github.com/JRH89/ForgeLoop/pull/95) implements issue #86 from `feat/4d-spend-reservations-pr`. Full local verification passed on the merged #85 base; hosted checks are pending.
 
 ## Update protocol
 
