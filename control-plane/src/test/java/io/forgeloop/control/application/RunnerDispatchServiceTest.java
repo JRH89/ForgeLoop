@@ -77,4 +77,19 @@ class RunnerDispatchServiceTest {
         assertEquals(List.of("implementation"), dispatch.available(producer).stream().map(task -> task.getPlanKey()).toList());
         assertEquals(List.of(), dispatch.available(other));
     }
+
+    @Test
+    void testFirstRootWritersRequireDockerCapability() {
+        FeatureRun run = new FeatureRun("org/repository", "main", "feature", "spec", 5, "GENERIC", 1);
+        run.snapshotTestFirst("unit", List.of("**/*Test.java"));
+        var test = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("src/test"), 2, 1_000_000);
+        var implementation = run.addPlannedTask("scaffold", "IMPLEMENTATION", "Scaffold", "provider", List.of("src/main"), 2, 1_000_000);
+        when(tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED))).thenReturn(List.of(test, implementation));
+        when(tasks.findByStateIn(List.of(TaskState.LEASED, TaskState.PREPARING, TaskState.RUNNING))).thenReturn(List.of());
+        Runner withoutDocker = new Runner("org", "provider-only", "1", List.of("provider"), "credential-hash");
+        Runner withDocker = new Runner("org", "provider-docker", "1", List.of("provider", "docker"), "credential-hash");
+
+        assertEquals(List.of(), dispatch.available(withoutDocker));
+        assertEquals(List.of("tests", "scaffold"), dispatch.available(withDocker).stream().map(task -> task.getPlanKey()).toList());
+    }
 }

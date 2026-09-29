@@ -17,13 +17,14 @@ public class VerificationGate {
     @Column(length = 20) private String networkPolicy;
     private Integer timeoutSeconds;
     @Column(length = 20) private String criterionCoverage;
+    @Column(length = 20) private String testReport;
 
     protected VerificationGate() { }
     VerificationGate(FeatureRun run, VerificationPolicySpec policy) {
         this.run = run; this.name = policy.name(); this.required = policy.required(); this.kind = policy.kind();
         this.imageDigest = policy.imageDigest(); this.command = String.join("\n", policy.command());
         this.networkPolicy = policy.networkPolicy(); this.timeoutSeconds = policy.timeoutSeconds();
-        this.criterionCoverage = policy.criterionCoverage();
+        this.criterionCoverage = policy.criterionCoverage(); this.testReport = policy.testReport();
     }
     /** Compatibility constructor for narrow domain tests; production runs use detailed policies. */
     VerificationGate(FeatureRun run, String name) { this.run = run; this.name = name; }
@@ -40,11 +41,11 @@ public class VerificationGate {
     public boolean satisfiesReview() { return !required || state == VerificationGateState.PASSED; }
     public VerificationPolicySpec toSpec() {
         if (kind == null) throw new IllegalStateException("Legacy verification gate has no executable policy");
-        return new VerificationPolicySpec(name, kind, imageDigest, getCommand(), networkPolicy, timeoutSeconds, required, criterionCoverage);
+        return new VerificationPolicySpec(name, kind, imageDigest, getCommand(), networkPolicy, timeoutSeconds, required, criterionCoverage, testReport);
     }
     public String getId() { return id; } public String getName() { return name; } public boolean isRequired() { return required; }
     public String getState() { return state.name(); } public String getKind() { return kind; } public String getImageDigest() { return imageDigest; }
     public List<String> getCommand() { return command == null ? List.of() : command.lines().toList(); }
     public String getNetworkPolicy() { return networkPolicy; } public Integer getTimeoutSeconds() { return timeoutSeconds; }
-    public String getCriterionCoverage() { return criterionCoverage; }
+    public String getCriterionCoverage() { return criterionCoverage; } public String getTestReport() { return testReport; }
 }
