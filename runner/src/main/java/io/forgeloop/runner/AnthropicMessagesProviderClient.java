@@ -14,6 +14,7 @@ import java.util.Map;
 
 /** Anthropic Messages API adapter; its key remains in the runner's environment and is never serialized as telemetry. */
 public final class AnthropicMessagesProviderClient implements ProviderClient, ConversationClient {
+    public static final String API_VERSION = ProviderClientFactory.ANTHROPIC_API_VERSION;
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient http; private final URI endpoint; private final String apiKey;
 
@@ -22,14 +23,22 @@ public final class AnthropicMessagesProviderClient implements ProviderClient, Co
         this.http = http; this.endpoint = endpoint; this.apiKey = apiKey;
     }
 
+    @Override public String adapterId() { return "anthropic-messages/1"; }
+
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
+        String body = executeRaw(request);
+        try { return parse(body); }
+        catch (Exception exception) { throw new ProviderException("Anthropic provider response could not be parsed", true, exception); }
+    }
+
+    @Override public String executeRaw(ProviderRequest request) throws ProviderException {
         try {
             String body = requestBody(request);
             HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5))
-                    .header("x-api-key", apiKey).header("anthropic-version", "2023-06-01").header("content-type", "application/json")
+                    .header("x-api-key", apiKey).header("anthropic-version", API_VERSION).header("content-type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("Anthropic", response.statusCode(), response.body());
-            return parse(response.body());
+            return response.body();
         } catch (ProviderException exception) { throw exception;
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("Anthropic provider request was interrupted", true, exception);
         } catch (Exception exception) { throw new ProviderException("Anthropic provider request failed", true, exception); }
@@ -99,7 +108,7 @@ public final class AnthropicMessagesProviderClient implements ProviderClient, Co
         try {
             String body = serialize(request);
             HttpResponse<String> response = http.send(HttpRequest.newBuilder(endpoint).timeout(request.timeout())
-                    .header("x-api-key", apiKey).header("anthropic-version", "2023-06-01").header("content-type", "application/json")
+                    .header("x-api-key", apiKey).header("anthropic-version", API_VERSION).header("content-type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("Anthropic", response.statusCode(), response.body());
             return parseConversation(response.body());

@@ -21,6 +21,12 @@ public final class GeminiGenerateContentProviderClient implements ProviderClient
         this.http = http; this.endpoint = endpoint; this.apiKey = apiKey;
     }
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
+        String body = executeRaw(request);
+        try { return parse(body); }
+        catch (Exception exception) { throw new ProviderException("Gemini provider response could not be parsed", true, exception); }
+    }
+
+    @Override public String executeRaw(ProviderRequest request) throws ProviderException {
         try {
             URI target = endpoint.resolve("models/" + request.model() + ":generateContent");
             String body = requestBody(request);
@@ -28,11 +34,13 @@ public final class GeminiGenerateContentProviderClient implements ProviderClient
                     .header("x-goog-api-key", apiKey).header("content-type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("Gemini", response.statusCode(), response.body());
-            return parse(response.body());
+            return response.body();
         } catch (ProviderException exception) { throw exception;
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("Gemini provider request was interrupted", true, exception);
         } catch (Exception exception) { throw new ProviderException("Gemini provider request failed", true, exception); }
     }
+
+    @Override public String adapterId() { return "gemini-generate-content/1"; }
     static String requestBody(ProviderRequest request) throws Exception {
         Map<String, Object> generationConfig = new LinkedHashMap<>();
         generationConfig.put("maxOutputTokens", request.maxOutputTokens());

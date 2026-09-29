@@ -21,17 +21,25 @@ public final class OpenAiChatCompatibleProviderClient implements ProviderClient,
         this.http = http; this.endpoint = endpoint; this.apiKey = apiKey == null ? "" : apiKey;
     }
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
+        String body = executeRaw(request);
+        try { return parse(body); }
+        catch (Exception exception) { throw new ProviderException("Local provider response could not be parsed", true, exception); }
+    }
+
+    @Override public String executeRaw(ProviderRequest request) throws ProviderException {
         try {
             String body = requestBody(request);
             HttpRequest.Builder builder = HttpRequest.newBuilder(endpoint).timeout(Duration.ofMinutes(5)).header("content-type", "application/json");
             if (!apiKey.isBlank()) builder.header("authorization", "Bearer " + apiKey);
             HttpResponse<String> response = http.send(builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) throw ProviderHttpErrors.from("Local", response.statusCode(), response.body());
-            return parse(response.body());
+            return response.body();
         } catch (ProviderException exception) { throw exception;
         } catch (InterruptedException exception) { Thread.currentThread().interrupt(); throw new ProviderException("Local provider request was interrupted", true, exception);
         } catch (Exception exception) { throw new ProviderException("Local provider request failed", true, exception); }
     }
+
+    @Override public String adapterId() { return "openai-chat-compatible/1"; }
     static String requestBody(ProviderRequest request) throws Exception {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", request.model());

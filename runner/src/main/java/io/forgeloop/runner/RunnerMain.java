@@ -48,6 +48,11 @@ public final class RunnerMain {
             providerHealth(arguments);
             return;
         }
+        if (arguments.length > 0 && "provider-drift-check".equals(arguments[0])) {
+            int exitCode = providerDriftCheck(arguments);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
         if (arguments.length > 0 && "provider-tool-check".equals(arguments[0])) {
             providerToolCheck(arguments);
             return;
@@ -194,6 +199,27 @@ public final class RunnerMain {
         ProviderClient provider = new ProviderClientFactory().create(policy);
         ProviderResult result = provider.execute(new ProviderRequest(arguments[2], "You are a credential health check.", "Reply with exactly: ForgeLoop provider ready.", 128));
         System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
+    }
+
+    /** Requires a live-recorded, pin-matched fixture before creating a client or sending one bounded health request. */
+    private static int providerDriftCheck(String[] arguments) {
+        if (arguments.length != 3) {
+            System.err.println("Usage: provider-drift-check <anthropic|openai|gemini|local> <model>");
+            return 2;
+        }
+        String provider = arguments[1], model = arguments[2];
+        final ProviderFixtureStore.Fixture fixture;
+        try { fixture = new ProviderFixtureStore().load(provider); }
+        catch (Exception invalid) { System.err.println("Could not run provider drift check: fixture is unavailable or invalid."); return 2; }
+        ProviderClientFactory codecs = new ProviderClientFactory();
+        ProviderDriftProbe.Result result = new ProviderDriftProbe().run(provider, model, fixture,
+                () -> codecs.create(new ProviderExecutionPolicy(provider, model, 1)));
+        if (result.exitCode() == 0) System.out.println(result.message());
+        else {
+            System.err.println(result.message());
+            result.differences().forEach(path -> System.err.println("- " + path));
+        }
+        return result.exitCode();
     }
 
     /** Live two-turn check; output is limited to normalized stop reasons and token counts. */

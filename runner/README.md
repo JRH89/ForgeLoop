@@ -51,6 +51,12 @@ Planner and writing prompts include a bounded runner-local repository manifest a
 
 The runner includes tested Anthropic Messages, OpenAI Responses, Gemini generateContent, and local OpenAI-compatible adapters behind one contract. Each reads its API key only from runner-local configuration; ForgeLoop's control plane never stores, logs, or receives that key. All adapters classify `429` and `5xx` responses as retryable and treat returned text as untrusted until a strict task schema validates it.
 
+### Credential-free replay and provider drift
+
+Local replay clients read complete, hash-chain-verified runner journals and use the selected adapter's production serializer and parser. They require no API key or network access, reject request-hash mismatches, and will not replay redacted or omitted journal records. Replay is a test/development tool; it does not rerun customer work.
+
+The explicit `provider-drift-check <anthropic|openai|gemini|local> <model>` diagnostic requires a reviewed live-recorded baseline at `runner/src/test/resources/provider-fixtures/<provider>/` and the selected provider's runner credential. It sends at most one small health request (up to 128 output tokens), which may incur provider charges, and reports only changed response paths/types—not response text, prompts, or credentials. It exits without constructing a provider client when the fixture is absent, malformed, for another model, or pinned to a different adapter/API version. The command currently expects a ForgeLoop source checkout containing the fixture; it is not a diagnostic available from the standalone packaged runner.
+
 Provider conversation adapters and the runner agent-loop core are being implemented additively. The loop core is dormant: production task dispatch still uses the existing single-call path until the control-plane policy and lease lifecycle and the later runner wiring slice are complete. See [Agent loop status](../docs/agent-loop.md) for its current boundary and local-only journal handling.
 
 `execute-policy-task` is the production provider-worker entry point. It resolves provider, model, and a one-to-three-attempt retry ceiling from a reviewed runner-local JSON policy, then claims and acknowledges the task lease, creates an isolated worktree, invokes the provider, validates every output field and path before writing, commits atomically written files, submits redacted usage/failure evidence, and completes the lease. Unsupported roles are rejected before a lease is claimed.
