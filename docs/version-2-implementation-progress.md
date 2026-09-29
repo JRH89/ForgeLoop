@@ -119,7 +119,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 - **Issue:** [#86](https://github.com/JRH89/ForgeLoop/issues/86).
 - **Result:** priced agent-loop turns now reserve a conservative worst-case cost with the control plane before the runner journals or sends the request. Run-scoped task locks serialize concurrent reservations; task and run known spend plus active sibling reservations must remain within budget. Reservations replace earlier values on retry, settle when provider usage is recorded, and are released when leases close or expire. Unknown pricing skips reservation; refusal stops before the provider call; control-plane transport failure retries with bounded backoff and then fails closed.
-- **Verification:** control-plane `mvn -B verify` passed (307 tests, 0 failures/errors/skips); runner `mvn -B verify` passed (244 tests, 0 failures/errors, 5 existing platform-dependent skips); harness `mvn -B verify` passed (2 tests). `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
+- **Verification:** the original full suites passed (control-plane 307 tests; runner 244 tests with 5 platform-dependent skips; harness 2 tests). Re-run on the #85 PR stack: control-plane 322 tests, runner 288 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
 - **Delivery:** implementation commit `288871d` is being validated on a preparation branch based on PR #94; issue #86 is linked. No #86 PR will open until #85 merges, preserving one open PR at a time.
 
 ## Update protocol
