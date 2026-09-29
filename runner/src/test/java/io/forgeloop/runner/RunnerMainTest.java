@@ -2,6 +2,7 @@ package io.forgeloop.runner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,13 +33,17 @@ class RunnerMainTest {
     void additionalMcpContextPreservesTestFirstContractFields() {
         RunnerTask task = new RunnerTask("task", "IMPLEMENTATION", "Implement", "org/repository", "main", "issue-1",
                 "spec", "provider", 1, List.of("src"), List.of(), null, null, null, List.of(), null, null,
-                "main", "main", List.of(), List.of(), "NO_TESTS", List.of("**/*.test.ts"), "JUNIT_XML");
+                "main", "main", List.of(), List.of(), "NO_TESTS", List.of("**/*.test.ts"), "JUNIT_XML",
+                List.of("Suite#added"), true, "RED check evidence summary");
 
         RunnerTask contextual = RunnerMain.withAdditionalContext(task, "\nextra context");
 
         assertEquals("NO_TESTS", contextual.writeBoundary());
         assertEquals(List.of("**/*.test.ts"), contextual.testPathGlobs());
         assertEquals("JUNIT_XML", contextual.testReportFormat());
+        assertEquals(List.of("Suite#added"), contextual.expectedTests());
+        assertTrue(contextual.expectedTestsOverflow());
+        assertEquals("RED check evidence summary", contextual.testFirstEvidence());
     }
 
     @Test
