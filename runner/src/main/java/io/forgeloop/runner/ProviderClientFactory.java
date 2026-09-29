@@ -5,6 +5,11 @@ import java.net.http.HttpClient;
 
 /** Builds only allow-listed providers and reads credentials exclusively from the runner environment. */
 public final class ProviderClientFactory {
+    static final String ANTHROPIC_API_VERSION = "2023-06-01";
+    static final String ANTHROPIC_ENDPOINT = "https://api.anthropic.com/v1/messages";
+    static final String OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
+    static final String GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/";
+    static final String LOCAL_ENDPOINT_PATH = "/v1/chat/completions";
     /** Stable adapter identifier for execution records; contains no credential or endpoint data. */
     public String adapterId(String provider) {
         return switch (provider) {
@@ -27,14 +32,72 @@ public final class ProviderClientFactory {
             default -> throw new IllegalArgumentException("Unsupported provider policy");
         };
     }
+
+    /** Parses a captured one-call response without constructing a credentialed client. */
+    ProviderResult parse(String provider, String body) throws Exception {
+        return switch (provider) {
+            case "anthropic" -> AnthropicMessagesProviderClient.parse(body);
+            case "openai" -> OpenAiResponsesProviderClient.parse(body);
+            case "gemini" -> GeminiGenerateContentProviderClient.parse(body);
+            case "local" -> OpenAiChatCompatibleProviderClient.parse(body);
+            default -> throw new IllegalArgumentException("Unsupported provider policy");
+        };
+    }
+
+    /** Serializes conversation turns exactly as the selected adapter would, without reading credentials. */
+    String conversationBody(String provider, ConversationRequest request) {
+        try {
+            return switch (provider) {
+                case "anthropic" -> AnthropicMessagesProviderClient.conversationBody(request);
+                case "openai" -> OpenAiResponsesProviderClient.conversationBody(request);
+                case "gemini" -> GeminiGenerateContentProviderClient.conversationBody(request);
+                case "local" -> OpenAiChatCompatibleProviderClient.conversationBody(request);
+                default -> throw new IllegalArgumentException("Unsupported provider policy");
+            };
+        } catch (IllegalArgumentException failure) { throw failure;
+        } catch (Exception failure) { throw new IllegalArgumentException("Conversation request could not be serialized", failure); }
+    }
+
+    /** Parses a captured conversation response through the selected adapter's production parser. */
+    ConversationTurn parseConversation(String provider, String body, ConversationRequest request) throws Exception {
+        long turnNumber = request.items().stream().filter(AssistantTurn.class::isInstance).count() + 1;
+        return switch (provider) {
+            case "anthropic" -> AnthropicMessagesProviderClient.parseConversation(body);
+            case "openai" -> OpenAiResponsesProviderClient.parseConversation(body);
+            case "gemini" -> GeminiGenerateContentProviderClient.parseConversation(body, turnNumber);
+            case "local" -> OpenAiChatCompatibleProviderClient.parseConversation(body);
+            default -> throw new IllegalArgumentException("Unsupported provider policy");
+        };
+    }
+
     public ProviderClient create(ProviderExecutionPolicy policy) {
         HttpClient client = HttpClient.newHttpClient();
         return switch (policy.provider()) {
-            case "anthropic" -> new AnthropicMessagesProviderClient(client, URI.create("https://api.anthropic.com/v1/messages"), required("ANTHROPIC_API_KEY"));
-            case "openai" -> new OpenAiResponsesProviderClient(client, URI.create("https://api.openai.com/v1/responses"), required("OPENAI_API_KEY"));
-            case "gemini" -> new GeminiGenerateContentProviderClient(client, URI.create("https://generativelanguage.googleapis.com/v1beta/"), required("GEMINI_API_KEY"));
+            case "anthropic" -> new AnthropicMessagesProviderClient(client, URI.create(ANTHROPIC_ENDPOINT), required("ANTHROPIC_API_KEY"));
+            case "openai" -> new OpenAiResponsesProviderClient(client, URI.create(OPENAI_ENDPOINT), required("OPENAI_API_KEY"));
+            case "gemini" -> new GeminiGenerateContentProviderClient(client, URI.create(GEMINI_ENDPOINT), required("GEMINI_API_KEY"));
             case "local" -> new OpenAiChatCompatibleProviderClient(client, localEndpoint(), optional("FORGELOOP_LOCAL_PROVIDER_API_KEY"));
             default -> throw new IllegalStateException("Unsupported provider policy");
+        };
+    }
+
+    String pinnedEndpoint(String provider) {
+        return switch (provider) {
+            case "anthropic" -> ANTHROPIC_ENDPOINT;
+            case "openai" -> OPENAI_ENDPOINT;
+            case "gemini" -> GEMINI_ENDPOINT;
+            case "local" -> LOCAL_ENDPOINT_PATH;
+            default -> throw new IllegalArgumentException("Unsupported provider policy");
+        };
+    }
+
+    String pinnedApiVersion(String provider) {
+        return switch (provider) {
+            case "anthropic" -> ANTHROPIC_API_VERSION;
+            case "openai" -> "v1";
+            case "gemini" -> "v1beta";
+            case "local" -> "openai-chat-compatible";
+            default -> throw new IllegalArgumentException("Unsupported provider policy");
         };
     }
     private static String required(String name) {
@@ -52,4 +115,5 @@ public final class ProviderClientFactory {
         }
         return endpoint;
     }
+
 }
