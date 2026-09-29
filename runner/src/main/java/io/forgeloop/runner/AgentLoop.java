@@ -60,7 +60,7 @@ public final class AgentLoop {
             String userMessage = initialMessage(setup, manifest);
             setup.journal().append("USER_MESSAGE", Map.of("content", userMessage));
             UserText initial = new UserText(userMessage);
-            if (!append(meter, initial, setup.budget().maxConversationBytes()))
+            if (!append(setup, meter, initial, setup.budget().maxConversationBytes(), 0))
                 return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.CONTEXT, null, null, 0);
             List<ConversationItem> items = new ArrayList<>(List.of(initial));
             Map<String, ToolOutcome> gateOutcomes = new HashMap<>();
@@ -153,7 +153,7 @@ public final class AgentLoop {
                 if (turn.stopReason() == StopReason.OTHER) return end(setup, meter, LoopOutcome.HARNESS_FAILURE, null, "LOOP_UNEXPECTED_STOP", null, 0);
 
                 AssistantTurn assistant = turn.toAssistantTurn();
-                if (!append(meter, assistant, setup.budget().maxConversationBytes()))
+                if (!append(setup, meter, assistant, setup.budget().maxConversationBytes(), turnNumber))
                     return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.CONTEXT, null, null, 0);
                 items.add(assistant);
 
@@ -161,7 +161,7 @@ public final class AgentLoop {
                     consecutiveNoToolTurns++;
                     if (consecutiveNoToolTurns >= 2) return end(setup, meter, LoopOutcome.DECLINED, null, "WORKER_DECLINED", null, 0);
                     UserText reminder = new UserText("Continue with the tools, or call finish when the change is complete.");
-                    if (!append(meter, reminder, setup.budget().maxConversationBytes()))
+                    if (!append(setup, meter, reminder, setup.budget().maxConversationBytes(), turnNumber))
                         return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.CONTEXT, null, null, 0);
                     items.add(reminder);
                     continue;
@@ -245,7 +245,8 @@ public final class AgentLoop {
                     shapedRecord.put("contentSha256", Hashing.sha256(item.content()));
                     setup.journal().append("TOOL_RESULT_SHAPED", shapedRecord);
                 }
-                meter.addConversationBytes(itemBytes(results));
+                if (!append(setup, meter, results, setup.budget().maxConversationBytes(), turnNumber))
+                    return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.CONTEXT, null, null, 0);
                 items.add(results);
                 if (setup.leaseLost().get()) return end(setup, meter, LoopOutcome.LEASE_LOST, null, null, null, 0);
                 if (held) return endPolicyHold(setup, meter, holdClass, holdRule, holdReason);
@@ -283,7 +284,8 @@ public final class AgentLoop {
         String requestHash = Hashing.sha256(prepared.serialized());
         setup.journal().append("TURN_REQUESTED", Map.of("turn", turnNumber, "correlationId", correlationId,
                 "requestSha256", requestHash, "maxOutputTokens", request.maxOutputTokens(),
-                "reservedMicros", reservedMicros, "truncationRetry", truncationRetry));
+                "reservedMicros", reservedMicros, "truncationRetry", truncationRetry,
+                "conversationRequest", ConversationRequestJournalCodec.encode(request)));
         try {
             return new LoopAttempt(conversations.converse(setup.conversationClient(), request, setup.providerPolicy().maxAttempts()), null, truncationRetry);
         } catch (ProviderExecutionFailure failure) {
@@ -360,6 +362,7 @@ public final class AgentLoop {
         completed.put("attemptCount", execution.attemptCount()); completed.put("stopReason", response.stopReason().name());
         completed.put("inputTokens", response.inputTokens()); completed.put("outputTokens", response.outputTokens());
         completed.put("providerRequestId", response.providerRequestId() == null ? "" : response.providerRequestId()); completed.put("text", response.text());
+        completed.put("answeredModel", response.answeredModel() == null ? "" : response.answeredModel());
         completed.put("toolCalls", response.toolCalls()); completed.put("replay", response.replay());
         completed.put("responseBody", response.responseBody());
         setup.journal().append("TURN_COMPLETED", completed);
@@ -441,9 +444,17 @@ public final class AgentLoop {
         return bounded.toString();
     }
 
-    private static boolean append(Meter meter, ConversationItem item, int maxBytes) throws IOException {
-        long size = itemBytes(item);
+    private static boolean append(LoopSetup setup, Meter meter, ConversationItem item, int maxBytes, int turn) throws IOException {
+        byte[] serialized = JSON.writeValueAsBytes(item);
+        long size = serialized.length;
         if (meter.counters.conversationBytes() + size > maxBytes) return false;
+        // Retain the exact append bytes so an offline verifier can independently recount this budget.
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("turn", turn);
+        evidence.put("itemBytes", size);
+        evidence.put("itemSha256", Hashing.sha256(serialized));
+        evidence.put("serializedItem", new String(serialized, StandardCharsets.UTF_8));
+        setup.journal().append("CONVERSATION_ITEM_ADDED", evidence);
         meter.addConversationBytes(size);
         return true;
     }

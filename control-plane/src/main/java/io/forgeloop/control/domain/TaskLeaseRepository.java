@@ -11,6 +11,8 @@ import jakarta.persistence.LockModeType;
 /** Retains lease-attempt history while selecting only the latest attempt for task coordination. */
 public interface TaskLeaseRepository extends JpaRepository<TaskLease,String>{
     Optional<TaskLease> findFirstByTask_IdOrderByExpiresAtDesc(String taskId);
+    /** All attempt rows are exported in claim order, including open leases and recovered retries. */
+    List<TaskLease> findByTask_Run_IdOrderByClaimedAtAsc(String runId);
     List<TaskLease> findByCompletedAtIsNullAndExpiresAtBefore(Instant now);
     /** Closed attempt history used to derive run outcomes without loading leases one task at a time. */
     @Query("select lease from TaskLease lease join fetch lease.task task "

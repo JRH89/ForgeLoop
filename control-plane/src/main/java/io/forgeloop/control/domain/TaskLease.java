@@ -171,5 +171,7 @@ public class TaskLease {
     public DeliveryTask getTask() { return task; }
     public String getRunnerId() { return runner.getId(); } public String getExpiresAt() { return expiresAt.toString(); }
     public Instant getClaimedAt() { return claimedAt; }
+    public Instant getAcknowledgedAt() { return acknowledgedAt; }
+    public Instant getCompletedAt() { return completedAt; }
     public boolean isAcknowledged() { return acknowledgedAt != null; } public boolean isCompleted() { return completedAt != null; }
 }

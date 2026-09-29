@@ -145,6 +145,7 @@ public class TestCheckEvidence {
 
     public String getId() { return id; }
     public String getTaskId() { return task.getId(); }
+    public String getLeaseId() { return leaseId; }
     public String getRunnerId() { return runner.getId(); }
     public String getKind() { return checkKind; }
     public String getGate() { return gate.getName(); }

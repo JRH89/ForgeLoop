@@ -57,6 +57,16 @@ public final class RunnerMain {
             providerToolCheck(arguments);
             return;
         }
+        if (arguments.length > 0 && "verify-run".equals(arguments[0])) {
+            int exitCode = verifyRunRecord(arguments, false);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
+        if (arguments.length > 0 && "verify-journal".equals(arguments[0])) {
+            int exitCode = verifyRunRecord(arguments, true);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
         if (arguments.length > 0 && "generate-patch".equals(arguments[0])) {
             generatePatch(arguments);
             return;
@@ -231,6 +241,30 @@ public final class RunnerMain {
         System.out.println("Provider tool check passed. firstStop=" + result.firstStopReason() + " secondStop=" + result.secondStopReason()
                 + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens()
                 + " attempts=" + result.firstAttempts() + "+" + result.secondAttempts());
+    }
+
+    /** Runs the record verifier without reading provider keys, control-plane credentials, or network state. */
+    private static int verifyRunRecord(String[] arguments, boolean journalOnly) {
+        String command = journalOnly ? "verify-journal" : "verify-run";
+        if (arguments.length != 3 && arguments.length != 5
+                || arguments.length == 5 && !"--json".equals(arguments[3])) {
+            System.err.println("Usage: " + command + (journalOnly
+                    ? " <journal.jsonl> <repository-path> [--json <report-file>]"
+                    : " <archive.zip> <repository-path> [--json <report-file>]"));
+            return 2;
+        }
+        try {
+            RunRecordVerifier verifier = new RunRecordVerifier();
+            VerifyReport report = journalOnly
+                    ? verifier.verifyJournal(Path.of(arguments[1]), Path.of(arguments[2]))
+                    : verifier.verifyRun(Path.of(arguments[1]), Path.of(arguments[2]));
+            report.printTo(System.out);
+            if (arguments.length == 5) report.writeJson(Path.of(arguments[4]));
+            return report.exitCode();
+        } catch (Exception failure) {
+            System.err.println("Run-record verification could not run: " + failure.getMessage());
+            return 2;
+        }
     }
 
     /** Generates and commits a schema-validated Claude patch only within operator-supplied policy prefixes. */
