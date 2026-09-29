@@ -14,6 +14,8 @@ public class FeatureRun {
   private double budgetUsd; private String harnessProfile; private String baseBranch; private int policyRevision;
   @Enumerated(EnumType.STRING) private RunState state; private Instant createdAt;
   private Instant approvedAt; private String approvedBy;
+  @Column(length=80) private String testFirstGate;
+  @Column(length=8000) private String testPathGlobs;
   private boolean archived;
   public boolean isArchived() { return archived; }
   /** Archive is reversible and never cancels work or erases its evidence. */
@@ -35,6 +37,16 @@ public class FeatureRun {
   /** Compatibility constructor for local fixtures; production creation always supplies a repository owner. */
   public FeatureRun(String repository,String sourceRef,String title,String specification,double budgetUsd,String harnessProfile,int policyRevision) { this("local-development", repository, sourceRef, title, specification, budgetUsd, harnessProfile, policyRevision); }
   public boolean belongsTo(String candidateOrganizationId) { return organizationId.equals(candidateOrganizationId); }
+  /** Captures the repository's test-first rules immutably when the run is submitted. */
+  public void snapshotTestFirst(String gateName, List<String> globs) {
+    if (gateName == null) return;
+    if (globs == null || globs.isEmpty()) throw new IllegalArgumentException("Test path globs are invalid");
+    testFirstGate = gateName;
+    testPathGlobs = String.join("\n", globs);
+  }
+  public boolean isTestFirst() { return testFirstGate != null; }
+  public String getTestFirstGate() { return testFirstGate; }
+  public List<String> getTestPathGlobs() { return testPathGlobs == null || testPathGlobs.isBlank() ? List.of() : testPathGlobs.lines().toList(); }
   public void addTask(String role,String title,String requiredCapability){tasks.add(new DeliveryTask(this,role,title,requiredCapability));}
   public DeliveryTask addPlannedTask(String planKey,String role,String title,String requiredCapability,List<String> ownedPaths,int attemptBudget,long budgetMicros){DeliveryTask task=new DeliveryTask(this,planKey,role,title,requiredCapability,ownedPaths,attemptBudget,budgetMicros);tasks.add(task);return task;}
   public void beginPlanning(){if(state!=RunState.RECEIVED)throw new IllegalStateException("Run is not ready for planning");state=RunState.PLANNING;}

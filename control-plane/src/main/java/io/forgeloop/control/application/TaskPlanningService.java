@@ -34,7 +34,7 @@ public class TaskPlanningService {
         }
         FeatureRun run = planner.getRun();
         if (run.getTasks().size() != 1) throw new IllegalStateException("A task graph has already been materialized");
-        validator.validate(plan, run.getBudgetUsd());
+        validator.validate(plan, run.getBudgetUsd(), run.isTestFirst());
 
         plan.acceptanceCriteria().forEach(run::addCriterion);
         Map<String, DeliveryTask> materialized = new HashMap<>();

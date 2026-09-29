@@ -293,7 +293,7 @@ public final class RunnerMain {
               result = new ContainerVerificationExecutor().execute(worktree, dockerVisibleWorktree(worktree),
                     evidenceDirectory, dockerVisibleWorktree(evidenceDirectory),
                     task.verificationImageDigest(), task.verificationCommand(), Duration.ofSeconds(task.verificationTimeoutSeconds()),
-                    "EGRESS".equals(task.verificationNetworkPolicy()));
+                    "EGRESS".equals(task.verificationNetworkPolicy()), task.testReportFormat());
             }
             VerificationEvidenceReport localReport = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
                     task.verificationImageDigest(), task.verificationCommand(), result, null);
@@ -599,7 +599,7 @@ public final class RunnerMain {
                     checkoutRef(task, task.baseBranch())));
             result = new GuardedPatchWorker().execute(policy, new ProgressProviderClient(new ProviderClientFactory().create(policy), events), task.role(),
                     task.title(), contextualTask.specification(), worktree, List.of(allowedPrefixes.split(",")),
-                    preferredContextPaths, lease.leaseId());
+                    preferredContextPaths, lease.leaseId(), new WriteBoundary(task.writeBoundary(), task.testPathGlobs()));
         } catch (ProviderExecutionFailure failure) {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
@@ -644,14 +644,14 @@ public final class RunnerMain {
         return new GitWorktreeManager().create(repository, checkoutRef(task, task.executionBaseRef()), task.id(), workspaceRoot);
     }
 
-    private static RunnerTask withAdditionalContext(RunnerTask task, String context) {
+    static RunnerTask withAdditionalContext(RunnerTask task, String context) {
         if (context == null || context.isBlank()) return task;
         return new RunnerTask(task.id(), task.role(), task.title(), task.repository(), task.baseBranch(), task.sourceRef(),
                 task.specification() + context, task.requiredCapability(), task.budgetUsd(), task.ownedPaths(),
                 task.dependencyChangeShas(), task.verificationGateName(), task.verificationKind(),
                 task.verificationImageDigest(), task.verificationCommand(), task.verificationNetworkPolicy(),
                 task.verificationTimeoutSeconds(), task.verificationBaseRef(), task.executionBaseRef(),
-                task.acceptanceCriteria(), task.mcpConfigurations());
+                task.acceptanceCriteria(), task.mcpConfigurations(), task.writeBoundary(), task.testPathGlobs(), task.testReportFormat());
     }
 
     private static String collectMcpOrFail(RunnerClient client, RunnerIdentity identity, RunnerLease lease,

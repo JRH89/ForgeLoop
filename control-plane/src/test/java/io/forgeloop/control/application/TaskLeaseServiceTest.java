@@ -88,6 +88,21 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void claimRefusesTestFirstRootWriterWithoutDockerCapability() {
+        FeatureRun run = new FeatureRun("org", "a/b", "issue-1", "x", "spec", 1, "GENERIC", "main", 1);
+        run.snapshotTestFirst("unit", List.of("**/*Test.java"));
+        DeliveryTask task = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("src/test"), 2, 100_000);
+        Runner runner = new Runner("org", "provider-only", "1", List.of("provider"), "credential-hash");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+        when(runners.findById("runner")).thenReturn(Optional.of(runner));
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> service.claim("task", "runner"));
+
+        assertEquals("Test-first work must run on a runner that can run its checks", failure.getMessage());
+    }
+
+    @Test
     void namedGateEvidenceUpdatesTheOwningRun() {
         FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "- x", 1, "GENERIC", 1);
         String image = "node@sha256:" + "a".repeat(64);

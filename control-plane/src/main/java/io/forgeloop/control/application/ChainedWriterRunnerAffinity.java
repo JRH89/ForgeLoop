@@ -1,6 +1,7 @@
 package io.forgeloop.control.application;
 
 import io.forgeloop.control.domain.DeliveryTask;
+import io.forgeloop.control.domain.Runner;
 import io.forgeloop.control.domain.TaskLeaseRepository;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
@@ -24,5 +25,16 @@ public final class ChainedWriterRunnerAffinity {
         return leases.findFirstByTask_IdOrderByExpiresAtDesc(predecessor.getId())
                 .map(lease -> Objects.equals(lease.getRunnerId(), runnerId))
                 .orElse(false);
+    }
+
+    /** Root test writers and scaffolds run the RED check locally and therefore need Docker. */
+    public boolean requiresDocker(DeliveryTask task) {
+        return task.getRun().isTestFirst() && task.isWritingTask()
+                && !"REPAIR".equals(task.getRole()) && task.getWritingDependency().isEmpty();
+    }
+
+    public boolean permits(DeliveryTask task, Runner runner) {
+        if (runner == null || (requiresDocker(task) && !runner.hasCapability("docker"))) return false;
+        return permits(task, runner.getId());
     }
 }
