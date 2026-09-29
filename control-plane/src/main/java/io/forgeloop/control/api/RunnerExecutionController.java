@@ -4,6 +4,8 @@ import io.forgeloop.control.application.LeaseGrant;
 import io.forgeloop.control.application.RunnerDispatchService;
 import io.forgeloop.control.application.RunnerService;
 import io.forgeloop.control.application.TaskLeaseService;
+import io.forgeloop.control.application.TestCheckEvidenceService;
+import io.forgeloop.control.application.TestCheckEvidenceSubmission;
 import io.forgeloop.control.application.VerificationEvidenceSubmission;
 import io.forgeloop.control.application.ProviderAttemptSubmission;
 import io.forgeloop.control.application.TaskPlanSubmission;
@@ -48,9 +50,10 @@ public class RunnerExecutionController {
     private final RepositoryScanService scans;
     private final RepositoryIssueProposalService issueProposals;
     private final IssueConversationService issueConversations;
+    private final TestCheckEvidenceService testChecks;
 
-    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews, RepositoryScanService scans, RepositoryIssueProposalService issueProposals, IssueConversationService issueConversations) {
-        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews; this.scans=scans; this.issueProposals=issueProposals; this.issueConversations=issueConversations;
+    public RunnerExecutionController(TaskLeaseService leases, RunnerService runners, RunnerDispatchService dispatch, TaskPlanningService planning, GithubRunnerPushService githubPush, GithubRunnerCheckoutService githubCheckout, ReviewEvidenceService reviews, RepositoryScanService scans, RepositoryIssueProposalService issueProposals, IssueConversationService issueConversations, TestCheckEvidenceService testChecks) {
+        this.leases = leases; this.runners = runners; this.dispatch = dispatch; this.planning = planning; this.githubPush = githubPush; this.githubCheckout=githubCheckout; this.reviews = reviews; this.scans=scans; this.issueProposals=issueProposals; this.issueConversations=issueConversations; this.testChecks=testChecks;
     }
 
     @QueryMapping public List<DeliveryTask> availableRunnerTasks(@Argument String runnerId, @Argument String credential) {
@@ -101,6 +104,12 @@ public class RunnerExecutionController {
                                                                               @Argument VerificationEvidenceSubmission input) {
         runners.authenticated(runnerId, credential);
         return leases.recordEvidence(leaseId, runnerId, nonce, input);
+    }
+    @MutationMapping public io.forgeloop.control.domain.TestCheckEvidence recordTestCheckEvidence(@Argument String leaseId,
+            @Argument String runnerId, @Argument String nonce, @Argument String credential,
+            @Argument TestCheckEvidenceSubmission input) {
+        runners.authenticated(runnerId, credential);
+        return testChecks.record(leaseId, runnerId, nonce, input);
     }
     @MutationMapping public ProviderAttempt recordProviderAttempt(@Argument String leaseId, @Argument String runnerId,
                                                                    @Argument String nonce, @Argument String credential,

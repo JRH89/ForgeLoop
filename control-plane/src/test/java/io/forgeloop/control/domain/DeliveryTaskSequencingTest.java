@@ -89,6 +89,37 @@ class DeliveryTaskSequencingTest {
         assertFalse(review.dependenciesSatisfied());
     }
 
+    @Test
+    void testFirstIntegrationWaitsForRedChecksAsWellAsWriterCommits() {
+        FeatureRun run = run();
+        run.snapshotTestFirst("unit", List.of("**/src/test/**"));
+        run.addGate("unit");
+        DeliveryTask tests = writer(run, "tests", "INDEPENDENT_TEST", "src/test");
+        DeliveryTask implementation = writer(run, "implementation", "IMPLEMENTATION", "src/main");
+        DeliveryTask integration = run.addPlannedTask("integration", "INTEGRATION", "Integrate", "git", List.of(), 2, 0);
+        implementation.dependsOn(tests);
+        integration.dependsOn(implementation);
+
+        run.addTestCheckTasks();
+        DeliveryTask red = run.getTasks().stream().filter(task -> "RED_CHECK".equals(task.getRole())).findFirst().orElseThrow();
+        tests.recordChangeSha(sha('a'));
+        tests.transition(TaskState.LEASED);
+        tests.transition(TaskState.CHANGE_READY);
+
+        assertTrue(red.dependenciesSatisfied());
+        assertFalse(implementation.dependenciesSatisfied(), "implementation cannot start before RED passes");
+        assertFalse(integration.dependenciesSatisfied(), "integration cannot pass a pending RED task");
+        red.transition(TaskState.LEASED);
+        red.transition(TaskState.VERIFIED);
+        assertTrue(implementation.dependenciesSatisfied());
+        implementation.transition(TaskState.LEASED);
+        implementation.recordChangeSha(sha('b'));
+        implementation.transition(TaskState.CHANGE_READY);
+
+        assertTrue(integration.dependenciesSatisfied());
+        assertEquals(List.of(sha('a'), sha('b')), integration.getDependencyChangeShas());
+    }
+
     private static FeatureRun run() {
         return new FeatureRun("org", "org/repository", "issue-1", "feature", "spec", 5, "GENERIC", "main", 1);
     }

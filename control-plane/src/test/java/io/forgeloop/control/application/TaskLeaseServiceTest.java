@@ -131,6 +131,50 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void genericLeaseCompletionCannotApproveRedOrGreenChecks() {
+        for (String role : List.of("RED_CHECK", "GREEN_CHECK")) {
+            DeliveryTask task = mock(DeliveryTask.class);
+            when(task.getRole()).thenReturn(role);
+            when(task.getId()).thenReturn("task");
+            acknowledgedLease();
+            when(tasks.findById("task")).thenReturn(Optional.of(task));
+
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> service.complete("lease", "runner", "nonce", true));
+
+            assertEquals("Test checks require checksummed test evidence", failure.getMessage());
+        }
+    }
+
+    @Test
+    void genericVerificationEvidenceCannotBeRecordedForTestCheckTask() {
+        DeliveryTask task = mock(DeliveryTask.class);
+        when(task.getRole()).thenReturn("RED_CHECK");
+        acknowledgedLease();
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        Instant time = Instant.parse("2026-01-01T00:00:00Z");
+        VerificationEvidenceSubmission submission = new VerificationEvidenceSubmission("CONTAINER", "unit",
+                "node@sha256:" + "a".repeat(64), List.of("npm", "test"), 0, false, "passed", time, time,
+                null, "a".repeat(64), "b".repeat(64));
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> service.recordEvidence("lease", "runner", "nonce", submission));
+
+        assertEquals("Verification evidence requires a verification task", failure.getMessage());
+    }
+
+    private TaskLease acknowledgedLease() {
+        TaskLease lease = mock(TaskLease.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(true);
+        when(lease.getTaskId()).thenReturn("task");
+        return lease;
+    }
+
+    @Test
     void providerAttemptsRequireAndRemainBoundToAnAcknowledgedLease() {
         TaskLease lease = mock(TaskLease.class);
         DeliveryTask task = mock(DeliveryTask.class);
