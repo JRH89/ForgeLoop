@@ -33,24 +33,7 @@ public final class RepositoryContextBuilder {
         if (!Files.exists(root.resolve(".git"))) throw new IllegalArgumentException("Repository context requires a Git worktree");
         List<String> prefixes = preferredPrefixes == null ? List.of() : preferredPrefixes.stream()
                 .map(value -> value.replace('\\', '/').replaceAll("/$", "")).toList();
-        List<Path> candidates = new ArrayList<>();
-        // Prune Git metadata before traversing it. Filtering a Files.walk stream
-        // is too late: background Git maintenance can remove lock files mid-walk.
-        Files.walkFileTree(root, new SimpleFileVisitor<>() {
-            @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
-                return !directory.equals(root) && GENERATED_DIRECTORIES.contains(directory.getFileName().toString())
-                        ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
-            }
-            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                String name = file.getFileName().toString();
-                if (attributes.isRegularFile() && !name.equals(".git") && !name.equalsIgnoreCase(".env")
-                        && SENSITIVE_SUFFIXES.stream().noneMatch(suffix -> name.toLowerCase().endsWith(suffix))) candidates.add(file);
-                return FileVisitResult.CONTINUE;
-            }
-        });
-        List<Path> candidatesInOrder = candidates.stream()
-                .sorted(Comparator.comparingInt((Path path) -> preferred(root, path, prefixes) ? 0 : 1)
-                        .thenComparing(path -> relative(root, path))).limit(MAX_FILES).toList();
+        List<Path> candidatesInOrder = orderedCandidates(root, prefixes);
         StringBuilder context = new StringBuilder("Repository manifest:\n");
         List<Path> files = new ArrayList<>();
         // Reserve room for source text so unusual long paths cannot defeat the prompt ceiling.
@@ -77,9 +60,51 @@ public final class RepositoryContextBuilder {
         return context.toString();
     }
 
-    private static boolean preferred(Path root, Path path, List<String> prefixes) {
+    /** Returns only prioritized repository paths so an agent can choose files without receiving their contents. */
+    public String manifest(Path repository, List<String> preferredPrefixes) throws IOException {
+        Path root = repository.toAbsolutePath().normalize();
+        if (!Files.exists(root.resolve(".git"))) throw new IllegalArgumentException("Repository context requires a Git worktree");
+        List<String> prefixes = normalizedPrefixes(preferredPrefixes);
+        StringBuilder manifest = new StringBuilder("Repository manifest (paths only):\n");
+        for (Path path : orderedCandidates(root, prefixes)) {
+            manifest.append("- ").append(relative(root, path)).append('\n');
+        }
+        return manifest.toString();
+    }
+
+    private static List<String> normalizedPrefixes(List<String> preferredPrefixes) {
+        return preferredPrefixes == null ? List.of() : preferredPrefixes.stream()
+                .map(value -> value.replace('\\', '/').replaceAll("/$", "")).toList();
+    }
+
+    private static List<Path> orderedCandidates(Path root, List<String> prefixes) throws IOException {
+        List<Path> candidates = new ArrayList<>();
+        // Prune Git metadata before traversing it. Filtering a Files.walk stream
+        // is too late: background Git maintenance can remove lock files mid-walk.
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                return !directory.equals(root) && GENERATED_DIRECTORIES.contains(directory.getFileName().toString())
+                        ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+            }
+            @Override public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                String name = file.getFileName().toString();
+                if (attributes.isRegularFile() && !name.equals(".git") && !name.equalsIgnoreCase(".env")
+                        && SENSITIVE_SUFFIXES.stream().noneMatch(suffix -> name.toLowerCase().endsWith(suffix))) candidates.add(file);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return candidates.stream()
+                .sorted(Comparator.comparingInt((Path path) -> priority(root, path, prefixes))
+                        .thenComparing(path -> relative(root, path))).limit(MAX_FILES).toList();
+    }
+
+    private static int priority(Path root, Path path, List<String> prefixes) {
         String relative = relative(root, path);
-        return prefixes.stream().anyMatch(prefix -> relative.equals(prefix) || relative.startsWith(prefix + "/"));
+        for (int index = 0; index < prefixes.size(); index++) {
+            String prefix = prefixes.get(index);
+            if (relative.equals(prefix) || relative.startsWith(prefix + "/")) return index;
+        }
+        return Integer.MAX_VALUE;
     }
 
     private static String relative(Path root, Path path) {

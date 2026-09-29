@@ -165,6 +165,32 @@ public final class GitWorktreeManager {
         return List.copyOf(changed);
     }
 
+    /** Returns current uncommitted and untracked paths; destructive or rename states are rejected. */
+    public List<String> changedPaths(Path worktree) throws IOException, InterruptedException {
+        if (!Files.exists(worktree.resolve(".git"))) throw new IllegalArgumentException("Changed-path request requires a Git worktree");
+        String status = outputRaw(worktree, List.of("git", "status", "--porcelain=v1", "-z", "--untracked-files=all"), 64 * 1024);
+        if (status.getBytes(StandardCharsets.UTF_8).length >= 64 * 1024) throw new IllegalStateException("Changed path output exceeds safe limits");
+        List<String> paths = new ArrayList<>();
+        int cursor = 0;
+        while (cursor < status.length()) {
+            int end = status.indexOf('\0', cursor);
+            if (end < 0 || end - cursor < 4) throw new IllegalStateException("Git status output is malformed or truncated");
+            String entry = status.substring(cursor, end);
+            char index = entry.charAt(0), worktreeStatus = entry.charAt(1);
+            if (index == 'D' || worktreeStatus == 'D' || index == 'R' || worktreeStatus == 'R' || index == 'C' || worktreeStatus == 'C')
+                throw new IllegalStateException("Finish does not allow deleted, renamed, or copied paths");
+            paths.add(entry.substring(3));
+            cursor = end + 1;
+            if (index == 'R' || worktreeStatus == 'R' || index == 'C' || worktreeStatus == 'C') {
+                int originalEnd = status.indexOf('\0', cursor);
+                if (originalEnd < 0) throw new IllegalStateException("Git rename output is malformed");
+                cursor = originalEnd + 1;
+            }
+            if (paths.size() > MAX_CHANGED_FILES) throw new IllegalStateException("Changed path list exceeds policy limits");
+        }
+        return List.copyOf(paths);
+    }
+
     private void run(Path repository, List<String> command) throws IOException, InterruptedException {
         List<String> safeCommand = new ArrayList<>();
         safeCommand.add("git");
