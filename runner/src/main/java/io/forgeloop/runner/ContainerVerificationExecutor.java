@@ -37,7 +37,7 @@ public final class ContainerVerificationExecutor {
         Path temporaryEvidence = Files.createTempDirectory("forgeloop-verification-");
         try {
             return execute(worktree, dockerVisibleWorktree, temporaryEvidence, temporaryEvidence,
-                    image, command, timeout, allowNetwork);
+                    image, command, timeout, allowNetwork, null);
         } finally {
             deleteRecursively(temporaryEvidence);
         }
@@ -52,32 +52,27 @@ public final class ContainerVerificationExecutor {
             List<String> command,
             Duration timeout,
             boolean allowNetwork) throws IOException, InterruptedException {
+        return execute(worktree, dockerVisibleWorktree, evidenceDirectory, dockerVisibleEvidenceDirectory,
+                image, command, timeout, allowNetwork, null);
+    }
+
+    public VerificationResult execute(
+            Path worktree,
+            Path dockerVisibleWorktree,
+            Path evidenceDirectory,
+            Path dockerVisibleEvidenceDirectory,
+            String image,
+            List<String> command,
+            Duration timeout,
+            boolean allowNetwork,
+            String testReportFormat) throws IOException, InterruptedException {
         validate(worktree, dockerVisibleWorktree, image, command, timeout);
         Files.createDirectories(evidenceDirectory.resolve("test-results"));
         Files.createDirectories(evidenceDirectory.resolve("playwright-report"));
+        if (testReportFormat != null) Files.createDirectories(evidenceDirectory.resolve("test-report"));
 
-        List<String> dockerCommand = new ArrayList<>(List.of(
-                "docker", "run", "--rm", "--init", "--read-only",
-                "--mount", "type=bind,src=" + dockerVisibleWorktree + ",dst=/source,readonly",
-                "--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("test-results") + ",dst=/workspace/test-results",
-                "--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("playwright-report") + ",dst=/workspace/playwright-report",
-                "--workdir", "/workspace",
-                "--tmpfs", "/tmp:rw,noexec,nosuid,size=128m",
-                "--tmpfs", "/workspace:rw,exec,nosuid,size=2g",
-                "--env", "HOME=/tmp/home",
-                "--env", "XDG_CACHE_HOME=/tmp/cache",
-                "--env", "MAVEN_CONFIG=/tmp/m2",
-                "--env", "MAVEN_OPTS=-Dmaven.repo.local=/workspace/.m2/repository -Djansi.tmpdir=/workspace/.tmp",
-                "--env", "npm_config_cache=/tmp/npm"));
-        if (!allowNetwork) {
-            dockerCommand.addAll(List.of("--network", "none"));
-        }
-        dockerCommand.add(image);
-        // The fixed bootstrap copies the read-only source into an ephemeral filesystem. Policy argv is
-        // forwarded as positional arguments and is never interpolated into shell source.
-        dockerCommand.addAll(List.of("sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /workspace/.tmp /workspace/.m2/repository && exec \"$@\"", "forgeloop-verify"));
-        dockerCommand.addAll(command);
-
+        List<String> dockerCommand = buildDockerCommand(dockerVisibleWorktree, dockerVisibleEvidenceDirectory,
+                image, command, allowNetwork, testReportFormat);
         Instant startedAt = Instant.now();
         Process process = new ProcessBuilder(dockerCommand).redirectErrorStream(true).start();
         // Drain concurrently: package managers can exceed the OS pipe buffer long before exit.
@@ -107,6 +102,40 @@ public final class ContainerVerificationExecutor {
                 new String(output, StandardCharsets.UTF_8),
                 startedAt,
                 Instant.now());
+    }
+
+    List<String> buildDockerCommand(Path dockerVisibleWorktree, Path dockerVisibleEvidenceDirectory,
+                                    String image, List<String> command, boolean allowNetwork,
+                                    String testReportFormat) {
+        if (testReportFormat != null && !"JUNIT_XML".equals(testReportFormat)) {
+            throw new IllegalArgumentException("Verification test report format is invalid");
+        }
+        List<String> dockerCommand = new ArrayList<>(List.of(
+                "docker", "run", "--rm", "--init", "--read-only",
+                "--mount", "type=bind,src=" + dockerVisibleWorktree + ",dst=/source,readonly",
+                "--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("test-results") + ",dst=/workspace/test-results",
+                "--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("playwright-report") + ",dst=/workspace/playwright-report",
+                "--workdir", "/workspace",
+                "--tmpfs", "/tmp:rw,noexec,nosuid,size=128m",
+                "--tmpfs", "/workspace:rw,exec,nosuid,size=2g",
+                "--env", "HOME=/tmp/home",
+                "--env", "XDG_CACHE_HOME=/tmp/cache",
+                "--env", "MAVEN_CONFIG=/tmp/m2",
+                "--env", "MAVEN_OPTS=-Dmaven.repo.local=/workspace/.m2/repository -Djansi.tmpdir=/workspace/.tmp",
+                "--env", "npm_config_cache=/tmp/npm"));
+        if (testReportFormat != null) {
+            dockerCommand.addAll(List.of("--mount", "type=bind,src=" + dockerVisibleEvidenceDirectory.resolve("test-report")
+                    + ",dst=/forgeloop/test-report"));
+        }
+        if (!allowNetwork) {
+            dockerCommand.addAll(List.of("--network", "none"));
+        }
+        dockerCommand.add(image);
+        // The fixed bootstrap copies the read-only source into an ephemeral filesystem. Policy argv is
+        // forwarded as positional arguments and is never interpolated into shell source.
+        dockerCommand.addAll(List.of("sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /workspace/.tmp /workspace/.m2/repository && exec \"$@\"", "forgeloop-verify"));
+        dockerCommand.addAll(command);
+        return List.copyOf(dockerCommand);
     }
 
     private static void deleteRecursively(Path directory) throws IOException {

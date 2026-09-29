@@ -8,7 +8,8 @@ public record RunnerTask(String id, String role, String title, String repository
                          List<String> ownedPaths, List<String> dependencyChangeShas, String verificationGateName,
                          String verificationKind, String verificationImageDigest, List<String> verificationCommand,
                          String verificationNetworkPolicy, Integer verificationTimeoutSeconds, String verificationBaseRef,
-                         String executionBaseRef, List<String> acceptanceCriteria,List<LocalMcpConfiguration> mcpConfigurations) {
+                         String executionBaseRef, List<String> acceptanceCriteria,List<LocalMcpConfiguration> mcpConfigurations,
+                         String writeBoundary, List<String> testPathGlobs, String testReportFormat) {
     public RunnerTask {
         if (id == null || id.isBlank() || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
                 || baseBranch == null || baseBranch.isBlank() || executionBaseRef == null || executionBaseRef.isBlank()
@@ -20,10 +21,20 @@ public record RunnerTask(String id, String role, String title, String repository
         verificationCommand = verificationCommand == null ? List.of() : List.copyOf(verificationCommand);
         acceptanceCriteria = acceptanceCriteria == null ? List.of() : List.copyOf(acceptanceCriteria);
         mcpConfigurations=mcpConfigurations==null?List.of():List.copyOf(mcpConfigurations);
+        writeBoundary = writeBoundary == null ? "ANY" : writeBoundary;
+        testPathGlobs = testPathGlobs == null ? List.of() : List.copyOf(testPathGlobs);
+        if (!List.of("ANY", "TESTS_ONLY", "NO_TESTS").contains(writeBoundary)
+                || (!"ANY".equals(writeBoundary) && !TestPathGlobs.areValid(testPathGlobs))) {
+            throw new IllegalArgumentException("Task write boundary is invalid");
+        }
+        if (testReportFormat != null && !"JUNIT_XML".equals(testReportFormat)) {
+            throw new IllegalArgumentException("Verification test report format is invalid");
+        }
     }
     public RunnerTask(String id, String role, String title, String repository, String baseBranch,
                       String sourceRef, String specification, String requiredCapability) {
-        this(id, role, title, repository, baseBranch, sourceRef, specification, requiredCapability, 0, List.of(), List.of(), null, null, null, List.of(), null, null, baseBranch, baseBranch, List.of(),List.of());
+        this(id, role, title, repository, baseBranch, sourceRef, specification, requiredCapability, 0, List.of(), List.of(), null, null, null, List.of(), null, null, baseBranch, baseBranch, List.of(),List.of(), "ANY", List.of(), null);
     }
-    public RunnerTask(String id,String role,String title,String repository,String baseBranch,String sourceRef,String specification,String requiredCapability,double budgetUsd,List<String> ownedPaths,List<String> dependencyChangeShas,String verificationGateName,String verificationKind,String verificationImageDigest,List<String> verificationCommand,String verificationNetworkPolicy,Integer verificationTimeoutSeconds,String verificationBaseRef,String executionBaseRef,List<String> acceptanceCriteria){this(id,role,title,repository,baseBranch,sourceRef,specification,requiredCapability,budgetUsd,ownedPaths,dependencyChangeShas,verificationGateName,verificationKind,verificationImageDigest,verificationCommand,verificationNetworkPolicy,verificationTimeoutSeconds,verificationBaseRef,executionBaseRef,acceptanceCriteria,List.of());}
+    public RunnerTask(String id,String role,String title,String repository,String baseBranch,String sourceRef,String specification,String requiredCapability,double budgetUsd,List<String> ownedPaths,List<String> dependencyChangeShas,String verificationGateName,String verificationKind,String verificationImageDigest,List<String> verificationCommand,String verificationNetworkPolicy,Integer verificationTimeoutSeconds,String verificationBaseRef,String executionBaseRef,List<String> acceptanceCriteria,List<LocalMcpConfiguration> mcpConfigurations){this(id,role,title,repository,baseBranch,sourceRef,specification,requiredCapability,budgetUsd,ownedPaths,dependencyChangeShas,verificationGateName,verificationKind,verificationImageDigest,verificationCommand,verificationNetworkPolicy,verificationTimeoutSeconds,verificationBaseRef,executionBaseRef,acceptanceCriteria,mcpConfigurations, "ANY", List.of(), null);}
+    public RunnerTask(String id,String role,String title,String repository,String baseBranch,String sourceRef,String specification,String requiredCapability,double budgetUsd,List<String> ownedPaths,List<String> dependencyChangeShas,String verificationGateName,String verificationKind,String verificationImageDigest,List<String> verificationCommand,String verificationNetworkPolicy,Integer verificationTimeoutSeconds,String verificationBaseRef,String executionBaseRef,List<String> acceptanceCriteria){this(id,role,title,repository,baseBranch,sourceRef,specification,requiredCapability,budgetUsd,ownedPaths,dependencyChangeShas,verificationGateName,verificationKind,verificationImageDigest,verificationCommand,verificationNetworkPolicy,verificationTimeoutSeconds,verificationBaseRef,executionBaseRef,acceptanceCriteria,List.of(), "ANY", List.of(), null);}
 }

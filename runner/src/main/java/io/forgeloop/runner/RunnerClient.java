@@ -163,7 +163,7 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
         if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
@@ -176,7 +176,9 @@ public final class RunnerClient {
                     JSON.convertValue(task.path("verificationCommand"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
                     nullableText(task, "verificationNetworkPolicy"), task.path("verificationTimeoutSeconds").isNull() ? null : task.path("verificationTimeoutSeconds").asInt(), task.path("verificationBaseRef").asText(), task.path("executionBaseRef").asText(),
                     JSON.convertValue(task.path("acceptanceCriteria"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
-                    JSON.convertValue(task.path("mcpConfigurations"),JSON.getTypeFactory().constructCollectionType(List.class,LocalMcpConfiguration.class))));
+                    JSON.convertValue(task.path("mcpConfigurations"),JSON.getTypeFactory().constructCollectionType(List.class,LocalMcpConfiguration.class)),
+                    nullableText(task, "writeBoundary"), JSON.convertValue(task.path("testPathGlobs"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
+                    nullableText(task, "testReportFormat")));
         }
         return List.copyOf(tasks);
     }

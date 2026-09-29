@@ -25,12 +25,22 @@ public final class GuardedPatchWorker {
                                       String title, String specification, Path worktree,
                                       List<String> allowedPrefixes, List<String> preferredContextPaths,
                                       String correlationId) throws Exception {
+        return execute(policy, provider, role, title, specification, worktree, allowedPrefixes,
+                preferredContextPaths, correlationId, WriteBoundary.any());
+    }
+
+    /** Applies server-derived test-file restrictions in addition to repository-owned path prefixes. */
+    public GuardedPatchResult execute(ProviderExecutionPolicy policy, ProviderClient provider, String role,
+                                      String title, String specification, Path worktree,
+                                      List<String> allowedPrefixes, List<String> preferredContextPaths,
+                                      String correlationId, WriteBoundary boundary) throws Exception {
         if (!supports(role)) {
             throw new IllegalArgumentException("Task role is not permitted to modify repository files");
         }
         String instructions = "You are the " + role + " worker. Return JSON only: "
                 + "{summary:string,changes:[{path:string,content:string,message:string}]}. "
-                + "Propose complete file contents only. Do not use paths outside the allowed prefixes.";
+                + "Propose complete file contents only. Do not use paths outside the allowed prefixes."
+                + boundaryInstructions(boundary);
         String input = "Task: " + title + "\nAllowed prefixes: " + String.join(",", allowedPrefixes)
                 + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n"
                 + new RepositoryContextBuilder().build(worktree, preferredContextPaths);
@@ -41,7 +51,9 @@ public final class GuardedPatchWorker {
         PatchPlan plan;
         try {
             plan = PatchPlan.parse(execution.result().output());
-            new PatchWriter().apply(worktree, plan, allowedPrefixes);
+            new PatchWriter().apply(worktree, plan, allowedPrefixes, boundary);
+        } catch (WriteBoundaryViolation boundaryViolation) {
+            throw new GuardedPatchFailure("TEST_BOUNDARY_VIOLATION", usage, boundaryViolation);
         } catch (Exception unsafeOutput) {
             throw new GuardedPatchFailure("INVALID_PROVIDER_OUTPUT", usage, unsafeOutput);
         }
@@ -51,6 +63,13 @@ public final class GuardedPatchWorker {
         } catch (Exception localFailure) {
             throw new GuardedPatchFailure("LOCAL_COMMIT_FAILURE", usage, localFailure);
         }
+    }
+
+    static String boundaryInstructions(WriteBoundary boundary) {
+        if (boundary == null || boundary.isAny()) return "";
+        if (boundary.requiresTestPaths()) return " Test files are paths matching: "
+                + String.join(",", boundary.testPathGlobs()) + ". You may write only test files.";
+        return " You may not write test files.";
     }
 
     /** Normalizes untrusted prose into one bounded Git subject without discarding an otherwise safe patch. */
