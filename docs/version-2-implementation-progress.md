@@ -27,7 +27,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 9 | 3e - Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
 | 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / [#92](https://github.com/JRH89/ForgeLoop/pull/92) | Merged to `master` (2026-09-29); dispatch remains dormant |
 | 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Merged to `master` (2026-09-29) |
-| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / PR pending | Implementation isolated; full local verification passed; hosted checks pending |
+| 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / [#94](https://github.com/JRH89/ForgeLoop/pull/94) | Full local verification passed; hosted checks pending |
 | 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) | Implemented locally; queued behind 4c |
 | 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) | Implemented locally; queued behind 4d |
 | 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) | Implemented locally; queued behind 5a |
@@ -113,7 +113,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Result:** administrator-only repository enforcement settings validate and audit custom protected globs, the default-deny workflow opt-out, and an optional repository verification finish gate. Settings are persisted on repositories and snapshotted immutably on feature runs, then exposed to writing tasks through GraphQL. The runner fingerprints and validates the policy before any provider request, enforces custom paths and opt-out semantics, and redirects finish until a qualifying post-write gate run exists. The loop remains dormant.
 - **Additional safety fix:** safe dot-prefixed paths such as `.github/workflows/ci.yml` are accepted by structured patch validation; empty, dot, parent/traversal segments remain rejected. This makes the audited workflow opt-out usable without widening repository confinement.
 - **Verification:** focused control-plane (18 tests) and runner (37 tests) suites passed. Re-run against merged `master`: control-plane `mvn -B verify` passed (316 tests), runner `mvn -B verify` passed (286 tests, 9 existing platform/live-fixture skips), and harness `mvn -B verify` passed (2 tests). `git diff --check` passed. No provider-backed work was run.
-- **Delivery:** implementation and documentation are isolated on `feat/4c-repository-enforcement-pr`; issue #85 is linked. Full local verification passed against the merged prerequisite chain; hosted checks will run on its linked PR.
+- **Delivery:** linked [PR #94](https://github.com/JRH89/ForgeLoop/pull/94) implements issue #85 from `feat/4c-repository-enforcement-pr`. Full local verification passed against the merged prerequisite chain; hosted checks are pending.
 
 ## Update protocol
 
