@@ -23,7 +23,7 @@ class DockerTestCheckExecutionTest {
 
     @Test
     void addedAssertionPassesAtParentAndFailsAtTestCommit() throws Exception {
-        assumeTrue(dockerAvailable(), "A Docker daemon is required for this integration test");
+        assumeTrue(dockerSupportsLinuxContainers(), "A Linux-container Docker daemon is required for this integration test");
         Path repository = temporaryDirectory.resolve("repository");
         Files.createDirectories(repository);
         run("git", "init", repository.toString());
@@ -74,11 +74,17 @@ class DockerTestCheckExecutionTest {
         }
     }
 
-    private static boolean dockerAvailable() {
+    private static boolean dockerSupportsLinuxContainers() {
         try {
-            Process process = new ProcessBuilder("docker", "info", "--format", "{{.ServerVersion}}")
+            // The fixture uses an Alpine image and a Linux-only read-only root mount.
+            Process process = new ProcessBuilder("docker", "info", "--format", "{{.OSType}}")
                     .redirectErrorStream(true).start();
-            return process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && process.exitValue() == 0;
+            if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            String operatingSystem = new String(process.getInputStream().readAllBytes()).trim();
+            return process.exitValue() == 0 && "linux".equalsIgnoreCase(operatingSystem);
         } catch (Exception unavailable) {
             return false;
         }
