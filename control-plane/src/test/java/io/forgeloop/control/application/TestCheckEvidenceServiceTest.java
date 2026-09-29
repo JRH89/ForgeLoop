@@ -59,8 +59,10 @@ class TestCheckEvidenceServiceTest {
     void failedRedCheckRequeuesItsTestWriterAndCarriesTheOffendingIdentity() throws Exception {
         Fixture fixture = fixture(redBundle(TestCheckRules.Outcome.PASSED));
 
-        fixture.service().record(LEASE_ID, RUNNER_ID, "nonce", fixture.submission());
+        TestCheckEvidence recorded = fixture.service().record(LEASE_ID, RUNNER_ID, "nonce", fixture.submission());
 
+        assertEquals(List.of(new TestCheckRules.ChangedFile("tests/NewTest.java", "d".repeat(40))),
+                recorded.changedFilesEvidence());
         verify(fixture.writer()).transition(TaskState.REPAIR_QUEUED);
         verify(fixture.check()).requeueRedCheckAfterWriterRepair();
         verify(fixture.lease()).closeForTestCheck();

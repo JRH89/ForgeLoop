@@ -101,6 +101,20 @@ public class TaskLeaseService {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.completeIntegration(integratedSha); return lease;
     }
 
+    /** Holds a published integration when GitHub shows test blobs that current RED evidence did not approve. */
+    @Transactional public TaskLease holdIntegrationForTestBoundaryViolation(String leaseId, String runnerId, String nonce,
+                                                                             String summary) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Policy hold requires an active acknowledged lease");
+        DeliveryTask task = lease.getTask();
+        if (!"INTEGRATION".equals(task.getRole())) throw new IllegalStateException("Only an integration lease can be held by the branch check");
+        task.hold();
+        task.getRun().block();
+        escalations.escalate(task, "TEST_BOUNDARY_VIOLATION", summary);
+        lease.closeForPolicyHold();
+        return lease;
+    }
+
     @Transactional public VerificationEvidence recordEvidence(String leaseId, String runnerId, String nonce,
                                                                   VerificationEvidenceSubmission submission) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);

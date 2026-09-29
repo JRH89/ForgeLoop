@@ -239,4 +239,28 @@ class TaskLeaseServiceTest {
 
         verify(lease).completeChangeReady("a".repeat(40));
     }
+
+    @Test
+    void testBoundaryViolationHoldsIntegrationBlocksRunAndClosesLease() throws Exception {
+        FeatureRun run = new FeatureRun("org", "acme/project", "issue-1", "Build feature", "spec", 1,
+                "GENERIC", "main", 1);
+        DeliveryTask integration = run.addPlannedTask("integration", "INTEGRATION", "Integrate", "git", List.of(), 1, 0);
+        run.beginPlanning();
+        run.queuePlannedWork();
+        run.startExecution();
+        Runner runner = mock(Runner.class);
+        when(runner.getId()).thenReturn("runner");
+        String nonceHash = java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest("nonce".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        TaskLease lease = new TaskLease(integration, runner, nonceHash, Instant.now().plusSeconds(600));
+        lease.acknowledge();
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+
+        service.holdIntegrationForTestBoundaryViolation("lease", "runner", "nonce", "test file changed");
+
+        assertEquals(TaskState.HELD, integration.getState());
+        assertEquals(RunState.BLOCKED, run.getState());
+        org.junit.jupiter.api.Assertions.assertTrue(lease.isCompleted());
+        verify(escalations).escalate(integration, "TEST_BOUNDARY_VIOLATION", "test file changed");
+    }
 }
