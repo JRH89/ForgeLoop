@@ -181,7 +181,8 @@ public class DeliveryTask {
                     .filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch());
         }
         if (isWritingRole(role) && !dependencies.isEmpty()) {
-            DeliveryTask dependency = getWritingDependency().filter(ignored -> dependencies.size() == 1)
+            DeliveryTask dependency = getWritingDependency().filter(ignored ->
+                            dependencies.stream().filter(DeliveryTask::isWritingTask).count() == 1)
                     .orElseThrow(() -> new IllegalStateException("A chained writing task must have exactly one writing dependency"));
             if (dependency.changeSha == null) throw new IllegalStateException("Writing dependency has no change commit");
             return dependency.changeSha;

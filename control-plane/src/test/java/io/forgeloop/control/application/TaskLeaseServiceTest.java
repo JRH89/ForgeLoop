@@ -62,10 +62,15 @@ class TaskLeaseServiceTest {
         FeatureRun run = new FeatureRun("org", "a/b", "issue-1", "x", "spec", 1, "GENERIC", "main", 1);
         DeliveryTask predecessor = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 100_000);
         DeliveryTask task = run.addPlannedTask("implementation", "IMPLEMENTATION", "Implement", "provider", List.of("src"), 2, 100_000);
+        DeliveryTask redCheck = run.addPlannedTask("red-tests", "RED_CHECK", "Check tests first", "docker", List.of(), 2, 0);
         task.dependsOn(predecessor);
+        task.dependsOn(redCheck);
+        redCheck.dependsOn(predecessor);
         predecessor.transition(TaskState.LEASED);
         predecessor.recordChangeSha("a".repeat(40));
         predecessor.transition(TaskState.CHANGE_READY);
+        redCheck.transition(TaskState.LEASED);
+        redCheck.transition(TaskState.VERIFIED);
         TaskLease producerLease = mock(TaskLease.class);
         when(producerLease.getRunnerId()).thenReturn("runner-a");
         Runner otherRunner = mock(Runner.class);
@@ -73,7 +78,7 @@ class TaskLeaseServiceTest {
         when(otherRunner.hasCapability("provider")).thenReturn(true);
         when(otherRunner.getId()).thenReturn("runner-b");
         when(tasks.findById("task")).thenReturn(Optional.of(task));
-        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task, predecessor));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task, predecessor, redCheck));
         when(runners.findById("runner-b")).thenReturn(Optional.of(otherRunner));
         when(leases.findFirstByTask_IdOrderByExpiresAtDesc(predecessor.getId())).thenReturn(Optional.of(producerLease));
 

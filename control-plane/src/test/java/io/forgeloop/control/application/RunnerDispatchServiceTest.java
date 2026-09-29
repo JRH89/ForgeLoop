@@ -53,10 +53,15 @@ class RunnerDispatchServiceTest {
         FeatureRun run = new FeatureRun("org/repository", "main", "feature", "spec", 5, "GENERIC", 1);
         var predecessor = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 1_000_000);
         var dependent = run.addPlannedTask("implementation", "IMPLEMENTATION", "Implementation", "provider", List.of("src"), 2, 1_000_000);
+        var redCheck = run.addPlannedTask("red-tests", "RED_CHECK", "Check tests first", "docker", List.of(), 2, 0);
         dependent.dependsOn(predecessor);
+        dependent.dependsOn(redCheck);
+        redCheck.dependsOn(predecessor);
         predecessor.transition(TaskState.LEASED);
         predecessor.recordChangeSha("a".repeat(40));
         predecessor.transition(TaskState.CHANGE_READY);
+        redCheck.transition(TaskState.LEASED);
+        redCheck.transition(TaskState.VERIFIED);
         TaskLease producerLease = mock(TaskLease.class);
         when(producerLease.getRunnerId()).thenReturn("runner-a");
         when(leases.findFirstByTask_IdOrderByExpiresAtDesc(predecessor.getId())).thenReturn(Optional.of(producerLease));

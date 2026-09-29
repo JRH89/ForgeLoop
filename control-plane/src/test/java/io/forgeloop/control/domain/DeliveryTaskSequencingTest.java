@@ -14,12 +14,18 @@ class DeliveryTaskSequencingTest {
         FeatureRun run = run();
         DeliveryTask tests = writer(run, "tests", "INDEPENDENT_TEST", "tests");
         DeliveryTask implementation = writer(run, "implementation", "IMPLEMENTATION", "src");
+        DeliveryTask redCheck = run.addPlannedTask("red-tests", "RED_CHECK", "Check tests first", "docker", List.of(), 2, 0);
         implementation.dependsOn(tests);
+        implementation.dependsOn(redCheck);
+        redCheck.dependsOn(tests);
 
         assertFalse(implementation.dependenciesSatisfied());
         tests.transition(TaskState.LEASED);
         tests.recordChangeSha(sha('a'));
         tests.transition(TaskState.CHANGE_READY);
+        assertFalse(implementation.dependenciesSatisfied());
+        redCheck.transition(TaskState.LEASED);
+        redCheck.transition(TaskState.VERIFIED);
 
         assertTrue(implementation.dependenciesSatisfied());
         assertEquals(sha('a'), implementation.getExecutionBaseRef());

@@ -16,7 +16,7 @@ public final class ChainedWriterRunnerAffinity {
 
     public boolean permits(DeliveryTask task, String runnerId) {
         if (!task.isWritingTask() || task.getDependencies().isEmpty()) return true;
-        if (task.getDependencies().size() != 1) return false;
+        if (task.getDependencies().stream().filter(DeliveryTask::isWritingTask).count() != 1) return false;
         var dependency = task.getWritingDependency();
         if (dependency.isEmpty()) return false;
         DeliveryTask predecessor = dependency.get();
