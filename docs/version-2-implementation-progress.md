@@ -4,9 +4,9 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 
 ## Current status
 
-- **Active work:** Slice 4d, shared spend reservation before agent-loop turns; issue [#86](https://github.com/JRH89/ForgeLoop/issues/86).
-- **Delivery branch:** `feat/4d-spend-reservations-pr` contains only 4d plus this tracker update, based directly on the merged prerequisite chain.
-- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, #93, and #94 are merged to `master` (2026-09-29). Only one PR is open at a time.
+- **Active work:** Slice 5a, run-record identity and input pins; issue [#87](https://github.com/JRH89/ForgeLoop/issues/87).
+- **Delivery branch:** `feat/5a-run-record-pins-pr` contains only 5a plus this tracker update, based directly on the merged prerequisite chain.
+- **Merged PR stack:** PRs #70, #72, #74, #76, #78, #80, #82, #92, #93, #94, and #95 are merged to `master` (2026-09-29). Only one PR is open at a time.
 - **Issue provenance:** #83-#86 decompose design 04 into slices 4a-4d; #87-#90 track design 05 slices 5a, 5b, 5c, and 5e; #91 tracks 5d-i. Slice 5d-ii is still planned without an issue.
 - **Safety boundary:** the agent loop remains dormant. Slices 4a–4c add enforcement contracts only; they must not enable or wire dispatch.
 - **External validation:** no paid provider-backed run is included. Local HTTP fixtures and hosted CI are not provider-backed evidence.
@@ -28,8 +28,8 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 | 10 | 4a - Fail-closed security guard | 2a, 2b, 3b, 3c | [#83](https://github.com/JRH89/ForgeLoop/issues/83) / [#92](https://github.com/JRH89/ForgeLoop/pull/92) | Merged to `master` (2026-09-29); dispatch remains dormant |
 | 11 | 4b - RED prerequisite validation | 4a, 2b | [#84](https://github.com/JRH89/ForgeLoop/issues/84) / [#93](https://github.com/JRH89/ForgeLoop/pull/93) | Merged to `master` (2026-09-29) |
 | 12 | 4c - Repository enforcement policy | 4a | [#85](https://github.com/JRH89/ForgeLoop/issues/85) / [#94](https://github.com/JRH89/ForgeLoop/pull/94) | Merged to `master` (2026-09-29); hosted checks passed |
-| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) / [#95](https://github.com/JRH89/ForgeLoop/pull/95) | Full local verification passed; hosted checks pending |
-| 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) | Implemented locally; queued behind 4d |
+| 13 | 4d - Spend reservation and enforcement | 4a | [#86](https://github.com/JRH89/ForgeLoop/issues/86) / [#95](https://github.com/JRH89/ForgeLoop/pull/95) | Merged to `master` (2026-09-29); hosted checks passed |
+| 14 | 5a - Run-record identity and input pins | 3 | [#87](https://github.com/JRH89/ForgeLoop/issues/87) / PR pending | Full local verification passed; hosted checks pending |
 | 15 | 5b - Attempt outcomes and attempt-local routing | 5a, 2 | [#88](https://github.com/JRH89/ForgeLoop/issues/88) | Implemented locally; queued behind 5a |
 | 16 | 5c - Opt-in record content and journal upload | 3, 5a, 5b | [#89](https://github.com/JRH89/ForgeLoop/issues/89) | Implemented locally; queued behind 5b |
 | 17 | 5e - Provider replay and drift probe | 3a, 5c fixtures | [#90](https://github.com/JRH89/ForgeLoop/issues/90) | Offline replay verified; live canonical fixtures and paid drift calls pending |
@@ -120,15 +120,15 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Issue:** [#86](https://github.com/JRH89/ForgeLoop/issues/86).
 - **Result:** priced agent-loop turns now reserve a conservative worst-case cost with the control plane before the runner journals or sends the request. Run-scoped task locks serialize concurrent reservations; task and run known spend plus active sibling reservations must remain within budget. Reservations replace earlier values on retry, settle when provider usage is recorded, and are released when leases close or expire. Unknown pricing skips reservation; refusal stops before the provider call; control-plane transport failure retries with bounded backoff and then fails closed.
 - **Verification:** the original full suites passed (control-plane 307 tests; runner 244 tests with 5 platform-dependent skips; harness 2 tests). Re-run on the #85 PR stack: control-plane 322 tests, runner 288 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
-- **Delivery:** linked [PR #95](https://github.com/JRH89/ForgeLoop/pull/95) implements issue #86 from `feat/4d-spend-reservations-pr`. Full local verification passed on the merged #85 base; hosted checks are pending.
+- **Delivery:** merged as [PR #95](https://github.com/JRH89/ForgeLoop/pull/95) on 2026-09-29; issue #86 is closed. Hosted checks passed, including end-to-end and all four desktop package targets. No provider-backed calls.
 
 ## Slice 5a - Run-record identity and input pins
 
 - **Issue:** [#87](https://github.com/JRH89/ForgeLoop/issues/87).
 - **Result:** provider adapters now report the model that actually answered; acknowledged leases pin runner revision and JAR SHA-256; gate evidence records the checked commit, resolved platform image ID, output-truncation flag, and validated lease link without changing existing evidence bundle digests. Claims capture immutable execution/verification refs and dependency commit order, while code-ready and integration closes pin their result SHA. Run submission stores canonical, SHA-256-addressed JSON for repository, organization, harness, and enabled local MCP policy; only the digest is exposed in GraphQL.
 - **Compatibility:** new GraphQL inputs are optional, the database migration is nullable with no backfill, and legacy/unpackaged runner builds are explicitly represented.
-- **Verification:** original control-plane `mvn -B verify` passed (317 tests); runner `mvn -B -Dforgeloop.revision=deadbeef0 verify` passed (255 tests, 5 platform-dependent skips); harness `mvn -B verify` passed (2 tests). V42 applied successfully against an isolated PostgreSQL 18 instance; all 12 new columns and both lease indexes were present. Re-run on the cumulative #85–#87 preparation stack: control-plane 326 tests, runner 290 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No provider-backed call was made.
-- **Delivery:** implementation commit `99a27ce` is being validated on a preparation branch stacked on issue #86; issue #87 is linked. No #87 PR will open until #85 and #86 merge, preserving one open PR at a time.
+- **Verification:** original control-plane `mvn -B verify` passed (317 tests); runner `mvn -B -Dforgeloop.revision=deadbeef0 verify` passed (255 tests, 5 platform-dependent skips); harness `mvn -B verify` passed (2 tests). V42 applied successfully against an isolated PostgreSQL 18 instance; all 12 new columns and both lease indexes were present. Re-run on the refreshed merged `master` plus 5a: control-plane 326 tests, runner 290 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No provider-backed call was made.
+- **Delivery:** implementation commit `99a27ce` is isolated on `feat/5a-run-record-pins-pr`; issue #87 is linked. Full local verification passed; the linked PR is pending creation.
 
 ## Update protocol
 
