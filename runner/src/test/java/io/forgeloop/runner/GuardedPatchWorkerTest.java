@@ -36,6 +36,29 @@ class GuardedPatchWorkerTest {
         assertFalse(Files.exists(repository.resolve("src/result.txt")));
     }
 
+    @Test void reportsTestBoundaryViolationsSeparatelyAndWritesNothing() throws Exception {
+        initializeRepository();
+        ProviderClient provider = ignored -> new ProviderResult("""
+                {"summary":"change","changes":[{"path":"src/Feature.test.ts","content":"forbidden","message":"test file"}]}
+                """, 1, 1, "boundary-request");
+
+        GuardedPatchFailure failure = org.junit.jupiter.api.Assertions.assertThrows(GuardedPatchFailure.class,
+                () -> new GuardedPatchWorker().execute(new ProviderExecutionPolicy("openai", "model", 1), provider,
+                        "IMPLEMENTATION", "task", "spec", repository, List.of("src"), List.of("src"),
+                        "boundary-lease", new WriteBoundary("NO_TESTS", List.of("**/*.test.ts"))));
+
+        assertEquals("TEST_BOUNDARY_VIOLATION", failure.category());
+        assertFalse(Files.exists(repository.resolve("src/Feature.test.ts")));
+    }
+
+    @Test void onlyTestFirstTasksReceiveBoundaryPromptInstructions() {
+        assertTrue(GuardedPatchWorker.boundaryInstructions(new WriteBoundary("TESTS_ONLY", List.of("tests/**")))
+                .contains("You may write only test files"));
+        assertTrue(GuardedPatchWorker.boundaryInstructions(new WriteBoundary("NO_TESTS", List.of("tests/**")))
+                .contains("You may not write test files"));
+        assertEquals("", GuardedPatchWorker.boundaryInstructions(WriteBoundary.any()));
+    }
+
     @Test void nonCodeRoleCannotReceiveRepositoryWriteCapability() throws Exception {
         initializeRepository();
         ProviderClient provider = ignored -> new ProviderResult("{}", 1, 1, "request");

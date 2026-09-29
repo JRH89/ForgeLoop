@@ -29,6 +29,19 @@ class RunnerMainTest {
     }
 
     @Test
+    void additionalMcpContextPreservesTestFirstContractFields() {
+        RunnerTask task = new RunnerTask("task", "IMPLEMENTATION", "Implement", "org/repository", "main", "issue-1",
+                "spec", "provider", 1, List.of("src"), List.of(), null, null, null, List.of(), null, null,
+                "main", "main", List.of(), List.of(), "NO_TESTS", List.of("**/*.test.ts"), "JUNIT_XML");
+
+        RunnerTask contextual = RunnerMain.withAdditionalContext(task, "\nextra context");
+
+        assertEquals("NO_TESTS", contextual.writeBoundary());
+        assertEquals(List.of("**/*.test.ts"), contextual.testPathGlobs());
+        assertEquals("JUNIT_XML", contextual.testReportFormat());
+    }
+
+    @Test
     void preparedWorktreeStartsFromTheServerSelectedExecutionBaseRef() throws Exception {
         Path repository = temporaryDirectory.resolve("repository");
         Files.createDirectories(repository);

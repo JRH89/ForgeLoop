@@ -13,13 +13,26 @@ import java.util.List;
 /** Applies validated complete-file changes only below policy-approved relative path prefixes. */
 public final class PatchWriter {
     public void apply(Path worktree, PatchPlan plan, List<String> allowedPrefixes) throws IOException {
+        apply(worktree, plan, allowedPrefixes, WriteBoundary.any());
+    }
+
+    public void apply(Path worktree, PatchPlan plan, List<String> allowedPrefixes, WriteBoundary boundary) throws IOException {
         if (worktree == null || !Files.exists(worktree.resolve(".git")) || allowedPrefixes == null || allowedPrefixes.isEmpty()) throw new IllegalArgumentException("Patch write policy is incomplete");
+        if (boundary == null) throw new IllegalArgumentException("Patch write policy is incomplete");
         Path root = worktree.toAbsolutePath().normalize();
         List<Path> allowedRoots = allowedPrefixes.stream().map(prefix -> allowedRoot(root, prefix)).toList();
         List<Target> targets = new ArrayList<>();
         for (ProposedChange change : plan.changes()) {
             Path target = root.resolve(change.path()).normalize();
             if (!target.startsWith(root) || allowedRoots.stream().noneMatch(target::startsWith)) throw new IllegalArgumentException("Patch path is not permitted by policy");
+            String repositoryPath = root.relativize(target).toString().replace('\\', '/');
+            boolean testPath = boundary.isTestPath(repositoryPath);
+            if (boundary.requiresTestPaths() && !testPath) {
+                throw new WriteBoundaryViolation("Patch path " + repositoryPath + " is not a test file; this task writes tests only");
+            }
+            if (boundary.forbidsTestPaths() && testPath) {
+                throw new WriteBoundaryViolation("Patch path " + repositoryPath + " is a test file; this task may not write tests");
+            }
             rejectSymbolicLinkTraversal(root, target);
             targets.add(new Target(change, target));
         }

@@ -2,6 +2,9 @@ package io.forgeloop.runner;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +41,37 @@ class ContainerVerificationExecutorTest {
         byte[] captured = ContainerVerificationExecutor.readBounded(new ByteArrayInputStream(verboseOutput), 64 * 1024);
 
         assertArrayEquals(java.util.Arrays.copyOf(verboseOutput, 64 * 1024), captured);
+    }
+
+    @Test
+    void leavesOrdinaryVerificationDockerArgvUnchangedWithoutReports() {
+        Path repo = Path.of("/repo");
+        Path evidence = Path.of("/evidence");
+        List<String> command = new ContainerVerificationExecutor().buildDockerCommand(repo, evidence,
+                "node@sha256:" + "a".repeat(64), List.of("npm", "test"), false, null);
+
+        assertEquals(List.of("docker", "run", "--rm", "--init", "--read-only",
+                "--mount", "type=bind,src=" + repo + ",dst=/source,readonly",
+                "--mount", "type=bind,src=" + evidence.resolve("test-results") + ",dst=/workspace/test-results",
+                "--mount", "type=bind,src=" + evidence.resolve("playwright-report") + ",dst=/workspace/playwright-report",
+                "--workdir", "/workspace", "--tmpfs", "/tmp:rw,noexec,nosuid,size=128m",
+                "--tmpfs", "/workspace:rw,exec,nosuid,size=2g", "--env", "HOME=/tmp/home",
+                "--env", "XDG_CACHE_HOME=/tmp/cache", "--env", "MAVEN_CONFIG=/tmp/m2",
+                "--env", "MAVEN_OPTS=-Dmaven.repo.local=/workspace/.m2/repository -Djansi.tmpdir=/workspace/.tmp",
+                "--env", "npm_config_cache=/tmp/npm", "--network", "none", "node@sha256:" + "a".repeat(64),
+                "sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /workspace/.tmp /workspace/.m2/repository && exec \"$@\"",
+                "forgeloop-verify", "npm", "test"), command);
+        assertFalse(command.contains("type=bind,src=" + evidence.resolve("test-report") + ",dst=/forgeloop/test-report"));
+    }
+
+    @Test
+    void mountsDeclaredJunitReportsOutsideWritableWorkspace() {
+        Path evidence = Path.of("/evidence");
+        List<String> command = new ContainerVerificationExecutor().buildDockerCommand(Path.of("/repo"), evidence,
+                "node@sha256:" + "a".repeat(64), List.of("pytest", "--junitxml=/forgeloop/test-report/pytest.xml"), false, "JUNIT_XML");
+
+        assertTrue(command.contains("type=bind,src=" + evidence.resolve("test-report") + ",dst=/forgeloop/test-report"));
+        assertTrue(command.contains("--network"));
     }
 
     private Path taskWorktree() throws Exception {

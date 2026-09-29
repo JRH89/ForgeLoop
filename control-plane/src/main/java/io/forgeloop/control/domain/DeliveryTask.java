@@ -198,5 +198,13 @@ public class DeliveryTask {
     public List<String> getVerificationCommand() { return verificationGate == null ? List.of() : verificationGate.getCommand(); }
     public String getVerificationNetworkPolicy() { return verificationGate == null ? null : verificationGate.getNetworkPolicy(); }
     public Integer getVerificationTimeoutSeconds() { return verificationGate == null ? null : verificationGate.getTimeoutSeconds(); }
+    public String getTestReportFormat() { return verificationGate == null ? null : verificationGate.getTestReport(); }
+    /** Uses the persisted task role so retries cannot gain a different patch boundary. */
+    public String getWriteBoundary() {
+        if (!run.isTestFirst()) return "ANY";
+        return "INDEPENDENT_TEST".equals(role) ? "TESTS_ONLY"
+                : isWritingRole(role) ? "NO_TESTS" : "ANY";
+    }
+    public List<String> getTestPathGlobs() { return run.getTestPathGlobs(); }
     public String getVerificationBaseRef() { return dependencies.stream().filter(task -> "INTEGRATION".equals(task.role)).map(DeliveryTask::getChangeSha).filter(java.util.Objects::nonNull).findFirst().orElse(run.getBaseBranch()); }
 }

@@ -42,7 +42,10 @@ public class TaskLeaseService {
         if (!runner.hasCapability(task.getRequiredCapability())) throw new IllegalStateException("Runner lacks the task capability");
         if (task.getState() != TaskState.PENDING && task.getState() != TaskState.REPAIR_QUEUED) throw new IllegalStateException("Task is not claimable");
         if (!task.dependenciesSatisfied()) throw new IllegalStateException("Task dependencies are not complete");
-        if (!writerAffinity.permits(task, runner.getId())) throw new IllegalStateException("Task must run on the runner that produced its dependency");
+        if (writerAffinity.requiresDocker(task) && !runner.hasCapability("docker")) {
+            throw new IllegalStateException("Test-first work must run on a runner that can run its checks");
+        }
+        if (!writerAffinity.permits(task, runner)) throw new IllegalStateException("Task must run on the runner that produced its dependency");
         if (!task.hasBudgetRemaining()) throw new IllegalStateException("Task budget is exhausted");
         if (!task.getRun().hasBudgetRemaining()) throw new IllegalStateException("Run budget is exhausted");
         boolean conflict = tasks.findByRun_Id(task.getRun().getId()).stream()
