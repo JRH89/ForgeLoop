@@ -48,6 +48,10 @@ public final class RunnerMain {
             providerHealth(arguments);
             return;
         }
+        if (arguments.length > 0 && "provider-fixture-capture".equals(arguments[0])) {
+            providerFixtureCapture(arguments);
+            return;
+        }
         if (arguments.length > 0 && "provider-drift-check".equals(arguments[0])) {
             int exitCode = providerDriftCheck(arguments);
             if (exitCode != 0) System.exit(exitCode);
@@ -211,19 +215,51 @@ public final class RunnerMain {
         System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
     }
 
+    /** Explicitly captures one fixed 128-token live response without printing it or overwriting a fixture. */
+    private static void providerFixtureCapture(String[] arguments) throws Exception {
+        if (arguments.length < 4 || arguments.length > 5 || !"--confirm-live-call".equals(arguments[3])
+                || arguments.length == 5 && !"--desktop-key".equals(arguments[4])) {
+            throw new IllegalArgumentException("Usage: provider-fixture-capture <anthropic|openai|gemini|local> <model> --confirm-live-call [--desktop-key]");
+        }
+        String provider = arguments[1], model = arguments[2];
+        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(provider, model, 1);
+        final String credential;
+        if (arguments.length == 5) {
+            if ("local".equals(provider)) throw new IllegalArgumentException("Local provider credentials are configured through the local provider environment");
+            credential = new DesktopSecretStore(DesktopFiles.directory(), provider).load();
+        } else credential = null;
+        ProviderClientFactory codecs = new ProviderClientFactory();
+        ProviderFixtureCapture.Captured capture = new ProviderFixtureCapture().capture(provider, model,
+                () -> codecs.create(policy, credential), Path.of("runner", "src", "test", "resources", "provider-fixtures"),
+                java.time.Instant.now());
+        System.out.println("Live provider fixture captured. provider=" + provider + " model=" + model
+                + " fixture=runner/src/test/resources/provider-fixtures/" + provider
+                + " inputTokens=" + capture.inputTokens()
+                + " outputTokens=" + capture.outputTokens());
+    }
+
     /** Requires a live-recorded, pin-matched fixture before creating a client or sending one bounded health request. */
-    private static int providerDriftCheck(String[] arguments) {
-        if (arguments.length != 3) {
-            System.err.println("Usage: provider-drift-check <anthropic|openai|gemini|local> <model>");
+    private static int providerDriftCheck(String[] arguments) throws Exception {
+        if (arguments.length != 3 && (arguments.length != 4 || !"--desktop-key".equals(arguments[3]))) {
+            System.err.println("Usage: provider-drift-check <anthropic|openai|gemini|local> <model> [--desktop-key]");
             return 2;
         }
         String provider = arguments[1], model = arguments[2];
+        String credential = null;
+        if (arguments.length == 4) {
+            if ("local".equals(provider)) {
+                System.err.println("Local provider credentials are configured through the local provider environment.");
+                return 2;
+            }
+            credential = new DesktopSecretStore(DesktopFiles.directory(), provider).load();
+        }
+        final String savedCredential = credential;
         final ProviderFixtureStore.Fixture fixture;
         try { fixture = new ProviderFixtureStore().load(provider); }
         catch (Exception invalid) { System.err.println("Could not run provider drift check: fixture is unavailable or invalid."); return 2; }
         ProviderClientFactory codecs = new ProviderClientFactory();
         ProviderDriftProbe.Result result = new ProviderDriftProbe().run(provider, model, fixture,
-                () -> codecs.create(new ProviderExecutionPolicy(provider, model, 1)));
+                () -> codecs.create(new ProviderExecutionPolicy(provider, model, 1), savedCredential));
         if (result.exitCode() == 0) System.out.println(result.message());
         else {
             System.err.println(result.message());
