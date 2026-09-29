@@ -20,6 +20,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -108,16 +109,94 @@ class AgentLoopTest {
     }
 
     @Test
-    void refusesBeforeCallingProviderWhenMoneyEstimateExceedsBudget() throws Exception {
+    void refusesBeforeCallingProviderWhenControlPlaneDeniesTurnReservation() throws Exception {
         Path repo = gitRepository("money");
         ScriptedClient client = new ScriptedClient();
         ProviderExecutionPolicy priced = new ProviderExecutionPolicy("openai", "test-model", 1,
                 new java.math.BigDecimal("1"), new java.math.BigDecimal("1"));
+        AtomicInteger reservations = new AtomicInteger();
         LoopResult result = run("money", repo, client, new RecordingReporter(), new AtomicBoolean(), standardBudget(10, 50_000, 65_536),
-                priced, "small specification", 100, 0, Clock.systemUTC());
+                priced, "small specification", 100, 0, Clock.systemUTC(), micros -> {
+                    reservations.incrementAndGet(); return new SpendReservationGrant(false, 0);
+                }, new AgentLoop(new ConversationExecutionService(), new ProviderCostCalculator(),
+                        new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor(duration -> { })));
         assertEquals(LoopOutcome.BUDGET_STOP, result.outcome());
         assertEquals(BudgetKind.MONEY, result.budgetKind());
+        assertEquals(1, reservations.get());
         assertTrue(client.requests.isEmpty());
+        assertTrue(new StepJournal(temporaryDirectory.resolve("money-state"), "task-1", "lease-1", Clock.systemUTC()).records()
+                .stream().noneMatch(row -> row.path("type").asText().equals("TURN_REQUESTED")));
+    }
+
+    @Test
+    void unknownCostSkipsReservationAndPricedTurnFailsClosedAfterThreeTransportRetries() throws Exception {
+        Path unknownRepo = gitRepository("unknown-cost");
+        ScriptedClient unknownProvider = new ScriptedClient(
+                turn(List.of(), StopReason.END_TURN), turn(List.of(), StopReason.END_TURN));
+        AtomicInteger unknownCalls = new AtomicInteger();
+        LoopResult unknown = run("unknown-cost", unknownRepo, unknownProvider, new RecordingReporter(), new AtomicBoolean(),
+                standardBudget(10, 50_000, 65_536), new ProviderExecutionPolicy("openai", "test-model", 1),
+                "small specification", 0, 0, Clock.systemUTC(), micros -> {
+                    unknownCalls.incrementAndGet(); return new SpendReservationGrant(true, micros);
+                }, new AgentLoop(new ConversationExecutionService(), new ProviderCostCalculator(),
+                        new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor(duration -> { })));
+        assertEquals(LoopOutcome.DECLINED, unknown.outcome());
+        assertEquals(0, unknownCalls.get());
+
+        Path unavailableRepo = gitRepository("reservation-unavailable");
+        ScriptedClient unavailableProvider = new ScriptedClient();
+        AtomicInteger attempts = new AtomicInteger();
+        List<Duration> delays = new ArrayList<>();
+        ProviderExecutionPolicy priced = new ProviderExecutionPolicy("openai", "test-model", 1,
+                new java.math.BigDecimal("1"), new java.math.BigDecimal("1"));
+        LoopResult unavailable = run("reservation-unavailable", unavailableRepo, unavailableProvider, new RecordingReporter(),
+                new AtomicBoolean(), standardBudget(10, 50_000, 65_536), priced, "small specification", 0, 0,
+                Clock.systemUTC(), micros -> {
+                    attempts.incrementAndGet(); throw new ControlPlaneFailure("unavailable", true);
+                }, new AgentLoop(new ConversationExecutionService(), new ProviderCostCalculator(),
+                        new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor(delays::add)));
+        assertEquals(LoopOutcome.HARNESS_FAILURE, unavailable.outcome());
+        assertEquals("LOOP_SPEND_RESERVATION_UNAVAILABLE", unavailable.category());
+        assertEquals(4, attempts.get());
+        assertEquals(List.of(Duration.ofSeconds(2), Duration.ofSeconds(4), Duration.ofSeconds(8)), delays);
+        assertTrue(unavailableProvider.requests.isEmpty());
+    }
+
+    @Test
+    void rejectedReservationMarksLeaseLostAndMaxTokensRetryReservesAgain() throws Exception {
+        Path rejectedRepo = gitRepository("reservation-rejected");
+        AtomicBoolean leaseLost = new AtomicBoolean();
+        ScriptedClient rejectedProvider = new ScriptedClient();
+        LoopResult rejected = run("reservation-rejected", rejectedRepo, rejectedProvider, new RecordingReporter(), leaseLost,
+                standardBudget(10, 50_000, 65_536), new ProviderExecutionPolicy("openai", "test-model", 1,
+                        new java.math.BigDecimal("1"), new java.math.BigDecimal("1")), "small specification", 0, 0,
+                Clock.systemUTC(), micros -> { throw new ControlPlaneFailure("lease rejected", false); },
+                new AgentLoop(new ConversationExecutionService(), new ProviderCostCalculator(),
+                        new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor(duration -> { })));
+        assertEquals(LoopOutcome.LEASE_LOST, rejected.outcome());
+        assertTrue(leaseLost.get());
+        assertTrue(rejectedProvider.requests.isEmpty());
+
+        Path retryRepo = gitRepository("truncation-reservation");
+        ScriptedClient provider = new ScriptedClient(
+                turn(List.of(), StopReason.MAX_TOKENS),
+                turn(List.of(call("write_file", "{\"path\":\"src/Feature.java\",\"content\":\"done\"}"),
+                        call("finish", "{\"summary\":\"Complete the requested change\"}")), StopReason.TOOL_USE));
+        List<Long> amounts = new ArrayList<>();
+        LoopResult retried = run("truncation-reservation", retryRepo, provider, new RecordingReporter(), new AtomicBoolean(),
+                standardBudget(10, 50_000, 65_536), new ProviderExecutionPolicy("openai", "test-model", 1,
+                        new java.math.BigDecimal("1"), new java.math.BigDecimal("1")), "small specification", 0, 0,
+                Clock.systemUTC(), micros -> {
+                    amounts.add(micros); return new SpendReservationGrant(true, micros);
+                }, new AgentLoop(new ConversationExecutionService(), new ProviderCostCalculator(),
+                        new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor(duration -> { })));
+        assertEquals(LoopOutcome.FINISHED, retried.outcome());
+        assertEquals(2, amounts.size());
+        assertTrue(amounts.get(1) > amounts.get(0));
+        List<JsonNode> turns = new StepJournal(temporaryDirectory.resolve("truncation-reservation-state"), "task-1", "lease-1", Clock.systemUTC()).records()
+                .stream().filter(row -> row.path("type").asText().equals("TURN_REQUESTED")).toList();
+        assertEquals(2, turns.size());
+        assertEquals(amounts.get(1), turns.get(1).path("reservedMicros").asLong());
     }
 
     @Test
@@ -338,6 +417,14 @@ class AgentLoopTest {
     private LoopResult run(String directory, Path repo, ScriptedClient client, RecordingReporter reporter, AtomicBoolean lost,
                            LoopBudget budget, ProviderExecutionPolicy policy, String specification,
                            long budgetMicros, long spentCostMicros, Clock clock) throws Exception {
+        return run(directory, repo, client, reporter, lost, budget, policy, specification, budgetMicros, spentCostMicros,
+                clock, null, new AgentLoop());
+    }
+
+    private LoopResult run(String directory, Path repo, ScriptedClient client, RecordingReporter reporter, AtomicBoolean lost,
+                           LoopBudget budget, ProviderExecutionPolicy policy, String specification,
+                           long budgetMicros, long spentCostMicros, Clock clock,
+                           SpendReservationClient reservationClient, AgentLoop agentLoop) throws Exception {
         String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
         StepJournal journal = new StepJournal(temporaryDirectory.resolve(directory + "-state"), "task-1", "lease-1", clock);
         GitWorktreeManager git = new GitWorktreeManager();
@@ -345,8 +432,8 @@ class AgentLoopTest {
         ToolGateway gateway = new ToolGateway(registry, journal, List.of());
         LoopSetup setup = new LoopSetup("task-1", "JRH89/agent-loop-test", "lease-1", "IMPLEMENTATION", "Implement a small feature", specification,
                 List.of("src/"), List.of(), repo, baseSha, policy, client, budget, List.of(), gateway, registry, journal,
-                clock, reporter, lost, budgetMicros, spentCostMicros);
-        return new AgentLoop().run(setup);
+                clock, reporter, lost, budgetMicros, spentCostMicros, EnforcementDescriptor.defaults(List.of()), reservationClient);
+        return agentLoop.run(setup);
     }
 
     private Path gitRepository(String name) throws Exception {

@@ -1,4 +1,4 @@
-# Agent-loop enforcement (Slices 4a–4c)
+# Agent-loop enforcement (Slices 4a–4d)
 
 This document describes the fail-closed guard layer added to the dormant agent loop. It is not an enablement guide: no runner dispatch path invokes the loop, and this slice must not enable one.
 
@@ -25,13 +25,19 @@ The first non-allow `before` decision wins. A rule exception, missing decision, 
 
 Repository administrators configure zero to 64 protected path globs with `configureRepositoryEnforcement`. These use the existing case-sensitive `TestPathGlobs` language. The built-in workflow deny remains case-insensitive to account for case-insensitive worktrees; opting out disables only that built-in rule. The optional finish gate must name a verification policy from that repository and remains off by default. For ordinary writers, its latest run must pass; for `TESTS_ONLY` writers, any completed non-timeout run is enough because the new tests are expected to fail. This advisory run can gate the model's `finish` call but never replaces server-authoritative verification evidence.
 
+## Shared spend reservation
+
+Before each agent-loop model turn with known provider pricing, the runner computes a conservative cost bound from the exact serialized request, its input-token upper bound, and the requested output-token cap. It asks the control plane to reserve that amount against both the task budget and the run budget before writing `TURN_REQUESTED` or contacting the provider. The lease reservation is replaceable (so retrying a request is idempotent), and a provider-attempt report settles it to zero after actual usage is recorded. Closing or expiring a lease also releases the reservation; expired leases no longer count while recovery is pending.
+
+The control plane serializes reservations for the same run by locking its tasks, and grants only when known spend plus active reservations stays within both limits. A budget refusal is a normal response: the runner sends no provider request and ends with `BUDGET_STOP/MONEY`. If pricing is unknown, it does not reserve. If the control plane cannot be reached, the runner retries after 2, 4, and 8 seconds, then fails closed as `HARNESS_FAILURE` with `LOOP_SPEND_RESERVATION_UNAVAILABLE`. No dispatch path invokes the agent loop yet; these protections do not enable it.
+
 ## Hold and evidence behavior
 
 Enforcement holds are `RULE_INPUT_MISSING`, `PREREQUISITE_MISSING`, `RULE_FAILED`, or `BOUNDARY_BREACHED`. A hold stops the rest of the model's current tool batch, prevents finish/commit, ends the loop as `POLICY_HOLD`, and records the class, rule/check, reason, and enforcement digest. Tool grant refusals are journaled as `DENY` under `tool-grant`.
 
 The control-plane lease hold maps these classes to `ENFORCEMENT_RULE_INPUT_MISSING`, `ENFORCEMENT_PREREQUISITE_MISSING`, `ENFORCEMENT_RULE_FAILED`, and `ENFORCEMENT_BOUNDARY_BREACHED`, respectively. All four are accepted only for an active acknowledged agent-loop lease and each creates a HIGH-severity escalation. The runner-to-control-plane mapping is documented here but is not wired into dispatch in this slice.
 
-Slice 4b binds RED prerequisites to the current `TestCheckEvidence` record and transports them through GraphQL into the runner task and enforcement fingerprint. The derivation follows the `RED_CHECK` edge and its independent test writer, separately from the execution-base helper, so dependency ordering cannot make both checks agree on the same wrong input. Slice 4c snapshots repository-configured protected globs, an audited workflow opt-out, and an optional finish gate into each submitted run. Spend reservations are Slice 4d.
+Slice 4b binds RED prerequisites to the current `TestCheckEvidence` record and transports them through GraphQL into the runner task and enforcement fingerprint. The derivation follows the `RED_CHECK` edge and its independent test writer, separately from the execution-base helper, so dependency ordering cannot make both checks agree on the same wrong input. Slice 4c snapshots repository-configured protected globs, an audited workflow opt-out, and an optional finish gate into each submitted run. Slice 4d adds shared, fail-closed spend reservations before priced model turns.
 
 ## Verification
 
@@ -43,4 +49,4 @@ $mavenExe = Join-Path $env:LOCALAPPDATA 'ForgeLoop\tools\apache-maven-3.9.12\bin
 & $mavenExe -B verify
 ```
 
-Verification on the local integration stack: control-plane `mvn -B verify` passed (299 tests); runner `mvn -B verify` passed (233 tests, 1 existing symlink-permission skip); harness `mvn -B verify` passed (2 tests). The suites cover descriptor/preflight, repository-policy parsing and fingerprints, snapshot persistence, RED proof transport, custom protected paths, workflow opt-out, finish-gate redirects, credential paths and redaction, gateway exception handling, and loop holds. No provider-backed work was run; the loop remains dormant.
+Verification on the local integration stack before 4d: control-plane `mvn -B verify` passed (299 tests); runner `mvn -B verify` passed (233 tests, 1 existing symlink-permission skip); harness `mvn -B verify` passed (2 tests). After 4d: control-plane `mvn -B verify` passed (307 tests); runner `mvn -B verify` passed (244 tests, 5 existing platform-dependent skips); harness `mvn -B verify` passed (2 tests). No provider-backed work was run; the loop remains dormant.

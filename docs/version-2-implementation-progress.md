@@ -115,6 +115,13 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Verification:** focused control-plane (18 tests) and runner (37 tests) suites passed. Re-run against merged `master`: control-plane `mvn -B verify` passed (316 tests), runner `mvn -B verify` passed (286 tests, 9 existing platform/live-fixture skips), and harness `mvn -B verify` passed (2 tests). `git diff --check` passed. No provider-backed work was run.
 - **Delivery:** linked [PR #94](https://github.com/JRH89/ForgeLoop/pull/94) implements issue #85 from `feat/4c-repository-enforcement-pr`. Full local verification passed against the merged prerequisite chain; hosted checks are pending.
 
+## Slice 4d - Shared spend reservation
+
+- **Issue:** [#86](https://github.com/JRH89/ForgeLoop/issues/86).
+- **Result:** priced agent-loop turns now reserve a conservative worst-case cost with the control plane before the runner journals or sends the request. Run-scoped task locks serialize concurrent reservations; task and run known spend plus active sibling reservations must remain within budget. Reservations replace earlier values on retry, settle when provider usage is recorded, and are released when leases close or expire. Unknown pricing skips reservation; refusal stops before the provider call; control-plane transport failure retries with bounded backoff and then fails closed.
+- **Verification:** control-plane `mvn -B verify` passed (307 tests, 0 failures/errors/skips); runner `mvn -B verify` passed (244 tests, 0 failures/errors, 5 existing platform-dependent skips); harness `mvn -B verify` passed (2 tests). `git diff --check` passed. No paid provider-backed run; dispatch remains dormant.
+- **Delivery:** implementation commit `288871d` is being validated on a preparation branch based on PR #94; issue #86 is linked. No #86 PR will open until #85 merges, preserving one open PR at a time.
+
 ## Update protocol
 
 For each slice, record its linked issue/PR, meaningful commits, behavior, exact verification outcomes, and remaining external or paid validation. Mark complete only after all slice-local work is complete. Keep hosted CI and provider-backed evidence distinct. The product agent loop must stay dormant until the plan explicitly enables it.

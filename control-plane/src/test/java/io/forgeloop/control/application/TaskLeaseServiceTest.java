@@ -205,6 +205,135 @@ class TaskLeaseServiceTest {
         assertEquals("anthropic", recorded.getProvider());
         assertEquals(2, recorded.getAttemptCount());
         assertEquals(42, recorded.getEstimatedCostMicros());
+        verify(lease).settleReservation();
+    }
+
+    @Test
+    void spendReservationGrantsWithinTaskAndRunBudgetsAndReplacesPriorAmount() throws Exception {
+        FeatureRun run = activeLoopRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = realAcknowledgedLease(task);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+
+        var first = service.reserveSpend("lease", "runner", "nonce", 20_000);
+        var replacement = service.reserveSpend("lease", "runner", "nonce", 30_000);
+
+        assertEquals(true, first.granted());
+        assertEquals(20_000, first.reservedMicros());
+        assertEquals(80_000, first.taskRemainingMicros());
+        assertEquals(4_980_000, first.runRemainingMicros());
+        assertEquals(30_000, replacement.reservedMicros());
+        assertEquals(30_000, lease.getReservedMicros());
+        verify(providerAttempts, org.mockito.Mockito.times(2)).sumKnownCostByTaskId(task.getId());
+    }
+
+    @Test
+    void spendReservationRefusesTaskAndRunBudgetsAndClearsOldReservation() throws Exception {
+        FeatureRun run = activeLoopRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = realAcknowledgedLease(task);
+        lease.reserve(10);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+        when(providerAttempts.sumKnownCostByTaskId(task.getId())).thenReturn(10L);
+        var taskRefusal = service.reserveSpend("lease", "runner", "nonce", 100_000);
+        assertEquals(false, taskRefusal.granted());
+        assertEquals(0, lease.getReservedMicros());
+
+        when(providerAttempts.sumKnownCostByTaskId(task.getId())).thenReturn(0L);
+        when(leases.sumActiveReservationsByRunExcludingLease(org.mockito.ArgumentMatchers.eq(run.getId()),
+                org.mockito.ArgumentMatchers.eq("lease"), org.mockito.ArgumentMatchers.any(Instant.class)))
+                .thenReturn(4_999_900L);
+        var runRefusal = service.reserveSpend("lease", "runner", "nonce", 200);
+        assertEquals(false, runRefusal.granted());
+        assertEquals(0, runRefusal.reservedMicros());
+        assertEquals(0, lease.getReservedMicros());
+    }
+
+    @Test
+    void spendReservationLocksRunTasksBeforeReadingKnownSpendAndExcludesExpiredOrCompletedSiblingsByQuery() throws Exception {
+        FeatureRun run = activeLoopRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease lease = realAcknowledgedLease(task);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(tasks, providerAttempts, leases);
+
+        service.reserveSpend("lease", "runner", "nonce", 1_000);
+
+        order.verify(tasks).findAllForUpdateByRunId(run.getId());
+        order.verify(providerAttempts).sumKnownCostByTaskId(task.getId());
+        order.verify(providerAttempts).sumKnownCostByRunId(run.getId());
+        order.verify(leases).sumActiveReservationsByRunExcludingLease(
+                org.mockito.ArgumentMatchers.eq(run.getId()), org.mockito.ArgumentMatchers.eq("lease"),
+                org.mockito.ArgumentMatchers.any(Instant.class));
+    }
+
+    @Test
+    void spendReservationRequiresAnActiveAcknowledgedAgentLoopLeaseAndIntegralAmount() throws Exception {
+        FeatureRun run = activeLoopRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        TaskLease expired = new TaskLease(task, runnerForTests(),
+                hashNonce("nonce"), Instant.now().minusSeconds(1));
+        setEntityId(expired, "lease");
+        when(leases.findById("lease")).thenReturn(Optional.of(expired));
+        assertEquals("Lease is not active", assertThrows(IllegalArgumentException.class,
+                () -> service.reserveSpend("lease", "runner", "nonce", 1)).getMessage());
+
+        TaskLease lease = realAcknowledgedLease(task);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        assertEquals("Spend reservation is invalid", assertThrows(IllegalArgumentException.class,
+                () -> service.reserveSpend("lease", "runner", "nonce", 1.5)).getMessage());
+
+        FeatureRun singleCall = activeRun();
+        TaskLease singleCallLease = realAcknowledgedLease(singleCall.getTasks().getFirst());
+        when(leases.findById("lease")).thenReturn(Optional.of(singleCallLease));
+        assertEquals("Spend reservation requires an agent-loop task", assertThrows(IllegalArgumentException.class,
+                () -> service.reserveSpend("lease", "runner", "nonce", 1)).getMessage());
+    }
+
+    @Test
+    void zeroTaskBudgetMeansUnlimitedButStillRespectsTheRunBudget() throws Exception {
+        FeatureRun run = new FeatureRun("org", "owner/repository", "issue-1", "x", "spec", 5,
+                "GENERIC", "main", 1);
+        DeliveryTask task = run.addPlannedTask("writer", "IMPLEMENTATION", "Write", "provider", List.of("src"), 2, 0);
+        run.adoptAgentLoop(new AgentLoopBudget(20, 100_000, 600, 524_288));
+        run.beginPlanning(); run.queuePlannedWork(); run.startExecution(); task.transition(TaskState.LEASED);
+        TaskLease lease = realAcknowledgedLease(task);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+
+        var reservation = service.reserveSpend("lease", "runner", "nonce", 500);
+
+        assertEquals(true, reservation.granted());
+        assertEquals(null, reservation.taskRemainingMicros());
+        assertEquals(4_999_500, reservation.runRemainingMicros());
+    }
+
+    private TaskLease realAcknowledgedLease(DeliveryTask task) throws Exception {
+        TaskLease lease = new TaskLease(task, runnerForTests(),
+                hashNonce("nonce"), Instant.now().plusSeconds(600));
+        setEntityId(lease, "lease");
+        lease.acknowledge();
+        return lease;
+    }
+
+    private static Runner runnerForTests() throws Exception {
+        Runner runner = new Runner("org", "runner", "1", List.of("provider"), "hash");
+        setEntityId(runner, "runner");
+        return runner;
+    }
+
+    private static void setEntityId(Object entity, String id) throws Exception {
+        var field = entity.getClass().getDeclaredField("id");
+        field.setAccessible(true);
+        field.set(entity, id);
+    }
+
+    private static String hashNonce(String nonce) throws Exception {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(nonce.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
 
     @Test

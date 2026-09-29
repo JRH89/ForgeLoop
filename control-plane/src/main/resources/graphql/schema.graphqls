@@ -48,6 +48,7 @@ extend type Mutation {
   configureRepositoryEnforcement(repository: String!, input: RepositoryEnforcementInput!): RepositoryConnection!
   renewTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!): TaskLease!
   holdTaskLease(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, reason: String!, summary: String!): TaskLease!
+  reserveTaskSpend(leaseId: ID!, runnerId: ID!, nonce: String!, credential: String!, micros: Float!): SpendReservation!
 }
 extend type RepositoryConnection { agentLoop: AgentLoopBudget }
 extend type RepositoryConnection { enforcement: LoopEnforcement! }
@@ -58,6 +59,7 @@ type AgentLoopGate { name: String!, kind: String!, imageDigest: String!, command
 type TaskAgentLoop { budget: AgentLoopBudget!, gates: [AgentLoopGate!]!, enforcement: LoopEnforcement! }
 type LoopEnforcement { protectedPaths: [String!]!, allowWorkflowChanges: Boolean!, finishGate: String }
 type RedPrerequisite { testTaskId: ID, targetSha: String, evidenceDigest: String }
+type SpendReservation { granted: Boolean!, reservedMicros: Float!, taskRemainingMicros: Float, runRemainingMicros: Float! }
 input AgentLoopBudgetInput { maxToolCalls: Int!, maxTokens: Int!, maxWallSeconds: Int!, maxConversationBytes: Int! }
 input RepositoryEnforcementInput { protectedPaths: [String!]!, allowWorkflowChanges: Boolean!, finishGate: String }
 input VerificationEvidenceInput { kind: String!, gate: String!, image: String!, command: [String!]!, exitCode: Int!, timedOut: Boolean!, output: String!, startedAt: String!, finishedAt: String!, artifactReference: String, outputDigest: String!, bundleDigest: String! }

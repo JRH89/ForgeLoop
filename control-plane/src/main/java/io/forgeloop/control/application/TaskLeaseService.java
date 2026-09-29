@@ -199,6 +199,8 @@ public class TaskLeaseService {
                 providerAttempts.save(new ProviderAttempt(task, runner, submission.provider(), submission.model(), submission.requestIdDigest(),
                         submission.inputTokens(), submission.outputTokens(), submission.attemptCount(), submission.estimatedCostMicros(),
                         submission.costKnown(), submission.outcome(), submission.retryable(), submission.category())));
+        // The actual usage is now accounted for, so it replaces the temporary worst-case reservation.
+        lease.settleReservation();
         long taskSpent = providerAttempts.sumKnownCostByTaskId(task.getId());
         long runSpent = providerAttempts.sumKnownCostByRunId(task.getRun().getId());
         long runBudget = Math.round(task.getRun().getBudgetUsd() * 1_000_000d);
@@ -207,6 +209,49 @@ public class TaskLeaseService {
             escalations.escalate(task, "BUDGET_EXHAUSTED", "Provider spend reached the configured task or run budget");
         }
         return recorded;
+    }
+
+    /** Serializes a worst-case turn reservation against all work spending from the same run budget. */
+    @Transactional public SpendReservation reserveSpend(String leaseId, String runnerId, String nonce, double requestedMicros) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active() || !lease.isAcknowledged()) throw new IllegalArgumentException("Lease is not active");
+        DeliveryTask task = lease.getTask();
+        if (task.getAgentLoop() == null) throw new IllegalArgumentException("Spend reservation requires an agent-loop task");
+        if (!Double.isFinite(requestedMicros) || requestedMicros < 1 || requestedMicros > 1_000_000_000_000d
+                || requestedMicros != Math.rint(requestedMicros))
+            throw new IllegalArgumentException("Spend reservation is invalid");
+        long micros = (long) requestedMicros;
+        String runId = task.getRun().getId();
+        // Locking every task in a run is the shared serialization point used by claims and reservations.
+        tasks.findAllForUpdateByRunId(runId);
+
+        long taskSpent = providerAttempts.sumKnownCostByTaskId(task.getId());
+        long runSpent = providerAttempts.sumKnownCostByRunId(runId);
+        long runBudget = Math.round(task.getRun().getBudgetUsd() * 1_000_000d);
+        long otherReservations = leases.sumActiveReservationsByRunExcludingLease(runId, lease.getId(), Instant.now());
+        long taskBudget = task.getBudgetMicros();
+        long taskAvailable = taskBudget == 0 ? Long.MAX_VALUE : Math.max(0, taskBudget - Math.min(taskBudget, taskSpent));
+        long runAvailable = Math.max(0, runBudget - Math.min(runBudget, runSpent));
+        runAvailable = Math.max(0, runAvailable - Math.min(runAvailable, otherReservations));
+        boolean taskAllowed = taskBudget == 0 || requestedWithin(taskSpent, micros, taskBudget);
+        boolean runAllowed = requestedWithinSiblings(runSpent, otherReservations, micros, runBudget);
+        boolean granted = taskAllowed && runAllowed;
+        if (granted) lease.reserve(micros);
+        else lease.settleReservation();
+
+        Long taskRemaining = taskBudget == 0 ? null
+                : Math.max(0, taskAvailable - (granted ? micros : 0));
+        long runRemaining = Math.max(0, runAvailable - (granted ? micros : 0));
+        return new SpendReservation(granted, granted ? micros : 0, taskRemaining, runRemaining);
+    }
+
+    private static boolean requestedWithin(long spent, long requested, long budget) {
+        return spent <= budget && requested <= budget - spent;
+    }
+
+    private static boolean requestedWithinSiblings(long spent, long siblings, long requested, long budget) {
+        if (spent > budget || siblings > budget - spent) return false;
+        return requested <= budget - spent - siblings;
     }
 
     /** Returns the active task identity only after validating the runner-bound lease credentials. */

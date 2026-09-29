@@ -24,12 +24,19 @@ public final class AgentLoop {
     private final ProviderCostCalculator costs;
     private final RepositoryContextBuilder contexts;
     private final ResultShaper shaper;
+    private final SpendGovernor spendGovernor;
 
-    public AgentLoop() { this(new ConversationExecutionService(), new ProviderCostCalculator(), new RepositoryContextBuilder(), new ResultShaper()); }
+    public AgentLoop() { this(new ConversationExecutionService(), new ProviderCostCalculator(), new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor()); }
 
     AgentLoop(ConversationExecutionService conversations, ProviderCostCalculator costs,
               RepositoryContextBuilder contexts, ResultShaper shaper) {
+        this(conversations, costs, contexts, shaper, new SpendGovernor());
+    }
+
+    AgentLoop(ConversationExecutionService conversations, ProviderCostCalculator costs,
+              RepositoryContextBuilder contexts, ResultShaper shaper, SpendGovernor spendGovernor) {
         this.conversations = conversations; this.costs = costs; this.contexts = contexts; this.shaper = shaper;
+        this.spendGovernor = spendGovernor;
     }
 
     public LoopResult run(LoopSetup setup) {
@@ -68,16 +75,22 @@ public final class AgentLoop {
                 if (setup.budget().maxConversationBytes() - meter.counters.conversationBytes() < 4 * 1024)
                     return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.CONTEXT, null, null, 0);
 
-                int outputTokens = outputLimit(setup, meter, NORMAL_OUTPUT_TOKENS);
-                if (outputTokens < 128 || exceedsMoneyBudget(setup, meter, outputTokens)) {
-                    BudgetKind kind = outputTokens < 128 ? BudgetKind.TOKENS : BudgetKind.MONEY;
-                    return end(setup, meter, LoopOutcome.BUDGET_STOP, kind, null, null, 0);
-                }
+                PreparedTurn prepared = prepareTurn(setup, items, toolSpecs, meter, NORMAL_OUTPUT_TOKENS,
+                        timeout(remainingMillis, NORMAL_TIMEOUT));
+                if (prepared == null) return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.TOKENS, null, null, 0);
+                SpendGovernor.Decision reservation = spendGovernor.reserve(prepared.bound(),
+                        setup.spendReservationClient(), setup.leaseLost());
+                if (reservation.status() == SpendGovernor.Status.REFUSED)
+                    return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.MONEY, null, null, 0);
+                if (reservation.status() == SpendGovernor.Status.LEASE_LOST)
+                    return end(setup, meter, LoopOutcome.LEASE_LOST, null, null, null, 0);
+                if (reservation.status() == SpendGovernor.Status.UNAVAILABLE)
+                    return end(setup, meter, LoopOutcome.HARNESS_FAILURE, null, "LOOP_SPEND_RESERVATION_UNAVAILABLE", null, 0);
                 turnNumber++;
                 String correlationId = setup.leaseId() + "/turn-" + turnNumber;
                 meter.turnRequested();
-                LoopAttempt attempt = requestTurn(setup, items, toolSpecs, turnNumber, correlationId,
-                        outputTokens, timeout(remainingMillis, NORMAL_TIMEOUT), false);
+                LoopAttempt attempt = requestTurn(setup, prepared, reservation.reservedMicros(), turnNumber,
+                        correlationId, false);
                 if (attempt.failure != null) {
                     ProviderExecutionFailure failure = attempt.failure;
                     ProviderFailureEvidence evidence = ProviderFailureEvidence.from(setup.providerPolicy(), failure, correlationId);
@@ -91,7 +104,7 @@ public final class AgentLoop {
                 ConversationTurn turn = execution.turn();
                 ProviderCostEstimate cost = costs.fromTokens(setup.providerPolicy(), turn.inputTokens(), turn.outputTokens());
                 ProviderUsageEvidence usage = ProviderUsageEvidence.fromTurn(setup.providerPolicy(), execution, cost, correlationId);
-                meter.record(turn, cost);
+                meter.record(turn, cost, prepared.bound().serializedRequestBytes());
                 journalTurnCompleted(setup, turnNumber, correlationId, execution);
                 setup.reporter().providerAttempt(ProviderAttemptReport.succeeded(usage));
 
@@ -100,14 +113,23 @@ public final class AgentLoop {
                     if (alreadyRetried) return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.OUTPUT_LIMIT, null, null, 0);
                     long nowRemaining = remainingMillis(setup, started);
                     if (nowRemaining <= 0) return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.WALL_TIME, null, null, 0);
-                    int retryOutput = outputLimit(setup, meter, TRUNCATION_RETRY_TOKENS);
-                    if (retryOutput < 128 || exceedsMoneyBudget(setup, meter, retryOutput))
-                        return end(setup, meter, LoopOutcome.BUDGET_STOP, retryOutput < 128 ? BudgetKind.TOKENS : BudgetKind.MONEY, null, null, 0);
+                    PreparedTurn retryPrepared = prepareTurn(setup, items, toolSpecs, meter, TRUNCATION_RETRY_TOKENS,
+                            timeout(nowRemaining, TRUNCATION_TIMEOUT));
+                    if (retryPrepared == null)
+                        return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.TOKENS, null, null, 0);
+                    SpendGovernor.Decision retryReservation = spendGovernor.reserve(retryPrepared.bound(),
+                            setup.spendReservationClient(), setup.leaseLost());
+                    if (retryReservation.status() == SpendGovernor.Status.REFUSED)
+                        return end(setup, meter, LoopOutcome.BUDGET_STOP, BudgetKind.MONEY, null, null, 0);
+                    if (retryReservation.status() == SpendGovernor.Status.LEASE_LOST)
+                        return end(setup, meter, LoopOutcome.LEASE_LOST, null, null, null, 0);
+                    if (retryReservation.status() == SpendGovernor.Status.UNAVAILABLE)
+                        return end(setup, meter, LoopOutcome.HARNESS_FAILURE, null, "LOOP_SPEND_RESERVATION_UNAVAILABLE", null, 0);
                     turnNumber++;
                     String retryCorrelation = setup.leaseId() + "/turn-" + turnNumber;
                     meter.turnRequested();
-                    LoopAttempt retry = requestTurn(setup, items, toolSpecs, turnNumber, retryCorrelation,
-                            retryOutput, timeout(nowRemaining, TRUNCATION_TIMEOUT), true);
+                    LoopAttempt retry = requestTurn(setup, retryPrepared, retryReservation.reservedMicros(),
+                            turnNumber, retryCorrelation, true);
                     if (retry.failure != null) {
                         ProviderFailureEvidence evidence = ProviderFailureEvidence.from(setup.providerPolicy(), retry.failure, retryCorrelation);
                         setup.journal().append("TURN_FAILED", Map.of("turn", turnNumber, "correlationId", retryCorrelation,
@@ -119,7 +141,7 @@ public final class AgentLoop {
                     ConversationTurn retryTurn = retried.turn();
                     ProviderCostEstimate retryCost = costs.fromTokens(setup.providerPolicy(), retryTurn.inputTokens(), retryTurn.outputTokens());
                     ProviderUsageEvidence retryUsage = ProviderUsageEvidence.fromTurn(setup.providerPolicy(), retried, retryCost, retryCorrelation);
-                    meter.record(retryTurn, retryCost);
+                    meter.record(retryTurn, retryCost, retryPrepared.bound().serializedRequestBytes());
                     journalTurnCompleted(setup, turnNumber, retryCorrelation, retried);
                     setup.reporter().providerAttempt(ProviderAttemptReport.succeeded(retryUsage));
                     if (retryTurn.stopReason() == StopReason.MAX_TOKENS)
@@ -236,31 +258,37 @@ public final class AgentLoop {
         }
     }
 
-    private LoopAttempt requestTurn(LoopSetup setup, List<ConversationItem> items, List<ToolSpec> specs,
-                                    int turnNumber, String correlationId, int outputTokens, Duration timeout, boolean truncationRetry) throws IOException {
-        ConversationRequest request = new ConversationRequest(setup.providerPolicy().model(), LoopInstructions.text(),
-                List.copyOf(items), specs, outputTokens, timeout);
-        String requestHash = Hashing.sha256(setup.conversationClient().serialize(request));
+    private PreparedTurn prepareTurn(LoopSetup setup, List<ConversationItem> items, List<ToolSpec> specs, Meter meter,
+                                     int outputCap, Duration timeout) {
+        int outputTokens = outputCap;
+        for (int recalculation = 0; recalculation < 8; recalculation++) {
+            if (outputTokens < 128) return null;
+            ConversationRequest request = new ConversationRequest(setup.providerPolicy().model(), LoopInstructions.text(),
+                    List.copyOf(items), specs, outputTokens, timeout);
+            String serialized = setup.conversationClient().serialize(request);
+            TurnCostBound bound = TurnCostBound.calculate(serialized, meter.lastSerializedRequestBytes,
+                    meter.lastInputTokens, outputTokens, setup.providerPolicy(), costs);
+            long remainingOutput = (long) setup.budget().maxTokens() - meter.counters.tokens() - bound.inputTokenUpperBound();
+            int allowedOutput = (int) Math.max(0, Math.min(outputTokens, remainingOutput));
+            if (allowedOutput == outputTokens) return new PreparedTurn(request, serialized, bound);
+            // Rebuild because max_output_tokens itself is part of the provider's serialized request.
+            outputTokens = allowedOutput;
+        }
+        return null;
+    }
+
+    private LoopAttempt requestTurn(LoopSetup setup, PreparedTurn prepared, long reservedMicros,
+                                    int turnNumber, String correlationId, boolean truncationRetry) throws IOException {
+        ConversationRequest request = prepared.request();
+        String requestHash = Hashing.sha256(prepared.serialized());
         setup.journal().append("TURN_REQUESTED", Map.of("turn", turnNumber, "correlationId", correlationId,
-                "requestSha256", requestHash, "maxOutputTokens", outputTokens, "truncationRetry", truncationRetry));
+                "requestSha256", requestHash, "maxOutputTokens", request.maxOutputTokens(),
+                "reservedMicros", reservedMicros, "truncationRetry", truncationRetry));
         try {
             return new LoopAttempt(conversations.converse(setup.conversationClient(), request, setup.providerPolicy().maxAttempts()), null, truncationRetry);
         } catch (ProviderExecutionFailure failure) {
             return new LoopAttempt(null, failure, truncationRetry);
         }
-    }
-
-    private boolean exceedsMoneyBudget(LoopSetup setup, Meter meter, int outputTokens) {
-        if (setup.budgetMicros() <= 0) return false;
-        ProviderCostEstimate estimate = costs.fromTokens(setup.providerPolicy(), meter.lastInputTokens, outputTokens);
-        if (!estimate.known()) return false;
-        long remaining = setup.budgetMicros() - setup.spentCostMicros() - meter.counters.knownCostMicros();
-        return estimate.estimatedCostMicros() > Math.max(0, remaining);
-    }
-
-    private int outputLimit(LoopSetup setup, Meter meter, int cap) {
-        long available = (long) setup.budget().maxTokens() - meter.counters.tokens() - meter.lastInputTokens;
-        return (int) Math.max(0, Math.min(cap, available));
     }
 
     private ToolResults fitToolResults(LoopSetup setup, Meter meter, List<ToolResultItem> rawResults) throws IOException {
@@ -433,17 +461,20 @@ public final class AgentLoop {
         return Duration.ofMillis(millis);
     }
 
+    private record PreparedTurn(ConversationRequest request, String serialized, TurnCostBound bound) { }
     private record LoopAttempt(ConversationExecution execution, ProviderExecutionFailure failure, boolean truncationRetry) { }
 
     private static final class Meter {
         private LoopCounters counters = new LoopCounters(0, 0, 0, 0, 0, 0);
         private long lastInputTokens;
+        private long lastSerializedRequestBytes;
         void turnRequested() { counters = new LoopCounters(counters.turns() + 1, counters.toolCalls(), counters.inputTokens(), counters.outputTokens(), counters.conversationBytes(), counters.knownCostMicros()); }
-        void record(ConversationTurn turn, ProviderCostEstimate cost) {
+        void record(ConversationTurn turn, ProviderCostEstimate cost, long serializedRequestBytes) {
             counters = new LoopCounters(counters.turns(), counters.toolCalls(),
                     Math.addExact(counters.inputTokens(), turn.inputTokens()), Math.addExact(counters.outputTokens(), turn.outputTokens()),
                     counters.conversationBytes(), Math.addExact(counters.knownCostMicros(), cost.known() ? cost.estimatedCostMicros() : 0));
             lastInputTokens = turn.inputTokens();
+            lastSerializedRequestBytes = serializedRequestBytes;
         }
         void call() { counters = new LoopCounters(counters.turns(), counters.toolCalls() + 1, counters.inputTokens(), counters.outputTokens(), counters.conversationBytes(), counters.knownCostMicros()); }
         void addConversationBytes(long bytes) { counters = new LoopCounters(counters.turns(), counters.toolCalls(), counters.inputTokens(), counters.outputTokens(), Math.addExact(counters.conversationBytes(), bytes), counters.knownCostMicros()); }
