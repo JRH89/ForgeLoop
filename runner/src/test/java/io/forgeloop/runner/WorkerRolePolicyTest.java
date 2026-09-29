@@ -24,6 +24,8 @@ class WorkerRolePolicyTest {
         assertTrue(WorkerRolePolicy.ISSUE_SPECIFICATION.tools().contains("issue-proposal"));
         assertFalse(WorkerRolePolicy.AI_CHAT.repositoryWrite());
         assertTrue(WorkerRolePolicy.AI_CHAT.tools().isEmpty());
+        assertTrue(WorkerRolePolicy.IMPLEMENTATION.tools().contains("gate-run"));
+        assertTrue(WorkerRolePolicy.REPAIR.tools().contains("gate-run"));
     }
 
     @Test

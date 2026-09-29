@@ -7,9 +7,8 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Active work:** Slice 3c - control-plane agent-loop policy and lease lifecycle.
 - **Branch:** `feat/agent-loop-control-plane`, retargeted to `master` after PR #78 merged.
 - **Issue / PR:** [#81 - Agent-loop control-plane lifecycle](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82), based on merged PR #78.
-- **Code state:** Slice 3c is implemented at `8716d01`. Its base reconciliation combines loop policy with test-first snapshots and evidence; fresh hosted checks are required. No dispatch or loop execution is enabled.
-- **Earlier V2 work:** PR #78 is merged. PR #80 remains open on `master`; its fresh hosted checks are running.
-- **Earlier slices:** PRs #70, #72, #74, and #76 are merged.
+- **Code state:** Slice 3c is implemented at `8716d01`. Its base reconciliation combines loop policy with test-first snapshots and evidence; local module verification passed, with fresh hosted checks required after push. No dispatch or loop execution is enabled.
+- **Earlier V2 work:** PRs #70, #72, #74, #76, #78, and #80 are merged.
 - **Local test toolchain:** portable Temurin 21 and Maven 3.9.12 under the user-local ForgeLoop tools directory; no project files added for tooling.
 - **External validation:** live provider-backed runs have not been attempted because they incur provider spend. Local HTTP-server fixtures and hosted CI are not paid-provider evidence.
 - **Outline:** `docs/original_outline.md` is the project-level direction; the approved `docs/Version_2/` designs define this implementation sequence.
@@ -25,8 +24,8 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 | 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Merged; hosted checks passed (2026-09-29) |
 | 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Merged; hosted checks passed (2026-09-29) |
 | 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Merged; local and hosted verification passed (2026-09-29) |
-| 6 | 3b - Agent loop core and journal write path | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80) | Local runner verification passed; hosted checks rerunning on `master` |
-| 7 | 3c - Control-plane loop policy and lease lifecycle | 3a; parallel with 3b | [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82) | Merge reconciliation in progress; hosted checks pending |
+| 6 | 3b - Agent loop core and journal write path | 3a | [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80) | Merged to `master` after all hosted checks passed (2026-09-29) |
+| 7 | 3c - Control-plane loop policy and lease lifecycle | 3a; parallel with 3b | [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82) | Conflict reconciliation locally verified; fresh hosted checks pending |
 | 8 | 3d — Runner loop wiring behind a default-off switch | 3b, 3c, 4a; keep disabled until 4a | Not opened | Planned |
 | 9 | 3e — Resume from the journal | 3b, 3d | Not opened | Planned / deferrable |
 | 10 | 4a — Fail-closed security guard | 1, 2, 3 | Not opened | Planned |
@@ -96,19 +95,22 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 
 ## Slice 3b log - Agent loop core and journal write path
 
-- **Issue / PR:** [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80), based on PR #78 so it could be implemented while 3c remained independent.
-- **Scope and implementation:** added the dormant runner loop state machine, role-derived tools, narrow grants, path-safe file operations, bounded tool/token/time/context execution, deterministic result envelopes, transient tool retry, and the hash-linked local journal. No runner dispatch or paid model execution was connected.
-- **Verification:** runner `mvn -B verify` passed (180 tests, 0 failures/errors/skips); focused loop tests passed; `git diff --check` passed. No provider-backed call was run.
-- **Commits:** `fa1205c` loop core; `467df94` status documentation; `f2ea742` tracker links.
-- **Hosted checks:** all PR #80 checks passed; PR remains open and stacked on #78.
+## Slice 3b log - Agent loop core and journal write path
+
+- **Issue / PR:** [#79](https://github.com/JRH89/ForgeLoop/issues/79) / [#80](https://github.com/JRH89/ForgeLoop/pull/80); branch `feat/agent-loop-core`, retargeted to `master` after PR #78 merged.
+- **Scope:** provider-neutral loop, role-derived grants, guarded list/read/search/write/edit tools, advisory gate execution seam, single tool gateway with interceptor hooks and one transient retry, context/result shaping, call/token/wall/context/money/output budgets, finish validation and commit, and runner-local write-ahead journal.
+- **Implementation:** added `AgentLoop`, immutable loop contracts, fixed loop instructions and paths-only context manifest; centralized `.git`, symlink, worktree-root and owned-prefix checks; bounded regex/file traversal and atomic writes; added durable sequenced/hash-linked JSONL records, owner-only POSIX permissions, torn-tail recovery, and complete loop/request/response/tool/post-image records. Journal start records now pin repository identity, provider/model/attempt limit, adapter and serializer versions, exact instructions, tool specifications, gates, budget and base SHA. Exact model-visible tool results and metadata-only `LOOP_TOOL_CALLED` events are recorded for later replay and progress reporting.
+- **Dormant boundary:** no dispatch path invokes this loop. Control-plane policy and lease renewal are 3c; runner wiring and Docker gate execution are 3d; journal resume is 3e. No hosted-provider calls were made and no cost was incurred.
+- **Verification:** runner `mvn -B verify` passed after implementation and review hardening: 180 tests, 0 failures, 0 errors, 0 skipped. `git diff --check` passed. All fresh hosted checks passed after reconciliation.
+- **Delivery:** implementation commits `fa1205c` and `467df94`; merged to `master` on 2026-09-29 as PR #80.
 
 ## Slice 3c log - Control-plane policy and lease lifecycle
 
-- **Issue / PR:** [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82), based on PR #78 and independent of PR #80.
+- **Issue / PR:** [#81](https://github.com/JRH89/ForgeLoop/issues/81) / [#82](https://github.com/JRH89/ForgeLoop/pull/82), based on merged PRs #78 and #80.
 - **Scope and implementation:** added validated opt-in repository budgets, immutable run policy and gate snapshots, writer-only `Task.agentLoop`, administrator configuration with audit, bounded acknowledged-lease renewal, safe holds and escalation, optional completion categories, and metadata event types. Migration V39 adds policy snapshot columns and lease claim time after the merged V36-V38 test-first migrations. Added the operator/runner contract at `docs/agent-loop-control-plane.md`.
-- **Verification:** control-plane `mvn -B verify` passed (244 tests, 0 failures/errors/skips), including GraphQL schema construction and H2 policy persistence round-trip tests; `git diff --check` passed. No paid provider call or loop dispatch was run.
+- **Verification:** control-plane `mvn -B verify` passed (244 tests, 0 failures/errors/skips), including GraphQL schema construction and H2 policy persistence round-trip tests; local control-plane, runner, and harness verification passed for the reconciled dependency stack; `git diff --check` passed. No paid provider call or loop dispatch was run.
 - **Commit:** `8716d01` - policy, lease lifecycle, migration, tests, and contract documentation.
-- **Hosted checks:** pending on PR #82 after migration renumbering and base reconciliation. PR #78 is merged; PR #80 is open with fresh checks running.
+- **Hosted checks:** fresh checks pending on PR #82 after dependency reconciliation.
 - **Compatibility boundary:** dispatch still does not request new loop fields or renew/hold leases. Slice 3d remains gated on Slice 4a and stays disabled until then.
 
 ## Update protocol

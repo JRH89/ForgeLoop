@@ -73,4 +73,20 @@ class RepositoryContextBuilderTest {
                 new PatchPlan("attempt out-of-scope write", List.of(
                         new ProposedChange("tests/Acceptance.java", "changed", "out-of-scope"))), List.of("src/")));
     }
+
+    @Test
+    void manifestPrioritizesOwnedPathsWithoutIncludingFileContents() throws Exception {
+        Files.createDirectory(temporaryDirectory.resolve(".git"));
+        Files.createDirectories(temporaryDirectory.resolve("src"));
+        Files.createDirectories(temporaryDirectory.resolve("docs"));
+        Files.writeString(temporaryDirectory.resolve("src/Secret.java"), "DO_NOT_SEND_SOURCE_CONTENT");
+        Files.writeString(temporaryDirectory.resolve("docs/Overview.md"), "also not sent");
+
+        String manifest = new RepositoryContextBuilder().manifest(temporaryDirectory, List.of("src/"));
+
+        assertTrue(manifest.indexOf("src/Secret.java") < manifest.indexOf("docs/Overview.md"));
+        assertTrue(manifest.contains("Repository manifest (paths only)"));
+        assertFalse(manifest.contains("DO_NOT_SEND_SOURCE_CONTENT"));
+        assertFalse(manifest.contains("also not sent"));
+    }
 }

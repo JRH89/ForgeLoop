@@ -5,12 +5,12 @@ import java.util.Set;
 /** Least-privilege manifest for every agent role in the delivery pipeline. */
 public enum WorkerRolePolicy {
     PLANNER(false, Set.of("repository-read", "task-graph-propose")),
-    IMPLEMENTATION(true, Set.of("repository-read", "scoped-file-write", "git-commit")),
-    BACKEND(true, Set.of("repository-read", "scoped-file-write", "git-commit")),
-    FRONTEND(true, Set.of("repository-read", "scoped-file-write", "git-commit")),
-    INDEPENDENT_TEST(true, Set.of("repository-read", "scoped-file-write", "git-commit")),
+    IMPLEMENTATION(true, Set.of("repository-read", "scoped-file-write", "git-commit", "gate-run")),
+    BACKEND(true, Set.of("repository-read", "scoped-file-write", "git-commit", "gate-run")),
+    FRONTEND(true, Set.of("repository-read", "scoped-file-write", "git-commit", "gate-run")),
+    INDEPENDENT_TEST(true, Set.of("repository-read", "scoped-file-write", "git-commit", "gate-run")),
     INTEGRATION(false, Set.of("repository-read", "git-integrate")),
-    REPAIR(true, Set.of("repository-read", "scoped-file-write", "git-commit", "failure-evidence-read")),
+    REPAIR(true, Set.of("repository-read", "scoped-file-write", "git-commit", "failure-evidence-read", "gate-run")),
     REVIEW(false, Set.of("repository-read", "diff-read", "evidence-read")),
     REPOSITORY_SCAN(false, Set.of("repository-read", "issue-proposal")),
     ISSUE_SPECIFICATION(false, Set.of("issue-proposal")),
