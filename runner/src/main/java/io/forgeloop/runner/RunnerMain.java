@@ -255,6 +255,10 @@ public final class RunnerMain {
             executeVerificationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
             return;
         }
+        if (List.of("RED_CHECK", "GREEN_CHECK").contains(task.role())) {
+            executeTestCheckTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
+            return;
+        }
         ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[6])).select(task.role());
         if ("INTEGRATION".equals(task.role())) {
             executeIntegrationTask(client, identity, task, arguments[4], arguments[5], Path.of(arguments[8]));
@@ -325,6 +329,96 @@ public final class RunnerMain {
             throw failure;
         }
     }
+
+    /** Runs the server-selected gate at the test commit boundary and submits only bounded, checksummed summaries. */
+    private static void executeTestCheckTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
+                                             String repositoriesRoot, String workspaceRoot, Path leaseFile) throws Exception {
+        if (!List.of("RED_CHECK", "GREEN_CHECK").contains(task.role()) || task.verificationGateName() == null
+                || task.verificationImageDigest() == null || task.verificationCommand().isEmpty()
+                || task.verificationNetworkPolicy() == null || task.verificationTimeoutSeconds() == null
+                || !"JUNIT_XML".equals(task.testReportFormat()) || task.verificationBaseRef() == null
+                || !task.verificationBaseRef().matches("[0-9a-f]{40,64}")) {
+            throw new IllegalArgumentException("Test-check task policy is incomplete");
+        }
+        RunnerLease lease = client.claimTask(identity, task.id());
+        new RunnerLeaseStore().save(leaseFile, lease);
+        Path repository = checkout(client, identity, lease, repositoriesRoot, task.repository());
+        GitWorktreeManager git = new GitWorktreeManager();
+        client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
+        RunnerEventReporter events = new RunnerEventReporter(client, identity, lease);
+        events.info("LEASE_ACKNOWLEDGED", "Test-check lease acknowledged");
+        events.info("EXECUTION_STARTED", "Isolated " + task.role() + " repository check started");
+        try {
+            String targetSha = task.verificationBaseRef();
+            TestCheckArtifact artifact;
+            if ("RED_CHECK".equals(task.role())) {
+                String parentSha = git.parentCommitSha(repository, targetSha);
+                List<GitWorktreeManager.ChangedFile> changedFiles = git.changedFilesInCommit(repository, parentSha, targetSha);
+                TestCheckRunResult before = runTestCheckAt(client, identity, lease, task, repository, git,
+                        parentSha, workspaceRoot, "before");
+                TestCheckRunResult after = runTestCheckAt(client, identity, lease, task, repository, git,
+                        targetSha, workspaceRoot, "after");
+                artifact = new TestCheckArtifact("RED", task.verificationGateName(), task.verificationImageDigest(),
+                        task.verificationCommand(), targetSha, parentSha,
+                        TestCheckArtifact.from(before.result(), before.report()),
+                        TestCheckArtifact.from(after.result(), after.report()), changedFiles);
+            } else {
+                TestCheckRunResult after = runTestCheckAt(client, identity, lease, task, repository, git,
+                        targetSha, workspaceRoot, "green");
+                artifact = new TestCheckArtifact("GREEN", task.verificationGateName(), task.verificationImageDigest(),
+                        task.verificationCommand(), targetSha, null, null,
+                        TestCheckArtifact.from(after.result(), after.report()), List.of());
+            }
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            byte[] bytes = mapper.writeValueAsBytes(artifact);
+            if (bytes.length > TestCheckArtifact.MAX_ARTIFACT_BYTES) {
+                artifact = artifact.withUnreadableReports();
+                bytes = mapper.writeValueAsBytes(artifact);
+                events.info("TEST_REPORT_UNREADABLE", "Test report exceeded the evidence size limit; submitted as unverifiable");
+            }
+            if (bytes.length == 0 || bytes.length > TestCheckArtifact.MAX_ARTIFACT_BYTES) {
+                throw new IllegalStateException("Test-check metadata exceeds its artifact bound");
+            }
+            String digest = EvidenceDigests.sha256(bytes);
+            String reference = client.uploadArtifact(identity, lease, bytes, digest,
+                    "application/json", "VERIFICATION_BUNDLE",
+                    "RED_CHECK".equals(task.role()) ? "red-evidence.json" : "green-evidence.json");
+            events.info("ARTIFACT_UPLOADED", "Checksummed test-check artifact uploaded");
+            client.recordTestCheckEvidence(identity, lease, reference, digest);
+            events.info("TEST_CHECK_SUBMITTED", "Test-check evidence submitted for server-side verdict");
+        } catch (Exception failure) {
+            try { client.completeLease(identity, lease.leaseId(), lease.nonce(), false); }
+            catch (Exception closeFailure) { failure.addSuppressed(closeFailure); }
+            throw failure;
+        }
+    }
+
+    private static TestCheckRunResult runTestCheckAt(RunnerClient client, RunnerIdentity identity, RunnerLease lease,
+                                                      RunnerTask task, Path repository, GitWorktreeManager git,
+                                                      String baseSha, String workspaceRoot, String label) throws Exception {
+        Path workspace = Path.of(workspaceRoot).toAbsolutePath().normalize();
+        Path evidence = workspace.resolve("evidence").resolve(task.id()).resolve(lease.leaseId()).resolve(label).normalize();
+        if (!evidence.startsWith(workspace)) throw new IllegalArgumentException("Test report path escapes the runner workspace");
+        Path worktree = git.create(repository, baseSha, task.id(), workspace);
+        try {
+            Files.createDirectories(evidence);
+            VerificationResult result;
+            try (var progress = new RunnerEventReporter(client, identity, lease).progress("Test gate running at " + label + " snapshot")) {
+                result = new ContainerVerificationExecutor().execute(worktree, dockerVisibleWorktree(worktree),
+                        evidence, dockerVisibleWorktree(evidence), task.verificationImageDigest(), task.verificationCommand(),
+                        Duration.ofSeconds(task.verificationTimeoutSeconds()), "EGRESS".equals(task.verificationNetworkPolicy()), "JUNIT_XML");
+            }
+            TestRunReport report = new JunitReportReader().read(evidence.resolve("test-report"));
+            return new TestCheckRunResult(result, report);
+        } finally {
+            if (Files.exists(workspace.resolve(task.id()))) {
+                try { git.remove(repository, task.id(), workspace); }
+                catch (Exception cleanupFailure) { System.err.println("Test-check worktree cleanup failed: task=" + task.id()); }
+            }
+        }
+    }
+
+    private record TestCheckRunResult(VerificationResult result, TestRunReport report) { }
 
     /** Cherry-picks only dependency commits declared by the validated task graph. */
     private static void executeIntegrationTask(RunnerClient client, RunnerIdentity identity, RunnerTask task,
@@ -651,7 +745,8 @@ public final class RunnerMain {
                 task.dependencyChangeShas(), task.verificationGateName(), task.verificationKind(),
                 task.verificationImageDigest(), task.verificationCommand(), task.verificationNetworkPolicy(),
                 task.verificationTimeoutSeconds(), task.verificationBaseRef(), task.executionBaseRef(),
-                task.acceptanceCriteria(), task.mcpConfigurations(), task.writeBoundary(), task.testPathGlobs(), task.testReportFormat());
+                task.acceptanceCriteria(), task.mcpConfigurations(), task.writeBoundary(), task.testPathGlobs(), task.testReportFormat(),
+                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence());
     }
 
     private static String collectMcpOrFail(RunnerClient client, RunnerIdentity identity, RunnerLease lease,

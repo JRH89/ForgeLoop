@@ -5,10 +5,10 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 ## Current status
 
 - **Active work:** Slice 3a - provider conversations and tool calling.
-- **Branch:** `feat/provider-conversations`, based on `master` after merged PR #70; now includes merged PR #72.
+- **Branch:** `feat/provider-conversations`, based on `master` after merged PRs #70, #72, #74, and #76.
 - **Issue / PR:** [#77 - Provider conversation contracts](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78).
 - **Code state:** Slice 3a is implemented and locally verified at commit `0f4a2b4`; its overlap with the newly merged #72 was limited to this tracker and is reconciled without dropping either slice's log.
-- **Earlier slices:** PR #70 and #72 are merged. PR #74 (2b) and #76 (2c) remain open; their target branches need to advance to `master` after #72.
+- **Earlier slices:** PRs #70, #72, #74, and #76 are merged; all three test-first slices are now integrated into `master`.
 - **Local test toolchain:** portable Temurin 21 and Maven 3.9.12 under the user-local ForgeLoop tools directory; no project files added for tooling.
 - **External validation:** live provider-backed runs have not been attempted because they incur provider spend. Local HTTP-server fixtures and hosted CI are not paid-provider evidence.
 - **Outline:** `docs/original_outline.md` is the project-level direction; the approved `docs/Version_2/` designs define this implementation sequence.
@@ -21,8 +21,8 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 |---:|---|---|---|---|
 | 1 | 1 - Sequenced writers | - | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Merged; local and hosted verification passed |
 | 2 | 2a - Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Merged; local and hosted verification passed (2026-09-29) |
-| 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Hosted checks passed; open, target still needs advancing to `master` |
-| 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Hosted checks passed; open and stacked on PR #74 |
+| 3 | 2b - RED/GREEN checks | 2a | [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74) | Merged; hosted checks passed (2026-09-29) |
+| 4 | 2c - GitHub branch check | 2b | [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76) | Merged; hosted checks passed (2026-09-29) |
 | 5 | 3a - Provider conversations and tool calling | 1 | [#77](https://github.com/JRH89/ForgeLoop/issues/77) / [#78](https://github.com/JRH89/ForgeLoop/pull/78) | Open against `master`; checks must rerun after the base reconciliation |
 | 6 | 3b — Agent loop core and journal write path | 3a | Not opened | Planned |
 | 7 | 3c — Control-plane loop policy and lease lifecycle | 3a; can proceed alongside 3b | Not opened | Planned |
@@ -71,16 +71,16 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 
 ## Slice 2b log - RED/GREEN checks
 
-- **Issue / PR:** [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74), originally stacked on PR #72; #72 merged on 2026-09-29.
+- **Issue / PR:** [#73](https://github.com/JRH89/ForgeLoop/issues/73) / [#74](https://github.com/JRH89/ForgeLoop/pull/74), originally stacked on PR #72; #72 and #74 merged on 2026-09-29.
 - **Scope and implementation:** bounded secure JUnit parsing; server-created RED/GREEN tasks and immutable evidence; deterministic verdicts, retries, idempotency and routing; runner affinity/leases; test-writer retries and quality repairs; `UNVERIFIABLE` hold/escalation; report upload/query; repair/review context; integration dependencies preventing unchecked test commits from becoming the head.
 - **Verification:** `mvn -B verify` passed in control-plane (260 tests), runner (153 tests, 1 symlink-permission skip), and harness (2). The runner included the Docker report-mount test. Hosted checks passed at `a45569f` after migration V38 and a Windows-container test guard. No paid provider run was attempted.
 - **Commits:** `0872763` control-plane; `913e6a5` runner; `1cdd879` tracker.
 
 ## Slice 2c log - GitHub branch check
 
-- **Issue / PR:** [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76), stacked on PR #74.
+- **Issue / PR:** [#75](https://github.com/JRH89/ForgeLoop/issues/75) / [#76](https://github.com/JRH89/ForgeLoop/pull/76), originally stacked on PR #74; #74 and #76 merged on 2026-09-29.
 - **Scope and implementation:** authenticated GitHub compare-files request; verify published test blobs against current passing RED evidence; fail closed on removals, stale/incomplete/conflicting evidence, invalid globs, and the 300-file cap; persist held integration, blocked run, HIGH escalation, audit event, and remote head on violation.
-- **Verification:** control-plane `mvn -B verify` passed (271 tests); focused compare/verifier/push/lease/evidence tests passed (27); runner `mvn -B verify` passed (153 tests, 1 symlink-permission skip); `git diff --check` passed. All hosted checks on PR #76 passed. PR #76 remains open and stacked on #74.
+- **Verification:** control-plane `mvn -B verify` passed (271 tests); focused compare/verifier/push/lease/evidence tests passed (27); runner `mvn -B verify` passed (153 tests, 1 symlink-permission skip); `git diff --check` passed. All hosted checks on PR #76 passed before merge.
 - **Commit:** `9447671`. No paid provider call was needed.
 
 ## Slice 3a log - Provider conversations and tool calling

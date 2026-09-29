@@ -131,6 +131,50 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void genericLeaseCompletionCannotApproveRedOrGreenChecks() {
+        for (String role : List.of("RED_CHECK", "GREEN_CHECK")) {
+            DeliveryTask task = mock(DeliveryTask.class);
+            when(task.getRole()).thenReturn(role);
+            when(task.getId()).thenReturn("task");
+            acknowledgedLease();
+            when(tasks.findById("task")).thenReturn(Optional.of(task));
+
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> service.complete("lease", "runner", "nonce", true));
+
+            assertEquals("Test checks require checksummed test evidence", failure.getMessage());
+        }
+    }
+
+    @Test
+    void genericVerificationEvidenceCannotBeRecordedForTestCheckTask() {
+        DeliveryTask task = mock(DeliveryTask.class);
+        when(task.getRole()).thenReturn("RED_CHECK");
+        acknowledgedLease();
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        Instant time = Instant.parse("2026-01-01T00:00:00Z");
+        VerificationEvidenceSubmission submission = new VerificationEvidenceSubmission("CONTAINER", "unit",
+                "node@sha256:" + "a".repeat(64), List.of("npm", "test"), 0, false, "passed", time, time,
+                null, "a".repeat(64), "b".repeat(64));
+
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> service.recordEvidence("lease", "runner", "nonce", submission));
+
+        assertEquals("Verification evidence requires a verification task", failure.getMessage());
+    }
+
+    private TaskLease acknowledgedLease() {
+        TaskLease lease = mock(TaskLease.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(true);
+        when(lease.getTaskId()).thenReturn("task");
+        return lease;
+    }
+
+    @Test
     void providerAttemptsRequireAndRemainBoundToAnAcknowledgedLease() {
         TaskLease lease = mock(TaskLease.class);
         DeliveryTask task = mock(DeliveryTask.class);
@@ -194,5 +238,29 @@ class TaskLeaseServiceTest {
         service.completeProviderWork("lease", "runner", "nonce", "a".repeat(40));
 
         verify(lease).completeChangeReady("a".repeat(40));
+    }
+
+    @Test
+    void testBoundaryViolationHoldsIntegrationBlocksRunAndClosesLease() throws Exception {
+        FeatureRun run = new FeatureRun("org", "acme/project", "issue-1", "Build feature", "spec", 1,
+                "GENERIC", "main", 1);
+        DeliveryTask integration = run.addPlannedTask("integration", "INTEGRATION", "Integrate", "git", List.of(), 1, 0);
+        run.beginPlanning();
+        run.queuePlannedWork();
+        run.startExecution();
+        Runner runner = mock(Runner.class);
+        when(runner.getId()).thenReturn("runner");
+        String nonceHash = java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest("nonce".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        TaskLease lease = new TaskLease(integration, runner, nonceHash, Instant.now().plusSeconds(600));
+        lease.acknowledge();
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+
+        service.holdIntegrationForTestBoundaryViolation("lease", "runner", "nonce", "test file changed");
+
+        assertEquals(TaskState.HELD, integration.getState());
+        assertEquals(RunState.BLOCKED, run.getState());
+        org.junit.jupiter.api.Assertions.assertTrue(lease.isCompleted());
+        verify(escalations).escalate(integration, "TEST_BOUNDARY_VIOLATION", "test file changed");
     }
 }

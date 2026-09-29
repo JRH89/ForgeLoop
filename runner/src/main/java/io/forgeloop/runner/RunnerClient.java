@@ -163,7 +163,7 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
         if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
@@ -178,7 +178,9 @@ public final class RunnerClient {
                     JSON.convertValue(task.path("acceptanceCriteria"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
                     JSON.convertValue(task.path("mcpConfigurations"),JSON.getTypeFactory().constructCollectionType(List.class,LocalMcpConfiguration.class)),
                     nullableText(task, "writeBoundary"), JSON.convertValue(task.path("testPathGlobs"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
-                    nullableText(task, "testReportFormat")));
+                    nullableText(task, "testReportFormat"),
+                    JSON.convertValue(task.path("expectedTests"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
+                    task.path("expectedTestsOverflow").asBoolean(false), nullableText(task, "testFirstEvidence")));
         }
         return List.copyOf(tasks);
     }
@@ -206,6 +208,15 @@ public final class RunnerClient {
                 + "\",\"artifactReference\":" + nullable(report.artifactReference()) + ",\"outputDigest\":\"" + report.outputDigest()
                 + "\",\"bundleDigest\":\"" + report.bundleDigest() + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:VerificationEvidenceInput!){recordVerificationEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest}}", variables);
+    }
+    /** Records an uploaded RED/GREEN bundle; the server derives the verdict from the artifact bytes. */
+    public String recordTestCheckEvidence(RunnerIdentity identity, RunnerLease lease, String artifactReference,
+                                          String bundleDigest) throws Exception {
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"input\":{\"artifactReference\":\"" + escape(artifactReference)
+                + "\",\"bundleDigest\":\"" + escape(bundleDigest) + "\"}}";
+        return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:TestCheckEvidenceInput!){recordTestCheckEvidence(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id digest verdict reason}}", variables);
     }
     /** Uploads a bounded local evidence file through the active lease without base64/GraphQL inflation. */
     public String uploadArtifact(RunnerIdentity identity, RunnerLease lease, byte[] content, String sha256) throws Exception {
