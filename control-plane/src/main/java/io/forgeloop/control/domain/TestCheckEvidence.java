@@ -174,6 +174,17 @@ public class TestCheckEvidence {
     public List<String> getFailingTests() { return failingTests == null || failingTests.isBlank() ? List.of() : failingTests.lines().toList(); }
     public String getClassifiedTests() { return classifiedTests == null ? "" : classifiedTests; }
     public String getChangedFiles() { return changedFiles == null ? "" : changedFiles; }
+    /** Rehydrates the bounded path/blob pairs used to compare test files against GitHub's published diff. */
+    public List<TestCheckRules.ChangedFile> changedFilesEvidence() {
+        if (changedFiles == null || changedFiles.isBlank()) return List.of();
+        return changedFiles.lines().map(line -> {
+            int separator = line.indexOf(' ');
+            if (separator <= 0 || separator == line.length() - 1) {
+                throw new IllegalArgumentException("Stored changed-file evidence is malformed");
+            }
+            return new TestCheckRules.ChangedFile(line.substring(separator + 1), line.substring(0, separator));
+        }).toList();
+    }
     public String getBeforeOutcomeDigest() { return beforeOutcomeDigest; }
     public String getAfterOutcomeDigest() { return afterOutcomeDigest; }
     public String getBeforeOutputDigest() { return beforeOutputDigest; }

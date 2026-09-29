@@ -41,6 +41,11 @@ public class TaskLease {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         completedAt = Instant.now();
     }
+    /** Closes an acknowledged lease after the task is held by a server-enforced policy boundary. */
+    public void closeForPolicyHold() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        completedAt = Instant.now();
+    }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */
     public void completeChangeReady(String changeSha) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");

@@ -3,6 +3,7 @@ package io.forgeloop.control.integrations.github;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -56,6 +57,22 @@ public class GithubHttpApi implements GithubApi, GithubIssueReader {
         } catch (Exception exception) {
             throw new IllegalStateException("GitHub branch lookup failed", exception);
         }
+    }
+    @Override public List<GithubChangedFile> compareFiles(long installationId, String repository, String base, String head) {
+        if (repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
+                || base == null || base.isBlank() || head == null || !head.matches("[0-9a-f]{40,64}")) {
+            throw new IllegalArgumentException("Invalid GitHub compare target");
+        }
+        String path = "/repos/" + repository + "/compare/" + encodePathSegment(base) + "..." + encodePathSegment(head);
+        JsonNode response = request(installationId, "GET", path, Map.of());
+        JsonNode files = response.path("files");
+        if (!files.isArray()) throw new IllegalStateException("GitHub compare response did not contain a file list");
+        java.util.ArrayList<GithubChangedFile> changedFiles = new java.util.ArrayList<>();
+        for (JsonNode file : files) {
+            changedFiles.add(new GithubChangedFile(file.path("filename").asText(null),
+                    file.path("status").asText(null), file.path("sha").asText(null)));
+        }
+        return List.copyOf(changedFiles);
     }
     @Override public long createCompletedCheck(long installationId, String repository, String headSha, String name, String summary) {
         JsonNode response = request(installationId, "POST", "/repos/" + repository + "/check-runs", Map.of("name", name, "head_sha", headSha, "status", "completed", "conclusion", "success", "output", Map.of("title", name, "summary", summary)));
@@ -154,4 +171,7 @@ public class GithubHttpApi implements GithubApi, GithubIssueReader {
         throw new IllegalStateException("GitHub API request failed with HTTP " + response.statusCode());
     }
     private static String part(String value) { return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8)); }
+    private static String encodePathSegment(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
 }
