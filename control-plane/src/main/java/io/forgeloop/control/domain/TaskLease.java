@@ -36,6 +36,11 @@ public class TaskLease {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         completedAt = Instant.now();
     }
+    /** Check verdict routing performs its own task transitions, then closes this lease atomically. */
+    public void closeForTestCheck() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        completedAt = Instant.now();
+    }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */
     public void completeChangeReady(String changeSha) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");

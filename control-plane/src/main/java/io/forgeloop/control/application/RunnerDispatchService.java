@@ -40,6 +40,10 @@ public class RunnerDispatchService {
             task.getDependencyChangeShas();
             task.getExecutionSpecification();
             task.getVerificationGateName();
+            task.getExpectedTests();
+            task.isExpectedTestsOverflow();
+            task.getTestFirstEvidence();
+            task.getTestCheckEvidence();
         });
         return available;
     }
