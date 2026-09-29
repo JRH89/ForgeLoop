@@ -14,6 +14,16 @@ class HumanEscalationServiceTest {
         HumanEscalation item=service.escalate(task,"BUDGET_EXHAUSTED","Budget reached");
         assertEquals("HIGH",item.getSeverity());assertEquals("OPEN",item.getStatus());
     }
+    @Test void everyEnforcementHoldReasonCreatesHighSeverityEscalation() {
+        FeatureRun run=mock(FeatureRun.class);DeliveryTask task=mock(DeliveryTask.class);
+        when(task.getRun()).thenReturn(run);when(run.getOrganizationId()).thenReturn("org");when(run.getId()).thenReturn("run");when(task.getId()).thenReturn("task");
+        when(repository.save(any())).thenAnswer(call->call.getArgument(0));
+        for (String reason : List.of("ENFORCEMENT_RULE_INPUT_MISSING", "ENFORCEMENT_PREREQUISITE_MISSING",
+                "ENFORCEMENT_RULE_FAILED", "ENFORCEMENT_BOUNDARY_BREACHED")) {
+            HumanEscalation item=service.escalate(task,reason,"Policy held this task for review.");
+            assertEquals("HIGH",item.getSeverity(),reason);
+        }
+    }
     @Test void enforcesTenantBoundaryAndLifecycle(){
         FeatureRun run=mock(FeatureRun.class);when(run.getOrganizationId()).thenReturn("org");HumanEscalation item=new HumanEscalation(run,null,"LEASE_EXPIRED","MEDIUM","Runner stopped");when(repository.findById("id")).thenReturn(Optional.of(item));
         assertThrows(IllegalArgumentException.class,()->service.acknowledge("id","other","operator"));

@@ -20,5 +20,9 @@ public class HumanEscalationService {
     @Transactional public HumanEscalation acknowledge(String id,String organization,String actor){HumanEscalation item=requireOwned(id,organization);item.acknowledge(actor);return item;}
     @Transactional public HumanEscalation resolve(String id,String organization,String actor){HumanEscalation item=requireOwned(id,organization);item.resolve(actor);return item;}
     private HumanEscalation requireOwned(String id,String organization){HumanEscalation item=escalations.findById(id).orElseThrow(()->new IllegalArgumentException("Escalation not found"));if(!item.belongsTo(organization))throw new IllegalArgumentException("Escalation not found");return item;}
-    private String severity(String reason){return List.of("BUDGET_EXHAUSTED","LOOP_BUDGET_EXHAUSTED","ATTEMPT_BUDGET_EXHAUSTED","TEST_CHECK_UNVERIFIABLE","TEST_BOUNDARY_VIOLATION","NEW_TESTS_NOT_SATISFIED").contains(reason)?"HIGH":"MEDIUM";}
+    private String severity(String reason){return List.of(
+            "BUDGET_EXHAUSTED", "LOOP_BUDGET_EXHAUSTED", "ATTEMPT_BUDGET_EXHAUSTED",
+            "TEST_CHECK_UNVERIFIABLE", "TEST_BOUNDARY_VIOLATION", "NEW_TESTS_NOT_SATISFIED",
+            "ENFORCEMENT_RULE_INPUT_MISSING", "ENFORCEMENT_PREREQUISITE_MISSING",
+            "ENFORCEMENT_RULE_FAILED", "ENFORCEMENT_BOUNDARY_BREACHED").contains(reason) ? "HIGH" : "MEDIUM";}
 }

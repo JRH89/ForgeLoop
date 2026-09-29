@@ -14,4 +14,26 @@ class EvidenceRedactorTest {
         assertFalse(redacted.contains("private material"));
         assertTrue(redacted.contains("[REDACTED PRIVATE KEY]"));
     }
+
+    @Test void identifiesCredentialCategoriesWithoutReturningSecrets() {
+        assertEquals("GitHub token", EvidenceRedactor.findCredentialToken("ghp_abcdefghijklmnopqrstuvwxyz123456").orElseThrow());
+        assertEquals("API key", EvidenceRedactor.findCredentialToken("sk-abcdefghijklmnopqrstuvwxyz123456").orElseThrow());
+        assertEquals("private key", EvidenceRedactor.findCredentialToken(
+                "-----BEGIN RSA PRIVATE KEY-----\nmaterial\n-----END RSA PRIVATE KEY-----").orElseThrow());
+        assertTrue(EvidenceRedactor.findCredentialToken("api_key = os.environ[\"KEY\"]").isEmpty());
+    }
+
+    @Test void redactsCredentialTokensAndReportsOnlyTheCount() {
+        var result = EvidenceRedactor.redactCredentialTokens(
+                "token=ghp_abcdefghijklmnopqrstuvwxyz123456 and sk-abcdefghijklmnopqrstuvwxyz123456");
+        assertEquals("token=[REDACTED] and [REDACTED]", result.content());
+        assertEquals(2, result.count());
+        assertFalse(result.content().contains("ghp_"));
+        assertFalse(result.content().contains("sk-"));
+    }
+
+    @Test void legacyEvidenceRedactionKeepsItsExistingAssignmentBehavior() {
+        String redacted = EvidenceRedactor.redact("api_key=abc123");
+        assertEquals("api_key=[REDACTED]", redacted);
+    }
 }

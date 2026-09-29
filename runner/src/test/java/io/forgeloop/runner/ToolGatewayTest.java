@@ -73,6 +73,60 @@ class ToolGatewayTest {
                 .invoke(call("read_file", "{\"value\":\"x\"}"), context(Set.of("read_file"))));
     }
 
+    @Test
+    void interceptorExceptionsFailClosedAsJournaledPolicyHolds() throws Exception {
+        EchoTool tool = new EchoTool();
+        ToolCallInterceptor broken = new ToolCallInterceptor() {
+            @Override public String name() { return "broken-rule"; }
+            @Override public Decision before(ToolCall call, ToolContext context) throws IOException { throw new IOException("do not expose details"); }
+            @Override public ToolOutcome after(ToolCall call, ToolOutcome outcome, ToolContext context) { return outcome; }
+        };
+
+        StepJournal journal = journal();
+        ToolOutcome result = new ToolGateway(new ToolRegistry(List.of(tool)), journal, List.of(broken))
+                .invoke(call("read_file", "{\"value\":\"x\"}"), context(Set.of("read_file")));
+
+        assertEquals(FailureCategory.PERMISSION, result.category());
+        assertEquals("HOLD", result.meta().get("decision"));
+        assertEquals(HoldClass.RULE_FAILED.name(), result.meta().get("holdClass"));
+        assertEquals("Not executed: this task is now held for a person (RULE_FAILED).", result.content());
+        assertEquals(0, tool.calls);
+        JsonNode completed = journal.records().stream().filter(row -> row.path("type").asText().equals("TOOL_COMPLETED")).findFirst().orElseThrow();
+        assertEquals("HOLD", completed.path("decision").asText());
+        assertEquals("broken-rule", completed.path("holdRule").asText());
+        assertFalse(completed.toString().contains("do not expose details"));
+    }
+
+    @Test
+    void afterHookCannotChangeStatusCategoryOrPostImagesButContentRewritesAreRecorded() throws Exception {
+        EchoTool tool = new EchoTool();
+        ToolCallInterceptor changesStatus = new ToolCallInterceptor() {
+            @Override public String name() { return "bad-after"; }
+            @Override public Decision before(ToolCall call, ToolContext context) { return Decision.allow(); }
+            @Override public ToolOutcome after(ToolCall call, ToolOutcome outcome, ToolContext context) {
+                return ToolOutcome.failed(FailureCategory.PERMISSION, outcome.content());
+            }
+        };
+        ToolOutcome held = gateway(tool, List.of(changesStatus), ignored -> { })
+                .invoke(call("read_file", "{\"value\":\"secret\"}"), context(Set.of("read_file")));
+        assertEquals(HoldClass.RULE_FAILED.name(), held.meta().get("holdClass"));
+
+        ToolCallInterceptor changesContent = new ToolCallInterceptor() {
+            @Override public String name() { return "redactor"; }
+            @Override public Decision before(ToolCall call, ToolContext context) { return Decision.allow(); }
+            @Override public ToolOutcome after(ToolCall call, ToolOutcome outcome, ToolContext context) {
+                return new ToolOutcome(outcome.status(), outcome.category(), "safe", Map.of("redactions", 1), outcome.postImages());
+            }
+        };
+        StepJournal journal = new StepJournal(temporaryDirectory.resolve("redaction-journal"), "task", "lease", Clock.systemUTC());
+        ToolOutcome rewritten = new ToolGateway(new ToolRegistry(List.of(tool)), journal, List.of(changesContent), ignored -> { })
+                .invoke(call("read_file", "{\"value\":\"visible\"}"), context(Set.of("read_file")));
+        assertEquals("safe", rewritten.content(), rewritten.meta().toString());
+        JsonNode completed = journal.records().stream().filter(row -> row.path("type").asText().equals("TOOL_COMPLETED")).findFirst().orElseThrow();
+        assertEquals("safe", completed.path("content").asText());
+        assertEquals("redactor", completed.path("rewrittenBy").get(0).asText());
+    }
+
     private ToolGateway gateway(EchoTool tool, List<ToolCallInterceptor> interceptors, ToolSleeper sleeper) throws Exception {
         return new ToolGateway(new ToolRegistry(List.of(tool)), journal(), interceptors, sleeper);
     }

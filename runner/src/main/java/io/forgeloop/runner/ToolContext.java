@@ -9,10 +9,11 @@ import java.util.Set;
 public record ToolContext(String taskId, String leaseId, String role, Path worktree, Set<String> declaredTools,
                           List<String> ownedPrefixes, List<LoopGate> gates, int turn, int step,
                           long remainingWallMillis, LoopCounters counters, Map<String, ToolOutcome> gateOutcomes,
-                          String notExecutedReason) {
+                          String notExecutedReason, String baseSha, int lastWriteStep) {
     public ToolContext {
         if (taskId == null || taskId.isBlank() || leaseId == null || leaseId.isBlank() || role == null || worktree == null
-                || declaredTools == null || ownedPrefixes == null || gates == null || turn < 1 || step < 1 || remainingWallMillis < 0 || counters == null)
+                || declaredTools == null || ownedPrefixes == null || gates == null || turn < 1 || step < 1 || remainingWallMillis < 0 || counters == null
+                || baseSha == null || !baseSha.matches("[0-9a-f]{40,64}") || lastWriteStep < 0)
             throw new IllegalArgumentException("Tool context is invalid");
         if (notExecutedReason != null && (notExecutedReason.isBlank() || notExecutedReason.length() > 200))
             throw new IllegalArgumentException("Tool skip reason is invalid");
@@ -22,5 +23,13 @@ public record ToolContext(String taskId, String leaseId, String role, Path workt
         ownedPrefixes = List.copyOf(ownedPrefixes);
         gates = List.copyOf(gates);
         gateOutcomes = Map.copyOf(gateOutcomes == null ? Map.of() : gateOutcomes);
+    }
+
+    public ToolContext(String taskId, String leaseId, String role, Path worktree, Set<String> declaredTools,
+                       List<String> ownedPrefixes, List<LoopGate> gates, int turn, int step,
+                       long remainingWallMillis, LoopCounters counters, Map<String, ToolOutcome> gateOutcomes,
+                       String notExecutedReason) {
+        this(taskId, leaseId, role, worktree, declaredTools, ownedPrefixes, gates, turn, step, remainingWallMillis,
+                counters, gateOutcomes, notExecutedReason, "0".repeat(40), 0);
     }
 }

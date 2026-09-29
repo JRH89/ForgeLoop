@@ -20,4 +20,10 @@ public record ToolOutcome(ToolStatus status, FailureCategory category, String co
     public static ToolOutcome failed(FailureCategory category, String content) {
         return new ToolOutcome(ToolStatus.FAILED, category, content, Map.of(), List.of());
     }
+
+    public static ToolOutcome held(HoldClass holdClass, String rule, String reason) {
+        return new ToolOutcome(ToolStatus.FAILED, FailureCategory.PERMISSION,
+                "Not executed: this task is now held for a person (" + holdClass.name() + ").",
+                Map.of("decision", "HOLD", "holdClass", holdClass.name(), "holdRule", rule, "holdReason", reason), List.of());
+    }
 }

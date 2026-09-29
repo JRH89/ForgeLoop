@@ -37,6 +37,16 @@ public class TaskLease {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         completedAt = Instant.now();
     }
+    /** Check verdict routing performs its own task transitions, then closes this lease atomically. */
+    public void closeForTestCheck() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        completedAt = Instant.now();
+    }
+    /** Closes an acknowledged lease after the task is held by a server-enforced policy boundary. */
+    public void closeForPolicyHold() {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
+        completedAt = Instant.now();
+    }
     /** Extends only acknowledged loop leases and never beyond the original claim-time budget cap. */
     public void renew(Instant now, Instant maximumExpiry) {
         if (now == null || completedAt != null || acknowledgedAt == null || !now.isBefore(expiresAt))
@@ -47,16 +57,6 @@ public class TaskLease {
     }
     /** Closes an acknowledged lease after the runner deliberately holds its task for an operator. */
     public void closeForHold() {
-        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        completedAt = Instant.now();
-    }
-    /** Check verdict routing performs its own task transitions, then closes this lease atomically. */
-    public void closeForTestCheck() {
-        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        completedAt = Instant.now();
-    }
-    /** Closes an acknowledged lease after the task is held by a server-enforced policy boundary. */
-    public void closeForPolicyHold() {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         completedAt = Instant.now();
     }

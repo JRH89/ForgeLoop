@@ -18,4 +18,5 @@ public record WriteBoundary(String mode, List<String> testPathGlobs) {
     public boolean forbidsTestPaths() { return "NO_TESTS".equals(mode); }
     public boolean isAny() { return "ANY".equals(mode); }
     public boolean isTestPath(String path) { return TestPathGlobs.matchesAny(path, testPathGlobs); }
+    public boolean permits(String path) { return isAny() || (requiresTestPaths() == isTestPath(path)); }
 }
