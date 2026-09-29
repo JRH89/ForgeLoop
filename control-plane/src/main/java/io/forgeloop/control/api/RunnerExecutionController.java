@@ -124,6 +124,12 @@ public class RunnerExecutionController {
         runners.authenticated(runnerId, credential);
         return leases.recordProviderAttempt(leaseId, runnerId, nonce, input);
     }
+    @MutationMapping public io.forgeloop.control.application.SpendReservation reserveTaskSpend(
+            @Argument String leaseId, @Argument String runnerId, @Argument String nonce,
+            @Argument String credential, @Argument Double micros) {
+        runners.authenticated(runnerId, credential);
+        return leases.reserveSpend(leaseId, runnerId, nonce, micros == null ? Double.NaN : micros);
+    }
     @MutationMapping public ReviewEvidence recordReviewEvidence(@Argument String leaseId, @Argument String runnerId,
                                                                  @Argument String nonce, @Argument String credential,
                                                                  @Argument ReviewEvidenceSubmission input) {

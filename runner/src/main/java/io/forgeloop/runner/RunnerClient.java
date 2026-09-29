@@ -269,6 +269,37 @@ public final class RunnerClient {
                 + ",\"category\":\"" + escape(report.category()) + "\"}}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$input:ProviderAttemptInput!){recordProviderAttempt(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,input:$input){id requestIdDigest outcome}}", variables);
     }
+    /** Reserves the exact worst-case turn amount; retries are safe because the lease reservation is replaceable. */
+    public SpendReservationGrant reserveSpend(RunnerIdentity identity, RunnerLease lease, long micros) throws Exception {
+        if (identity == null || lease == null || micros < 1 || micros > 1_000_000_000_000L)
+            throw new IllegalArgumentException("Spend reservation request is invalid");
+        String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())
+                + "\",\"nonce\":\"" + escape(lease.nonce()) + "\",\"credential\":\"" + escape(identity.credential())
+                + "\",\"micros\":" + micros + "}";
+        String response;
+        try {
+            response = post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$micros:Float!){reserveTaskSpend(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,micros:$micros){granted reservedMicros}}", variables);
+        } catch (ControlPlaneFailure failure) {
+            throw failure;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new ControlPlaneFailure("Spend reservation transport was interrupted", true);
+        } catch (java.io.IOException transportFailure) {
+            throw new ControlPlaneFailure("Spend reservation control plane is unavailable", true);
+        }
+        try {
+            JsonNode grant = JSON.readTree(response).path("data").path("reserveTaskSpend");
+            if (!grant.path("granted").isBoolean() || !grant.path("reservedMicros").isNumber())
+                throw new IllegalArgumentException("Spend reservation response was malformed");
+            long reserved = grant.path("reservedMicros").longValue();
+            boolean granted = grant.path("granted").booleanValue();
+            if (reserved < 0 || (granted && reserved != micros) || (!granted && reserved != 0))
+                throw new IllegalArgumentException("Spend reservation response did not match the request");
+            return new SpendReservationGrant(granted, reserved);
+        } catch (Exception malformed) {
+            throw new ControlPlaneFailure("Spend reservation response was malformed", true);
+        }
+    }
     /** Submits the exact planner contract through the active planner lease. */
     public String submitTaskPlan(RunnerIdentity identity, RunnerLease lease, PlannerPlan plan) throws Exception {
         String variables = "{\"leaseId\":\"" + escape(lease.leaseId()) + "\",\"runnerId\":\"" + escape(identity.runnerId())

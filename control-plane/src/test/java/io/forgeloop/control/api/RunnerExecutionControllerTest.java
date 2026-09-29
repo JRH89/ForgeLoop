@@ -162,6 +162,17 @@ class RunnerExecutionControllerTest {
     }
 
     @Test
+    void authenticatesRunnerBeforeReservingSpend() {
+        org.mockito.Mockito.when(runners.authenticated("runner-1", "runner-credential"))
+                .thenReturn(mock(io.forgeloop.control.domain.Runner.class));
+
+        controller.reserveTaskSpend("lease-1", "runner-1", "nonce", "runner-credential", 500.0);
+
+        verify(runners).authenticated("runner-1", "runner-credential");
+        verify(leases).reserveSpend("lease-1", "runner-1", "nonce", 500.0);
+    }
+
+    @Test
     void authenticatesRunnerBeforeCompletingProviderWork() {
         controller.completeProviderTaskLease("lease-1", "runner-1", "nonce", "runner-credential", "a".repeat(40));
 

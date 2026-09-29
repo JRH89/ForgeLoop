@@ -14,6 +14,8 @@ public class TaskLease {
     @Column(nullable = false) private Instant claimedAt;
     private Instant acknowledgedAt;
     private Instant completedAt;
+    @Column(nullable = false)
+    private long reservedMicros;
 
     protected TaskLease() { }
     public TaskLease(DeliveryTask task, Runner runner, String nonceHash, Instant expiresAt) {
@@ -25,27 +27,36 @@ public class TaskLease {
         return java.security.MessageDigest.isEqual(nonceHash.getBytes(java.nio.charset.StandardCharsets.US_ASCII), hash.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
     }
     public void acknowledge() { if (!active()) throw new IllegalStateException("Lease is expired"); acknowledgedAt = Instant.now(); }
+    /** Replaces, rather than increments, the active lease's worst-case provider-spend reservation. */
+    public void reserve(long micros) {
+        if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before reserving spend");
+        if (micros < 1 || micros > 1_000_000_000_000L) throw new IllegalArgumentException("Spend reservation is invalid");
+        reservedMicros = micros;
+    }
+    /** Releases the reservation after provider usage is persisted or the lease is closed. */
+    public void settleReservation() { reservedMicros = 0; }
+    private void close() { completedAt = Instant.now(); settleReservation(); }
     public void complete(boolean passed) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         task.transition(passed ? TaskState.VERIFIED : TaskState.REPAIR_QUEUED);
         if (task.getState() == TaskState.FAILED) task.getRun().block();
         if (passed) task.getRun().evaluateReviewReadiness();
-        completedAt = Instant.now();
+        close();
     }
     /** Closes a failed quality-stage lease before the run atomically materializes its code-repair cycle. */
     public void closeForRepairCycle() {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        completedAt = Instant.now();
+        close();
     }
     /** Check verdict routing performs its own task transitions, then closes this lease atomically. */
     public void closeForTestCheck() {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        completedAt = Instant.now();
+        close();
     }
     /** Closes an acknowledged lease after the task is held by a server-enforced policy boundary. */
     public void closeForPolicyHold() {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        completedAt = Instant.now();
+        close();
     }
     /** Extends only acknowledged loop leases and never beyond the original claim-time budget cap. */
     public void renew(Instant now, Instant maximumExpiry) {
@@ -58,20 +69,20 @@ public class TaskLease {
     /** Closes an acknowledged lease after the runner deliberately holds its task for an operator. */
     public void closeForHold() {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
-        completedAt = Instant.now();
+        close();
     }
     /** Completes code generation without treating an agent-authored patch as verification evidence. */
     public void completeChangeReady(String changeSha) {
         if (!active() || acknowledgedAt == null) throw new IllegalStateException("Lease must be active and acknowledged before completion");
         task.recordChangeSha(changeSha);
-        task.transition(TaskState.CHANGE_READY); completedAt = Instant.now();
+        task.transition(TaskState.CHANGE_READY); close();
     }
     /** Closes a planner lease after its graph was materialized in the same transaction. */
     public void completePlanning() {
         if (!active() || acknowledgedAt == null || task.getState() != TaskState.VERIFIED) {
             throw new IllegalStateException("Planner lease can close only after an acknowledged, verified plan");
         }
-        completedAt = Instant.now();
+        close();
     }
     /** Atomically records the integration head and advances only its declared dependencies. */
     public void completeIntegration(String integratedSha) {
@@ -79,22 +90,23 @@ public class TaskLease {
         task.integrateDependencies();
         task.recordChangeSha(integratedSha);
         task.transition(TaskState.INTEGRATED);
-        completedAt = Instant.now();
+        close();
     }
     /** Requeues expired work; terminal work is merely closed and reports that no repair package is needed. */
     public boolean recover() {
         if (completedAt != null || Instant.now().isBefore(expiresAt)) throw new IllegalStateException("Only expired incomplete leases can be recovered");
         if (java.util.List.of(RunState.COMPLETE, RunState.CANCELLED, RunState.REJECTED, RunState.FAILED).contains(task.getRun().getState())
                 || java.util.List.of(TaskState.VERIFIED, TaskState.FAILED, TaskState.HELD).contains(task.getState())) {
-            completedAt = Instant.now();
+            close();
             return false;
         }
         task.transition(TaskState.REPAIR_QUEUED);
         if (task.getState() == TaskState.FAILED) task.getRun().block();
-        completedAt = Instant.now();
+        close();
         return true;
     }
     public String getId() { return id; } public String getTaskId() { return task.getId(); }
+    public long getReservedMicros() { return reservedMicros; }
     public DeliveryTask getTask() { return task; }
     public String getRunnerId() { return runner.getId(); } public String getExpiresAt() { return expiresAt.toString(); }
     public Instant getClaimedAt() { return claimedAt; }

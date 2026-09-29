@@ -11,7 +11,8 @@ public record LoopSetup(String taskId, String repository, String leaseId, String
                         ProviderExecutionPolicy providerPolicy, ConversationClient conversationClient,
                         LoopBudget budget, List<LoopGate> gates, ToolGateway toolGateway, ToolRegistry toolRegistry,
                         LoopJournal journal, Clock clock, LoopReporter reporter, AtomicBoolean leaseLost,
-                        long budgetMicros, long spentCostMicros, EnforcementDescriptor enforcementDescriptor) {
+                        long budgetMicros, long spentCostMicros, EnforcementDescriptor enforcementDescriptor,
+                        SpendReservationClient spendReservationClient) {
     public LoopSetup {
         if (taskId == null || taskId.isBlank() || repository == null || repository.isBlank() || repository.length() > 200
                 || leaseId == null || leaseId.isBlank() || role == null || title == null || title.isBlank()
@@ -31,11 +32,23 @@ public record LoopSetup(String taskId, String repository, String leaseId, String
     public LoopSetup(String taskId, String repository, String leaseId, String role, String title, String specification,
                      List<String> ownedPrefixes, List<String> changedFiles, Path worktree, String baseSha,
                      ProviderExecutionPolicy providerPolicy, ConversationClient conversationClient,
-                     LoopBudget budget, List<LoopGate> gates, ToolGateway toolGateway, ToolRegistry toolRegistry,
-                     LoopJournal journal, Clock clock, LoopReporter reporter, AtomicBoolean leaseLost,
-                     long budgetMicros, long spentCostMicros) {
+                LoopBudget budget, List<LoopGate> gates, ToolGateway toolGateway, ToolRegistry toolRegistry,
+                LoopJournal journal, Clock clock, LoopReporter reporter, AtomicBoolean leaseLost,
+                long budgetMicros, long spentCostMicros) {
         this(taskId, repository, leaseId, role, title, specification, ownedPrefixes, changedFiles, worktree, baseSha,
                 providerPolicy, conversationClient, budget, gates, toolGateway, toolRegistry, journal, clock, reporter,
-                leaseLost, budgetMicros, spentCostMicros, EnforcementDescriptor.defaults(gates));
+                leaseLost, budgetMicros, spentCostMicros, EnforcementDescriptor.defaults(gates), null);
+    }
+
+    /** Preserves the enforcement-aware constructor while keeping reservation transport optional for unknown-cost loops. */
+    public LoopSetup(String taskId, String repository, String leaseId, String role, String title, String specification,
+                     List<String> ownedPrefixes, List<String> changedFiles, Path worktree, String baseSha,
+                     ProviderExecutionPolicy providerPolicy, ConversationClient conversationClient,
+                     LoopBudget budget, List<LoopGate> gates, ToolGateway toolGateway, ToolRegistry toolRegistry,
+                     LoopJournal journal, Clock clock, LoopReporter reporter, AtomicBoolean leaseLost,
+                     long budgetMicros, long spentCostMicros, EnforcementDescriptor enforcementDescriptor) {
+        this(taskId, repository, leaseId, role, title, specification, ownedPrefixes, changedFiles, worktree, baseSha,
+                providerPolicy, conversationClient, budget, gates, toolGateway, toolRegistry, journal, clock, reporter,
+                leaseLost, budgetMicros, spentCostMicros, enforcementDescriptor, null);
     }
 }

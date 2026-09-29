@@ -12,6 +12,13 @@ public interface TaskLeaseRepository extends JpaRepository<TaskLease,String>{
     Optional<TaskLease> findFirstByTask_IdOrderByExpiresAtDesc(String taskId);
     List<TaskLease> findByCompletedAtIsNullAndExpiresAtBefore(Instant now);
     long countByTask_Run_IdAndCompletedAtIsNullAndExpiresAtAfter(String runId,Instant now);
+    /** Only unexpired, incomplete sibling leases reserve run budget; retries replace their own reservation. */
+    @Query("select coalesce(sum(lease.reservedMicros), 0) from TaskLease lease "
+            + "where lease.task.run.id = :runId and lease.id <> :excludedLeaseId "
+            + "and lease.completedAt is null and lease.expiresAt > :now")
+    long sumActiveReservationsByRunExcludingLease(@Param("runId") String runId,
+                                                  @Param("excludedLeaseId") String excludedLeaseId,
+                                                  @Param("now") Instant now);
     /** Serializes evidence retries on one lease so simultaneous submissions remain idempotent. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select lease from TaskLease lease where lease.id = :leaseId")

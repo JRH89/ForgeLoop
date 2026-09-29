@@ -106,4 +106,24 @@ class TaskLeaseTest {
         lease.closeForHold();
         assertEquals(true, lease.isCompleted());
     }
+
+    @Test
+    void reservationIsReplaceableAndSettledWhenUsageIsRecordedOrLeaseCloses() {
+        FeatureRun run = new FeatureRun("owner/repository", "issue-3", "Feature", "criterion", 5, "GENERIC", 1);
+        DeliveryTask task = run.addPlannedTask("writer", "IMPLEMENTATION", "Write", "provider", List.of("src"), 1, 1_000);
+        task.transition(TaskState.LEASED);
+        TaskLease lease = new TaskLease(task, new Runner("org", "runner", "1", List.of("provider"), "hash"),
+                "nonce", Instant.now().plusSeconds(60));
+        lease.acknowledge();
+
+        lease.reserve(400);
+        lease.reserve(700);
+        assertEquals(700, lease.getReservedMicros());
+        lease.settleReservation();
+        assertEquals(0, lease.getReservedMicros());
+
+        lease.reserve(250);
+        lease.closeForHold();
+        assertEquals(0, lease.getReservedMicros());
+    }
 }
