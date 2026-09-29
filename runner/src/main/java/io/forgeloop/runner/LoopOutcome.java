@@ -1,0 +1,3 @@
+package io.forgeloop.runner;
+
+public enum LoopOutcome { FINISHED, BUDGET_STOP, DECLINED, REFUSED, PROVIDER_FAILURE, HARNESS_FAILURE, LEASE_LOST }
