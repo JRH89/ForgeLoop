@@ -83,8 +83,15 @@ final class ProviderFixtureCapture {
     }
 
     private static void rejectSymlinkAncestors(Path root) throws IOException {
-        for (Path path = root; path != null; path = path.getParent()) {
-            if (Files.isSymbolicLink(path)) throw new IOException("Provider fixture path cannot contain a symbolic link");
+        // Check from the checkout boundary: system temp roots may legitimately traverse aliases (for example macOS /var).
+        Path workspace = Path.of("").toAbsolutePath().normalize();
+        Path cursor = root.startsWith(workspace) ? workspace : root;
+        if (Files.isSymbolicLink(cursor)) throw new IOException("Provider fixture path cannot contain a symbolic link");
+        if (root.startsWith(workspace)) {
+            for (Path component : workspace.relativize(root)) {
+                cursor = cursor.resolve(component);
+                if (Files.isSymbolicLink(cursor)) throw new IOException("Provider fixture path cannot contain a symbolic link");
+            }
         }
     }
 
