@@ -73,7 +73,6 @@ public record PlannerPlan(List<String> acceptanceCriteria, List<PlannedTask> tas
                     || new HashSet<>(task.dependencies()).size() != task.dependencies().size()
                     || new HashSet<>(task.ownedPaths()).size() != task.ownedPaths().size()
                     || (writingRoles.contains(task.role()) && task.ownedPaths().isEmpty())
-                    || (writingRoles.contains(task.role()) && !task.dependencies().isEmpty())
                     || task.ownedPaths().stream().anyMatch(PlannerPlan::unsafePath)) {
                 throw new IllegalArgumentException("Planner task semantics are invalid");
             }
@@ -84,6 +83,12 @@ public record PlannerPlan(List<String> acceptanceCriteria, List<PlannedTask> tas
         tasks.forEach(task -> task.dependencies().forEach(dependency -> {
             if (dependency.equals(task.key()) || !byKey.containsKey(dependency)) throw new IllegalArgumentException("Planner dependency is invalid");
         }));
+        for (PlannedTask task : tasks) {
+            if (writingRoles.contains(task.role()) && (task.dependencies().size() > 1
+                    || task.dependencies().stream().anyMatch(key -> !writingRoles.contains(byKey.get(key).role())))) {
+                throw new IllegalArgumentException("Planner task semantics are invalid");
+            }
+        }
         Set<String> visiting = new HashSet<>();
         Set<String> visited = new HashSet<>();
         byKey.keySet().forEach(key -> visit(key, byKey, visiting, visited));

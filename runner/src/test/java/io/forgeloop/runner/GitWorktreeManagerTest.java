@@ -3,6 +3,7 @@ package io.forgeloop.runner;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -54,6 +55,45 @@ class GitWorktreeManagerTest {
         assertFalse(integratedSha.isBlank());
         assertTrue(Files.exists(integration.resolve("backend.txt")));
         assertTrue(Files.exists(integration.resolve("frontend.txt")));
+    }
+
+    @Test
+    void buildsAndIntegratesASequencedWriterChainAndReportsItsChangedFiles() throws Exception {
+        run("git", "init", temporaryDirectory.toString());
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.email", "runner@example.test");
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.name", "ForgeLoop Runner");
+        Files.writeString(temporaryDirectory.resolve("README.md"), "base");
+        run("git", "-C", temporaryDirectory.toString(), "add", ".");
+        run("git", "-C", temporaryDirectory.toString(), "commit", "-m", "base");
+        GitWorktreeManager git = new GitWorktreeManager();
+        String baseSha = output("git", "-C", temporaryDirectory.toString(), "rev-parse", "HEAD");
+        Path root = temporaryDirectory.resolve("worktrees");
+        Path tests = git.create(temporaryDirectory, baseSha, "tests-task", root);
+        Files.createDirectories(tests.resolve("tests"));
+        Files.writeString(tests.resolve("tests/Acceptance.java"), "class AcceptanceTest {}\n");
+        String testsSha = git.commit(tests, "test: add acceptance coverage");
+        Path implementation = git.create(temporaryDirectory, testsSha, "implementation-task", root);
+
+        assertEquals(testsSha, git.headSha(implementation));
+        Files.createDirectories(implementation.resolve("src"));
+        Files.writeString(implementation.resolve("src/Feature.java"), "class Feature {}\n");
+        String implementationSha = git.commit(implementation, "feat: implement feature");
+        assertTrue(git.changedFiles(implementation, baseSha).containsAll(
+                java.util.List.of("src/Feature.java", "tests/Acceptance.java")));
+        Path integration = git.create(temporaryDirectory, baseSha, "integration-task", root);
+
+        String integratedSha = git.integrate(integration, java.util.List.of(testsSha, implementationSha));
+
+        assertFalse(integratedSha.isBlank());
+        assertTrue(Files.readString(integration.resolve("tests/Acceptance.java")).contains("class AcceptanceTest {}"));
+        assertTrue(Files.readString(integration.resolve("src/Feature.java")).contains("class Feature {}"));
+    }
+
+    private static String output(String... command) throws Exception {
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String result = new String(process.getInputStream().readAllBytes());
+        if (process.waitFor() != 0) throw new IllegalStateException(result);
+        return result.strip();
     }
     private static void run(String... command) throws Exception { Process process = new ProcessBuilder(command).redirectErrorStream(true).start(); if (process.waitFor() != 0) throw new IllegalStateException(new String(process.getInputStream().readAllBytes())); }
 }

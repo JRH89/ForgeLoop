@@ -3,10 +3,12 @@ package io.forgeloop.runner;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,6 +41,31 @@ class GuardedPatchWorkerTest {
         ProviderClient provider = ignored -> new ProviderResult("{}", 1, 1, "request");
         assertThrows(IllegalArgumentException.class, () -> new GuardedPatchWorker().execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,
                 "PLANNER", "task", "spec", repository, List.of("src/")));
+    }
+
+    @Test void changedDependencyContextIsPrioritizedButCannotExpandWriteScope() throws Exception {
+        initializeRepository();
+        Files.createDirectories(repository.resolve("tests"));
+        Files.createDirectories(repository.resolve("src"));
+        Files.createDirectories(repository.resolve("docs"));
+        Files.writeString(repository.resolve("tests/Acceptance.java"), "dependency acceptance contract");
+        Files.writeString(repository.resolve("src/Feature.java"), "owned source file");
+        Files.writeString(repository.resolve("docs/Overview.md"), "general repository context");
+        AtomicReference<ProviderRequest> captured = new AtomicReference<>();
+        ProviderClient provider = request -> {
+            captured.set(request);
+            return new ProviderResult("""
+                    {"summary":"change test","changes":[{"path":"tests/Acceptance.java","content":"rewritten","message":"attempt out-of-scope write"}]}
+                    """, 1, 1, "request-context");
+        };
+
+        assertThrows(GuardedPatchFailure.class, () -> new GuardedPatchWorker().execute(
+                new ProviderExecutionPolicy("openai", "model", 1), provider, "IMPLEMENTATION", "task", "spec",
+                repository, List.of("src/"), List.of("src/", "tests/Acceptance.java"), "context-lease"));
+
+        String input = captured.get().input();
+        assertTrue(input.indexOf("--- tests/Acceptance.java ---") < input.indexOf("--- docs/Overview.md ---"));
+        assertEquals("dependency acceptance contract", Files.readString(repository.resolve("tests/Acceptance.java")));
     }
 
     @Test void normalizesAndBoundsProviderGeneratedCommitSubjects() {

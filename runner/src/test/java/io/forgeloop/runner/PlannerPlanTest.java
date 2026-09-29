@@ -31,13 +31,51 @@ class PlannerPlanTest {
     }
 
     @Test
-    void rejectsDependenciesBetweenIsolatedWritingTasks() {
-        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse("""
+    void acceptsAChainOfWritingTasks() {
+        PlannerPlan plan = PlannerPlan.parse("""
+                {"acceptanceCriteria":["x"],"tasks":[
+                  {"key":"tests","role":"INDEPENDENT_TEST","title":"Tests","requiredCapability":"provider","dependencies":[],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"backend","role":"BACKEND","title":"Backend","requiredCapability":"provider","dependencies":["tests"],"ownedPaths":["backend"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"implementation","role":"IMPLEMENTATION","title":"Implement","requiredCapability":"provider","dependencies":["backend"],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["implementation","backend","tests"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
+                ]}
+                """).validate(1);
+
+        assertEquals(4, plan.tasks().size());
+    }
+
+    @Test
+    void rejectsMultipleWritingDependenciesAndNonWritingDependencies() {
+        String multipleWritingDependencies = """
+                {"acceptanceCriteria":["x"],"tasks":[
+                  {"key":"tests","role":"INDEPENDENT_TEST","title":"Tests","requiredCapability":"provider","dependencies":[],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"backend","role":"BACKEND","title":"Backend","requiredCapability":"provider","dependencies":[],"ownedPaths":["backend"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"implementation","role":"IMPLEMENTATION","title":"Implement","requiredCapability":"provider","dependencies":["tests","backend"],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["tests","backend","implementation"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
+                ]}
+                """;
+        String nonWritingDependency = """
                 {"acceptanceCriteria":["x"],"tasks":[
                   {"key":"implementation","role":"IMPLEMENTATION","title":"Implement","requiredCapability":"provider","dependencies":[],"ownedPaths":["src"],"attemptBudget":2,"budgetMicros":1},
-                  {"key":"test","role":"INDEPENDENT_TEST","title":"Test","requiredCapability":"provider","dependencies":["implementation"],"ownedPaths":["tests"],"attemptBudget":2,"budgetMicros":1},
-                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["implementation","test"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["implementation"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0},
+                  {"key":"dependent","role":"BACKEND","title":"Dependent","requiredCapability":"provider","dependencies":["integration"],"ownedPaths":["backend"],"attemptBudget":2,"budgetMicros":1}
                 ]}
-                """).validate(1));
+                """;
+
+        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse(multipleWritingDependencies).validate(1));
+        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse(nonWritingDependency).validate(1));
+    }
+
+    @Test
+    void rejectsCyclesBetweenWritingTasks() {
+        String cycle = """
+                {"acceptanceCriteria":["x"],"tasks":[
+                  {"key":"backend","role":"BACKEND","title":"Backend","requiredCapability":"provider","dependencies":["frontend"],"ownedPaths":["backend"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"frontend","role":"FRONTEND","title":"Frontend","requiredCapability":"provider","dependencies":["backend"],"ownedPaths":["frontend"],"attemptBudget":2,"budgetMicros":1},
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["backend","frontend"],"ownedPaths":[],"attemptBudget":2,"budgetMicros":0}
+                ]}
+                """;
+
+        assertThrows(IllegalArgumentException.class, () -> PlannerPlan.parse(cycle).validate(1));
     }
 }

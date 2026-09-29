@@ -2,6 +2,7 @@ package io.forgeloop.runner;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,5 +56,21 @@ class RepositoryContextBuilderTest {
         assertTrue(context.contains("[REDACTED]"));
         assertTrue(context.contains("feature=true"));
         assertTrue(context.length() <= 8 * 1024);
+    }
+
+    @Test
+    void prioritizesChangedDependencyFilesWithoutConfusingThemWithWritePermissions() throws Exception {
+        Files.createDirectories(temporaryDirectory.resolve(".git"));
+        Files.createDirectories(temporaryDirectory.resolve("tests"));
+        Files.createDirectories(temporaryDirectory.resolve("docs"));
+        Files.writeString(temporaryDirectory.resolve("tests/Acceptance.java"), "dependency test contract");
+        Files.writeString(temporaryDirectory.resolve("docs/Overview.md"), "general repository context");
+
+        String context = new RepositoryContextBuilder().build(temporaryDirectory, List.of("src/", "tests/Acceptance.java"));
+
+        assertTrue(context.indexOf("--- tests/Acceptance.java ---") < context.indexOf("--- docs/Overview.md ---"));
+        assertThrows(IllegalArgumentException.class, () -> new PatchWriter().apply(temporaryDirectory,
+                new PatchPlan("attempt out-of-scope write", List.of(
+                        new ProposedChange("tests/Acceptance.java", "changed", "out-of-scope"))), List.of("src/")));
     }
 }

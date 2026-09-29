@@ -9,10 +9,16 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.Base64;
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** Creates a task-scoped detached Git worktree below a runner-controlled directory. */
 public final class GitWorktreeManager {
     private static final Duration COMMAND_TIMEOUT = Duration.ofMinutes(2);
+    private static final int MAX_CHANGED_FILES = 400;
+    private static final int MAX_CHANGED_FILE_OUTPUT_BYTES = 64 * 1024;
     private static final List<String> FORGELOOP_IDENTITY = List.of("-c", "user.name=ForgeLoop", "-c", "user.email=runner@forgeloop.invalid");
 
     public Path create(Path repository, String baseRef, String taskId, Path workspaceRoot) throws IOException, InterruptedException {
@@ -96,6 +102,22 @@ public final class GitWorktreeManager {
         return output(worktree, List.of("git", "diff", "--no-ext-diff", "--unified=3", baseRef + "...HEAD"), 48 * 1024);
     }
 
+    /** Returns a bounded list of repository-relative paths changed since the supplied base ref. */
+    public List<String> changedFiles(Path worktree, String baseRef) throws IOException, InterruptedException {
+        if (!Files.exists(worktree.resolve(".git")) || baseRef == null || baseRef.isBlank()) {
+            throw new IllegalArgumentException("Changed-file request is invalid");
+        }
+        String names = outputRaw(worktree, List.of("git", "diff", "--no-ext-diff", "--name-only", "-z", baseRef + "...HEAD"),
+                MAX_CHANGED_FILE_OUTPUT_BYTES);
+        List<String> changed = new ArrayList<>();
+        int start = 0;
+        for (int end = names.indexOf('\0'); end >= 0 && changed.size() < MAX_CHANGED_FILES; end = names.indexOf('\0', start)) {
+            if (end > start) changed.add(names.substring(start, end));
+            start = end + 1;
+        }
+        return List.copyOf(changed);
+    }
+
     private void run(Path repository, List<String> command) throws IOException, InterruptedException {
         List<String> safeCommand = new ArrayList<>();
         safeCommand.add("git");
@@ -109,10 +131,39 @@ public final class GitWorktreeManager {
     }
     private String output(Path repository, List<String> command) throws IOException, InterruptedException { return output(repository,command,4096); }
     private String output(Path repository, List<String> command, int limit) throws IOException, InterruptedException {
+        return outputRaw(repository, command, limit).strip();
+    }
+    private String outputRaw(Path repository, List<String> command, int limit) throws IOException, InterruptedException {
+        if (limit < 1) throw new IllegalArgumentException("Git output limit must be positive");
         List<String> safe = new ArrayList<>(List.of("git", "-c", "safe.directory=" + repository.toAbsolutePath().normalize())); safe.addAll(command.subList(1, command.size()));
         Process process = new ProcessBuilder(safe).directory(repository.toFile()).redirectErrorStream(true).start();
-        if (!process.waitFor(COMMAND_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) { process.destroyForcibly(); throw new IllegalStateException("Git command timed out"); }
-        String value = new String(process.getInputStream().readNBytes(limit), java.nio.charset.StandardCharsets.UTF_8).strip(); if (process.exitValue() != 0) throw new IllegalStateException("Git command failed: " + value); return value;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream(Math.min(limit, 8192));
+        AtomicReference<IOException> readFailure = new AtomicReference<>();
+        Thread reader = Thread.ofVirtual().start(() -> {
+            try (InputStream stream = process.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int total = 0;
+                for (int count; (count = stream.read(buffer)) >= 0;) {
+                    int keep = Math.min(count, limit - total);
+                    if (keep > 0) {
+                        captured.write(buffer, 0, keep);
+                        total += keep;
+                    }
+                }
+            } catch (IOException failure) {
+                readFailure.set(failure);
+            }
+        });
+        if (!process.waitFor(COMMAND_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            reader.join();
+            throw new IllegalStateException("Git command timed out");
+        }
+        reader.join();
+        if (readFailure.get() != null) throw readFailure.get();
+        String value = captured.toString(StandardCharsets.UTF_8);
+        if (process.exitValue() != 0) throw new IllegalStateException("Git command failed: " + value.strip());
+        return value;
     }
     private static List<String> gitWithIdentity(String... arguments) {
         List<String> command = new ArrayList<>();
