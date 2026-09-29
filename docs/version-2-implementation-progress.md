@@ -7,9 +7,9 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Active work:** Piece 1 — sequenced writers.
 - **Branch:** `feat/sequenced-writers`, based on `origin/master` after merged PR #68 (`0fb7a9c`).
 - **Issue:** [#69 — Allow writers to build on a predecessor task commit](https://github.com/JRH89/ForgeLoop/issues/69).
-- **Code state:** implemented locally and reviewed; full Maven verification for all Java modules passes. Focused reruns cover the final explicit cycle cases.
+- **Code state:** implemented, locally verified, and pushed; GitHub Actions checks are running.
 - **Commits:** `9f6f21f` control-plane scheduling and validation; `f90d03b` runner chaining, context, and worktree setup.
-- **PR:** not yet opened; the branch has not been pushed.
+- **PR:** [#70 — Sequence dependent writer tasks](https://github.com/JRH89/ForgeLoop/pull/70), linked to #69. No merge has been performed.
 - **Local test toolchain:** portable Temurin 21 and Maven 3.9.12 under the user-local ForgeLoop tools directory; no project files added for tooling.
 - **External validation:** Docker Engine is available. A real provider-backed chained run has not been attempted because it incurs provider spend; do not treat unit/CI checks as that evidence.
 
@@ -19,7 +19,7 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 
 | Order | Slice | Dependency | Issue / PR | Status |
 |---:|---|---|---|---|
-| 1 | 1 — Sequenced writers | — | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / not opened | Local verification passed; PR pending |
+| 1 | 1 — Sequenced writers | — | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Local verification passed; hosted CI running |
 | 2 | 2a — Test boundary | 1 | Not opened | Planned |
 | 3 | 2b — RED/GREEN checks | 2a | Not opened | Planned |
 | 4 | 2c — GitHub branch check | 2b | Not opened | Planned |
@@ -50,12 +50,13 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 ## Slice 1 log — Sequenced writers
 
 - **Issue:** [#69](https://github.com/JRH89/ForgeLoop/issues/69).
+- **PR:** [#70 — Sequence dependent writer tasks](https://github.com/JRH89/ForgeLoop/pull/70).
 - **Scope implemented:** both planner validators allow at most one writing dependency and reject multiple/non-writing dependencies; writer readiness accepts a predecessor at `CHANGE_READY`; execution starts at the predecessor commit and fails closed if it is missing; chained writers are offered to and claimable only by the runner holding that commit; integration orders commits topologically while preserving peer order and placing quality repairs last; changed predecessor files are prioritized in context without widening patch permissions; prepared worktrees use the execution base ref.
 - **Tests added:** valid three-writer chain and cycle rejection in both validators; predecessor readiness, execution refs, repair/base behavior, integration ordering; dispatch affinity and authoritative claim rejection; planner prompt; real temporary Git chain and changed-file discovery; context prioritization/write-boundary preservation; prepared worktree base.
 - **Test-first evidence:** focused tests were run against the pre-change logic and failed on the missing chained-writer behavior; after implementation, focused control-plane tests passed (18) and focused runner tests passed (21).
 - **Focused final reruns:** control-plane `mvn -B -Dtest=TaskGraphValidatorTest,DeliveryTaskSequencingTest,RunnerDispatchServiceTest,TaskLeaseServiceTest test` — 19 tests, 0 failures/errors; runner `mvn -B -Dtest=PlannerPlanTest,PlannerWorkerTest,GitWorktreeManagerTest,RepositoryContextBuilderTest,GuardedPatchWorkerTest,RunnerMainTest test` — 22 tests, 0 failures/errors. These cover the added cycle cases.
 - **Full verification:** `mvn -B verify` in `control-plane` — 228 tests, 0 failures/errors; in `runner` — 126 tests, 0 failures/errors; in `harness` — 2 tests, 0 failures/errors. Only tests/comments changed after the full runs; the final changed test sets then passed above.
-- **Remaining:** push the branch, open the PR linked to #69, and record hosted CI results. Real provider-backed end-to-end evidence remains unrun pending an affordable provider window.
+- **Remaining:** record hosted CI results and complete the provider-backed end-to-end check when a provider budget is available. Provider-backed evidence remains unrun and is not implied by CI.
 - **Known limits kept in scope:** no cross-runner commit transfer or recovery of a vanished producer runner; these are out of this slice.
 
 ## Update protocol
