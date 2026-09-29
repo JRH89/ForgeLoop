@@ -7,7 +7,7 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Active work:** Piece 2a — test boundary.
 - **Branch:** `feat/test-boundary`, rebasing the Slice 2a work onto `master` after prerequisite PR #70 merged.
 - **Issue:** [#71 — Enforce test-first write boundaries per repository](https://github.com/JRH89/ForgeLoop/issues/71).
-- **Code state:** Slice 2a is implemented and locally verified across control-plane, runner, and harness; the implementation commits are rebased directly onto merged `master` and ready for its issue-linked PR.
+- **Code state:** Slice 2a is implemented and locally verified across control-plane, runner, and harness; its issue-linked PR is open against `master` and hosted CI is pending.
 - **Slice 1 commits:** `9f6f21f` control-plane scheduling and validation; `f90d03b` runner chaining, context, and worktree setup; `e3fa9d2` role-select chained predecessors alongside server-added checks.
 - **Slice 2a commits:** `8a367de` control-plane test-first policy and graph enforcement; `527d01f` runner write-boundary and JUnit report enforcement. Both are rebased directly onto merged `master`.
 - **PR:** [#70 — Sequence dependent writer tasks](https://github.com/JRH89/ForgeLoop/pull/70), linked to #69. Merged into `master` on 2026-09-29; hosted checks passed.
@@ -22,7 +22,7 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 | Order | Slice | Dependency | Issue / PR | Status |
 |---:|---|---|---|---|
 | 1 | 1 — Sequenced writers | — | [#69](https://github.com/JRH89/ForgeLoop/issues/69) / [#70](https://github.com/JRH89/ForgeLoop/pull/70) | Merged; local and hosted verification passed |
-| 2 | 2a — Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / pending | Implementation, local verification, and code commits complete; opening PR |
+| 2 | 2a — Test boundary | 1 | [#71](https://github.com/JRH89/ForgeLoop/issues/71) / [#72](https://github.com/JRH89/ForgeLoop/pull/72) | Local verification passed; hosted CI pending |
 | 3 | 2b — RED/GREEN checks | 2a | Not opened | Planned |
 | 4 | 2c — GitHub branch check | 2b | Not opened | Planned |
 | 5 | 3a — Provider conversations and tool calling | 1 | Not opened | Planned |
@@ -72,7 +72,7 @@ Future issue numbers and exact PR scope will be recorded when those dependencies
 - **Progress:** implemented: nullable `JUNIT_XML` policy snapshots and repository configuration mutation; enabled-repository/admin/gate/glob validation; immutable run snapshot; the two-module test-path matcher; stored-role-derived `ANY` / `TESTS_ONLY` / `NO_TESTS` task contract; atomic patch-boundary enforcement with a distinct failure category; conditional test-first planner contract and graph validation; Docker-capability dispatch/claim checks for root test writers and scaffolds; and an isolated report bind mount that leaves old verification argv unchanged when disabled.
 - **Documentation:** expanded `docs/verification-policy-and-evidence.md` with the generic repository setup, the admin test-first mutation, glob semantics, and JUnit command guidance; removed the demo repository name from the example.
 - **Verification:** after rebasing onto merged `master`, `mvn -B verify` passed in `control-plane` (241 tests), `runner` (138 tests), and `harness` (2 tests); `git diff --check` passed. No paid provider request or actual Docker policy execution was made.
-- **Commits / PR:** `8a367de` control-plane and `527d01f` runner; the branch is based directly on `master`. PR targets `master` and links to #71.
+- **Commits / PR:** `8a367de` control-plane and `527d01f` runner; the branch is based directly on `master`. [PR #72](https://github.com/JRH89/ForgeLoop/pull/72) targets `master` and closes #71.
 - **Validation boundaries:** hosted CI starts after push. Full RED/GREEN evidence belongs to Slice 2b.
 
 ## Update protocol
