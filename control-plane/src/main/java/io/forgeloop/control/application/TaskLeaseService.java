@@ -82,28 +82,36 @@ public class TaskLeaseService {
     @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed, String failureCategory) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
+        if (!passed && failureCategory != null && !failureCategory.matches("[A-Z_]{1,80}"))
+            throw new IllegalArgumentException("Failure category is invalid");
         if (passed && java.util.List.of("RED_CHECK", "GREEN_CHECK").contains(task.getRole())) {
             throw new IllegalStateException("Test checks require checksummed test evidence");
         }
-        String latestProviderCategory = providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId()).map(ProviderAttempt::getCategory).orElse(null);
-        boolean rejectedByReviewer = "REVIEW".equals(task.getRole()) && "COMPLETED".equals(latestProviderCategory);
-        if (!passed && ("VERIFICATION".equals(task.getRole()) || rejectedByReviewer)) {
+        String leaseIdForEvidence = lease.getId();
+        String latestProviderCategory = providerAttempts.findFirstByLease_IdOrderByRecordedAtDesc(leaseIdForEvidence)
+                .map(ProviderAttempt::getCategory).orElse(null);
+        boolean verificationEvidenceRecorded = "VERIFICATION".equals(task.getRole())
+                && evidence.existsByLease_Id(leaseIdForEvidence);
+        boolean reviewerResultRecorded = "REVIEW".equals(task.getRole())
+                && providerAttempts.existsByLease_IdAndCategory(leaseIdForEvidence, "COMPLETED");
+        if (!passed && (verificationEvidenceRecorded || reviewerResultRecorded)) {
+            boolean rejectedByReviewer = reviewerResultRecorded;
             String category = rejectedByReviewer ? "REVIEW_REJECTED" : "VERIFICATION_FAILED";
-            String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId()).map(VerificationEvidence::getDigest).orElse(null);
-            lease.closeForRepairCycle();
+            String digest = verificationEvidenceRecorded
+                    ? evidence.findFirstByLease_IdOrderByRecordedAtDesc(leaseIdForEvidence).map(VerificationEvidence::getDigest).orElse(null)
+                    : null;
+            lease.closeForRepairCycle(category);
             RepairPackage repair = task.getRun().scheduleQualityRepair(task, category, digest);
             if (repair != null) repairPackages.save(repair);
             else escalations.escalate(task, "ATTEMPT_BUDGET_EXHAUSTED", "Autonomous quality repair budget is exhausted for " + task.getTitle());
             return lease;
         }
-        lease.complete(passed);
+        String category = failureCategory != null ? failureCategory
+                : latestProviderCategory != null ? latestProviderCategory
+                : "VERIFICATION".equals(task.getRole()) ? "VERIFICATION_NOT_RECORDED" : "EXECUTION_FAILED";
+        lease.complete(passed, passed ? "COMPLETED" : category);
         if (!passed) {
-            String category = latestProviderCategory == null ? "EXECUTION_FAILED" : latestProviderCategory;
-            if (!List.of("REVIEW", "VERIFICATION").contains(task.getRole()) && failureCategory != null) {
-                if (!failureCategory.matches("[A-Z_]{1,80}")) throw new IllegalArgumentException("Failure category is invalid");
-                category = failureCategory;
-            }
-            String digest = evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())
+            String digest = evidence.findFirstByLease_IdOrderByRecordedAtDesc(leaseIdForEvidence)
                     .map(VerificationEvidence::getDigest).orElse(null);
             repairPackages.save(new RepairPackage(task, category, digest));
             if (task.getState() == TaskState.FAILED) escalations.escalate(task, "ATTEMPT_BUDGET_EXHAUSTED", "Task failed after all autonomous attempts: " + task.getTitle());
@@ -142,7 +150,7 @@ public class TaskLeaseService {
         if (task.getAgentLoop() == null) throw new IllegalArgumentException("Holding requires an agent-loop task");
         if (task.getState() == TaskState.HELD) {
             // Cancellation may hold the task just before this runner reports its own stop.
-            lease.closeForHold();
+            lease.closeForHold(reason);
             return lease;
         }
         RunState runState = task.getRun().getState();
@@ -150,7 +158,7 @@ public class TaskLeaseService {
                 || List.of(RunState.CANCELLED, RunState.COMPLETE, RunState.FAILED, RunState.REJECTED).contains(runState))
             throw new IllegalArgumentException("Task is no longer running");
         task.transition(TaskState.HELD);
-        lease.closeForHold();
+        lease.closeForHold(reason);
         task.getRun().block();
         escalations.escalate(task, reason, summary);
         return lease;
@@ -174,7 +182,7 @@ public class TaskLeaseService {
         task.hold();
         task.getRun().block();
         escalations.escalate(task, "TEST_BOUNDARY_VIOLATION", summary);
-        lease.closeForPolicyHold();
+        lease.closeForPolicyHold("TEST_BOUNDARY_VIOLATION");
         return lease;
     }
 

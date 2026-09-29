@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.forgeloop.control.artifacts.ArtifactStore;
 import io.forgeloop.control.domain.ArtifactMetadata;
 import io.forgeloop.control.domain.ArtifactMetadataRepository;
+import io.forgeloop.control.domain.AttemptOutcome;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.RepairPackage;
 import io.forgeloop.control.domain.RepairPackageRepository;
@@ -143,14 +144,14 @@ public class TestCheckEvidenceService {
     private void route(TaskLease lease, DeliveryTask task, TestCheckEvidence recorded, TestCheckRules.Decision decision) {
         if (decision.verdict() == TestCheckRules.Verdict.PASS) {
             task.transition(TaskState.VERIFIED);
-            lease.closeForTestCheck();
+            lease.closeForTestCheck(AttemptOutcome.CLEAN, "COMPLETED");
             task.getRun().evaluateReviewReadiness();
             return;
         }
         if (decision.verdict() == TestCheckRules.Verdict.UNVERIFIABLE) {
             task.transition(TaskState.HELD);
             task.getRun().block();
-            lease.closeForTestCheck();
+            lease.closeForTestCheck(AttemptOutcome.STOPPED, category(task.getRole(), decision));
             escalations.escalate(task, "TEST_CHECK_UNVERIFIABLE", "Test-first check evidence is unverifiable: " + decision.reason());
             return;
         }
@@ -166,7 +167,7 @@ public class TestCheckEvidenceService {
         DeliveryTask testWriter = redCheck.getWritingDependency()
                 .orElseThrow(() -> new IllegalStateException("RED check has no test writer"));
         testWriter.transition(TaskState.REPAIR_QUEUED);
-        lease.closeForTestCheck();
+        lease.closeForTestCheck(AttemptOutcome.FINDINGS, category("RED_CHECK", decision));
         if (testWriter.getState() == TaskState.FAILED) {
             redCheck.hold();
             testWriter.getRun().block();
@@ -179,7 +180,7 @@ public class TestCheckEvidenceService {
 
     private void routeGreenFailure(TaskLease lease, DeliveryTask greenCheck, TestCheckEvidence recorded,
                                    TestCheckRules.Decision decision) {
-        lease.closeForTestCheck();
+        lease.closeForTestCheck(AttemptOutcome.FINDINGS, category("GREEN_CHECK", decision));
         RepairPackage repair = greenCheck.getRun().scheduleQualityRepair(greenCheck,
                 "GREEN_FAILED:" + decision.reason(), recorded.getDigest(), decision.failingTests());
         if (repair != null) {
@@ -194,5 +195,11 @@ public class TestCheckEvidenceService {
 
     private static void requireActiveAcknowledged(TaskLease lease) {
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Test-check evidence requires an active acknowledged lease");
+    }
+
+    private static String category(String role, TestCheckRules.Decision decision) {
+        String prefix = "RED_CHECK".equals(role) ? "RED_" : "GREEN_";
+        String reason = decision.reason().name();
+        return reason.startsWith(prefix) ? reason : prefix + reason;
     }
 }

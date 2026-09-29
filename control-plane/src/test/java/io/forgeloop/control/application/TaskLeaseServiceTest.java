@@ -24,6 +24,8 @@ import io.forgeloop.control.domain.VerificationEvidenceRepository;
 import io.forgeloop.control.domain.VerificationEvidence;
 import io.forgeloop.control.domain.VerificationPolicySpec;
 import io.forgeloop.control.domain.AgentLoopBudget;
+import io.forgeloop.control.domain.RepairPackage;
+import io.forgeloop.control.domain.ProviderAttempt;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.List;
@@ -489,7 +491,7 @@ class TaskLeaseServiceTest {
         service.hold("lease", "runner", "nonce", "LOOP_BUDGET_EXHAUSTED", "Loop reached its token budget after 8 calls.");
         assertEquals(TaskState.HELD, task.getState());
         assertEquals(RunState.BLOCKED, run.getState());
-        verify(lease).closeForHold();
+        verify(lease).closeForHold("LOOP_BUDGET_EXHAUSTED");
         verify(escalations).escalate(task, "LOOP_BUDGET_EXHAUSTED", "Loop reached its token budget after 8 calls.");
 
         FeatureRun cancelled = activeLoopRun();
@@ -497,7 +499,7 @@ class TaskLeaseServiceTest {
         cancelled.cancel();
         TaskLease raced = authorizedLease(cancelledTask);
         service.hold("lease", "runner", "nonce", "WORKER_DECLINED", "Cancellation won the race.");
-        verify(raced).closeForHold();
+        verify(raced).closeForHold("WORKER_DECLINED");
         verify(escalations, never()).escalate(eq(cancelledTask), any(), any());
         assertEquals(RunState.CANCELLED, cancelled.getState());
     }
@@ -528,12 +530,13 @@ class TaskLeaseServiceTest {
     }
 
     @Test
-    void explicitFailureCategoryIsUsedOnlyForGeneralExecutionFailures() {
+    void explicitFailureCategoryOverridesTheGeneralFailureFallback() {
         FeatureRun run = activeRun();
         DeliveryTask task = run.getTasks().getFirst();
         TaskLease lease = authorizedLease(task);
-        when(providerAttempts.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())).thenReturn(Optional.empty());
-        when(evidence.findFirstByTask_IdOrderByRecordedAtDesc(task.getId())).thenReturn(Optional.empty());
+        when(lease.getId()).thenReturn("lease");
+        when(providerAttempts.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.empty());
+        when(evidence.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.empty());
         when(repairPackages.save(any())).thenAnswer(call -> call.getArgument(0));
 
         service.complete("lease", "runner", "nonce", false, "LOOP_HARNESS_FAILURE");
@@ -542,8 +545,85 @@ class TaskLeaseServiceTest {
                 org.mockito.ArgumentCaptor.forClass(io.forgeloop.control.domain.RepairPackage.class);
         verify(repairPackages).save(repair.capture());
         assertEquals("LOOP_HARNESS_FAILURE", repair.getValue().getFailureCategory());
-        verify(lease).complete(false);
+        verify(lease).complete(false, "LOOP_HARNESS_FAILURE");
         assertThrows(IllegalArgumentException.class, () -> service.complete("lease", "runner", "nonce", false, "bad category"));
+    }
+
+    @Test
+    void verificationFailureWithoutEvidenceRetriesTheVerificationTask() {
+        DeliveryTask task = repairableTask("VERIFICATION");
+        TaskLease lease = authorizedLease(task);
+        when(evidence.existsByLease_Id("lease")).thenReturn(false);
+        when(evidence.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.empty());
+        when(providerAttempts.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.empty());
+        when(repairPackages.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.complete("lease", "runner", "nonce", false);
+
+        verify(lease).complete(false, "VERIFICATION_NOT_RECORDED");
+        org.mockito.ArgumentCaptor<RepairPackage> repair = org.mockito.ArgumentCaptor.forClass(RepairPackage.class);
+        verify(repairPackages).save(repair.capture());
+        assertEquals("VERIFICATION_NOT_RECORDED", repair.getValue().getFailureCategory());
+        verify(evidence, never()).findFirstByTask_IdOrderByRecordedAtDesc("task");
+    }
+
+    @Test
+    void verificationQualityRepairUsesOnlyEvidenceFromTheFailingLease() {
+        DeliveryTask task = mock(DeliveryTask.class);
+        FeatureRun run = mock(FeatureRun.class);
+        when(task.getRole()).thenReturn("VERIFICATION");
+        when(task.getId()).thenReturn("task");
+        when(task.getRun()).thenReturn(run);
+        TaskLease lease = authorizedLease(task);
+        VerificationEvidence recorded = mock(VerificationEvidence.class);
+        when(recorded.getDigest()).thenReturn("current-lease-digest");
+        when(evidence.existsByLease_Id("lease")).thenReturn(true);
+        when(evidence.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.of(recorded));
+        RepairPackage repair = mock(RepairPackage.class);
+        when(run.scheduleQualityRepair(task, "VERIFICATION_FAILED", "current-lease-digest")).thenReturn(repair);
+
+        service.complete("lease", "runner", "nonce", false);
+
+        verify(lease).closeForRepairCycle("VERIFICATION_FAILED");
+        verify(repairPackages).save(repair);
+        verify(lease, never()).complete(false, "VERIFICATION_NOT_RECORDED");
+        verify(evidence, never()).findFirstByTask_IdOrderByRecordedAtDesc("task");
+    }
+
+    @Test
+    void priorReviewCompletionDoesNotTurnCurrentLeaseHarnessFailureIntoRejection() {
+        DeliveryTask task = repairableTask("REVIEW");
+        TaskLease lease = authorizedLease(task);
+        when(providerAttempts.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.empty());
+        when(providerAttempts.existsByLease_IdAndCategory("lease", "COMPLETED")).thenReturn(false);
+        when(evidence.findFirstByLease_IdOrderByRecordedAtDesc("lease")).thenReturn(Optional.empty());
+        when(repairPackages.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.complete("lease", "runner", "nonce", false);
+
+        verify(lease).complete(false, "EXECUTION_FAILED");
+        verify(lease, never()).closeForRepairCycle("REVIEW_REJECTED");
+        verify(providerAttempts, never()).findFirstByTask_IdOrderByRecordedAtDesc("task");
+    }
+
+    @Test
+    void completedReviewResultUnderCurrentLeaseSchedulesQualityRepair() {
+        DeliveryTask task = mock(DeliveryTask.class);
+        FeatureRun run = mock(FeatureRun.class);
+        when(task.getRole()).thenReturn("REVIEW");
+        when(task.getId()).thenReturn("task");
+        when(task.getRun()).thenReturn(run);
+        TaskLease lease = authorizedLease(task);
+        when(providerAttempts.findFirstByLease_IdOrderByRecordedAtDesc("lease"))
+                .thenReturn(Optional.of(mock(ProviderAttempt.class)));
+        when(providerAttempts.existsByLease_IdAndCategory("lease", "COMPLETED")).thenReturn(true);
+        RepairPackage repair = mock(RepairPackage.class);
+        when(run.scheduleQualityRepair(task, "REVIEW_REJECTED", null)).thenReturn(repair);
+
+        service.complete("lease", "runner", "nonce", false);
+
+        verify(lease).closeForRepairCycle("REVIEW_REJECTED");
+        verify(repairPackages).save(repair);
     }
 
     private FeatureRun activeRun() {
@@ -568,7 +648,17 @@ class TaskLeaseServiceTest {
         when(lease.active()).thenReturn(true);
         when(lease.isAcknowledged()).thenReturn(true);
         when(lease.getTaskId()).thenReturn("task");
+        when(lease.getId()).thenReturn("lease");
         when(tasks.findById("task")).thenReturn(Optional.of(task));
         return lease;
+    }
+
+    private DeliveryTask repairableTask(String role) {
+        FeatureRun run = new FeatureRun("org", "owner/repository", "issue-1", "x", "spec", 5, "GENERIC", "main", 1);
+        run.addCriterion("Expected behavior");
+        run.addTask(role, "Check delivery", "provider");
+        DeliveryTask task = run.getTasks().getFirst();
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        return task;
     }
 }

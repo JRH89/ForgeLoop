@@ -8,4 +8,6 @@ public interface VerificationEvidenceRepository extends JpaRepository<Verificati
     List<VerificationEvidence> findByTask_IdOrderByRecordedAtAsc(String taskId);
     List<VerificationEvidence> findByTask_Run_IdOrderByRecordedAtAsc(String runId);
     java.util.Optional<VerificationEvidence> findFirstByTask_IdOrderByRecordedAtDesc(String taskId);
+    java.util.Optional<VerificationEvidence> findFirstByLease_IdOrderByRecordedAtDesc(String leaseId);
+    boolean existsByLease_Id(String leaseId);
 }
