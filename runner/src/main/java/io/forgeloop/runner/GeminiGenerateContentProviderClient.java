@@ -44,7 +44,7 @@ public final class GeminiGenerateContentProviderClient implements ProviderClient
         JsonNode response = JSON.readTree(body); StringBuilder output = new StringBuilder();
         for (JsonNode candidate : response.path("candidates")) for (JsonNode part : candidate.path("content").path("parts")) if (part.hasNonNull("text")) output.append(part.path("text").asText());
         JsonNode usage = response.path("usageMetadata");
-        return new ProviderResult(output.toString(), usage.path("promptTokenCount").asLong(), usage.path("candidatesTokenCount").asLong(), response.path("responseId").asText(null));
+        return new ProviderResult(output.toString(), usage.path("promptTokenCount").asLong(), usage.path("candidatesTokenCount").asLong(), response.path("responseId").asText(null), response.path("modelVersion").asText(null));
     }
 
     @Override public String serialize(ConversationRequest request) {
@@ -113,7 +113,7 @@ public final class GeminiGenerateContentProviderClient implements ProviderClient
         if (!candidates.isArray() || candidates.isEmpty()) {
             String blocked = response.path("promptFeedback").path("blockReason").asText("");
             if (!blocked.isBlank()) return new ConversationTurn("", List.of(), StopReason.REFUSAL, response.path("usageMetadata").path("promptTokenCount").asLong(), 0,
-                    response.path("responseId").asText(null), JSON.createArrayNode(), body);
+                    response.path("responseId").asText(null), JSON.createArrayNode(), body, response.path("modelVersion").asText(null));
             throw new IllegalArgumentException("Gemini response has no candidate");
         }
         JsonNode candidate = candidates.get(0), content = candidate.path("content"), parts = content.path("parts");
@@ -143,6 +143,6 @@ public final class GeminiGenerateContentProviderClient implements ProviderClient
         JsonNode usage = response.path("usageMetadata");
         long outputTokens = usage.path("candidatesTokenCount").asLong() + usage.path("thoughtsTokenCount").asLong();
         return new ConversationTurn(text.toString(), calls, reason, usage.path("promptTokenCount").asLong(), outputTokens,
-                response.path("responseId").asText(null), content, body);
+                response.path("responseId").asText(null), content, body, response.path("modelVersion").asText(null));
     }
 }

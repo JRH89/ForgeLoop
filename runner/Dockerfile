@@ -1,10 +1,11 @@
 FROM maven:3.9.12-eclipse-temurin-21-alpine AS build
 WORKDIR /app
+ARG FORGELOOP_REVISION=unknown
 COPY pom.xml .
 # The worktree integration test exercises the same Git primitive used by a runner.
 RUN apk add --no-cache git
 COPY src src
-RUN mvn -q test package
+RUN mvn -q "-Dforgeloop.revision=${FORGELOOP_REVISION}" test package
 FROM eclipse-temurin:21-jre-alpine
 # The Docker CLI is used only for policy-selected disposable verification containers.
 # Operators must explicitly mount a daemon socket when enabling this capability.

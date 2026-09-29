@@ -17,13 +17,17 @@ public class FeatureRunService {
   @Transactional public FeatureRun submit(FeatureSubmission input) {
     if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
     RepositoryConnection connection = connections.requireEnabled(input.repository());
-    if(!platform.policy().permitsBudget(input.budgetUsd()))throw new IllegalArgumentException("Requested budget exceeds organization policy");
-    platform.requireHarness(connection.getHarnessProfile());
+    var organizationPolicy = platform.policy();
+    if(!organizationPolicy.permitsBudget(input.budgetUsd()))throw new IllegalArgumentException("Requested budget exceeds organization policy");
+    var harness = platform.requireHarness(connection.getHarnessProfile());
     if (!connection.permitsBudget(input.budgetUsd())) throw new IllegalArgumentException("Requested budget exceeds repository policy");
     FeatureRun run = new FeatureRun(connection.getOrganizationId(), input.repository(), input.sourceRef(), input.title(), input.specification(), input.budgetUsd(), connection.getHarnessProfile(), connection.getDefaultBranch(), connection.getPolicyRevision());
     run.snapshotTestFirst(connection.getTestFirstGate(), connection.getTestPathGlobs());
     run.adoptAgentLoop(connection.getAgentLoopBudget());
     run.snapshotEnforcement(connection.getEnforcement());
+    RunPolicySnapshot.Captured policySnapshot = RunPolicySnapshot.capture(connection, organizationPolicy, harness,
+            platform.enabledMcpConfigurations(connection.getOrganizationId()));
+    run.snapshotPolicy(policySnapshot.canonicalJson(), policySnapshot.sha256());
     run.addTask("PLANNER", "Derive acceptance criteria and task DAG", "provider");
     if (connection.getVerificationPolicies().isEmpty()) throw new IllegalStateException("Repository verification policy is not configured");
     connection.getVerificationPolicies().forEach(run::addGate);

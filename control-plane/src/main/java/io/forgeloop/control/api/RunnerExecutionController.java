@@ -83,8 +83,11 @@ public class RunnerExecutionController {
     @MutationMapping public LeaseGrant claimTaskLease(@Argument String taskId, @Argument String runnerId, @Argument String credential) {
         runners.authenticated(runnerId, credential); return leases.claim(taskId, runnerId);
     }
-    @MutationMapping public TaskLease acknowledgeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential) {
-        runners.authenticated(runnerId, credential); return leases.acknowledge(leaseId, runnerId, nonce);
+    @MutationMapping public TaskLease acknowledgeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce,
+                                                            @Argument String credential, @Argument String runnerRevision,
+                                                            @Argument String runnerJarSha256) {
+        runners.authenticated(runnerId, credential);
+        return leases.acknowledge(leaseId, runnerId, nonce, runnerRevision, runnerJarSha256);
     }
     @MutationMapping public TaskLease completeTaskLease(@Argument String leaseId, @Argument String runnerId, @Argument String nonce, @Argument String credential, @Argument boolean passed, @Argument String category) {
         runners.authenticated(runnerId, credential); return leases.complete(leaseId, runnerId, nonce, passed, category);

@@ -293,14 +293,17 @@ public final class RunnerMain {
             Path evidenceDirectory = Path.of(workspaceRoot).resolve("evidence").resolve(task.id());
             Files.createDirectories(evidenceDirectory);
             VerificationResult result;
+            ContainerVerificationExecutor executor = new ContainerVerificationExecutor();
             try (var progress = events.progress("Policy verification running")) {
-              result = new ContainerVerificationExecutor().execute(worktree, dockerVisibleWorktree(worktree),
+              result = executor.execute(worktree, dockerVisibleWorktree(worktree),
                     evidenceDirectory, dockerVisibleWorktree(evidenceDirectory),
                     task.verificationImageDigest(), task.verificationCommand(), Duration.ofSeconds(task.verificationTimeoutSeconds()),
                     "EGRESS".equals(task.verificationNetworkPolicy()), task.testReportFormat());
             }
+            String targetSha = new GitWorktreeManager().headSha(worktree);
+            String imageId = executor.resolveImageId(task.verificationImageDigest());
             VerificationEvidenceReport localReport = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
-                    task.verificationImageDigest(), task.verificationCommand(), result, null);
+                    task.verificationImageDigest(), task.verificationCommand(), result, null, null, null, targetSha, imageId);
             EvidenceBundleWriter writer = new EvidenceBundleWriter();
             Path localArtifact = writer.write(evidenceDirectory, localReport);
             if (!writer.verify(localArtifact)) throw new IllegalStateException("Local evidence checksum verification failed");
@@ -317,7 +320,7 @@ public final class RunnerMain {
                 if (!screenshots.isEmpty()) events.info("SCREENSHOTS_UPLOADED", "Browser screenshot evidence uploaded: " + screenshots.size());
             }
             VerificationEvidenceReport report = new VerificationEvidenceReport(task.verificationKind(), task.verificationGateName(),
-                    task.verificationImageDigest(), task.verificationCommand(), result, artifactReference);
+                    task.verificationImageDigest(), task.verificationCommand(), result, artifactReference, null, null, targetSha, imageId);
             writer.write(evidenceDirectory, report);
             client.recordEvidence(identity, lease, report);
             events.info(result.passed()?"TASK_COMPLETED":"TASK_FAILED",result.passed()?"Policy verification completed":"Policy verification failed");

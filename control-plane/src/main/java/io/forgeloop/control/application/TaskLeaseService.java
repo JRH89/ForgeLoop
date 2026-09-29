@@ -56,14 +56,23 @@ public class TaskLeaseService {
         TaskLease existing = leases.findFirstByTask_IdOrderByExpiresAtDesc(taskId).orElse(null);
         if (existing != null && existing.active()) throw new IllegalStateException("Task already has an active lease");
         String nonce = secret();
-        TaskLease lease = leases.save(new TaskLease(task, runner, hash(nonce), Instant.now().plus(task.leaseDuration())));
+        TaskLease lease = new TaskLease(task, runner, hash(nonce), Instant.now().plus(task.leaseDuration()));
+        lease.captureInputRefs(LeaseInputReferences.capture(task));
+        lease = leases.save(lease);
         task.transition(TaskState.LEASED);
         if (!"PLANNER".equals(task.getRole())) task.getRun().startExecution();
         return new LeaseGrant(lease, nonce);
     }
 
     @Transactional public TaskLease acknowledge(String leaseId, String runnerId, String nonce) {
-        TaskLease lease = validatedLease(leaseId, runnerId, nonce); lease.acknowledge(); return lease;
+        return acknowledge(leaseId, runnerId, nonce, null, null);
+    }
+
+    @Transactional public TaskLease acknowledge(String leaseId, String runnerId, String nonce,
+                                                 String runnerRevision, String runnerJarSha256) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        lease.acknowledge(runnerRevision, runnerJarSha256);
+        return lease;
     }
 
     @Transactional public TaskLease complete(String leaseId, String runnerId, String nonce, boolean passed) {
@@ -180,9 +189,14 @@ public class TaskLeaseService {
         if (gate == null || submission.gate() == null || !gate.matches(submission.gate())) throw new IllegalArgumentException("Evidence is not bound to this verification task");
         VerificationPolicySpec policy = gate.toSpec();
         if (!policy.kind().equals(submission.kind()) || !policy.imageDigest().equals(submission.image()) || !policy.command().equals(submission.command())) throw new IllegalArgumentException("Evidence metadata does not match the run policy snapshot");
+        String verificationBase = task.getVerificationBaseRef();
+        if (submission.targetSha() != null && verificationBase.matches("[0-9a-f]{40,64}")
+                && !verificationBase.equals(submission.targetSha()))
+            throw new IllegalArgumentException("Evidence target does not match the verification commit");
         EvidenceSecretPolicy.requireRedacted(submission.output());
-        VerificationEvidence candidate = new VerificationEvidence(task, runner, submission.kind(), submission.gate(), submission.image(), submission.command(),
-                submission.exitCode(), submission.timedOut(), submission.output(), submission.startedAt(), submission.finishedAt(), submission.artifactReference(), submission.outputDigest(), submission.bundleDigest());
+        VerificationEvidence candidate = new VerificationEvidence(task, runner, lease, submission.kind(), submission.gate(), submission.image(), submission.command(),
+                submission.exitCode(), submission.timedOut(), submission.output(), submission.startedAt(), submission.finishedAt(), submission.artifactReference(),
+                submission.outputDigest(), submission.bundleDigest(), submission.targetSha(), submission.imageId(), submission.outputTruncated());
         VerificationEvidence recorded = evidence.findByDigest(candidate.getDigest()).orElseGet(() -> evidence.save(candidate));
         task.getRun().recordGate(submission.gate(), !submission.timedOut() && submission.exitCode() == 0, submission.timedOut());
         return recorded;
@@ -196,9 +210,9 @@ public class TaskLeaseService {
         DeliveryTask task = tasks.findById(lease.getTaskId()).orElseThrow(() -> new IllegalArgumentException("Task not found"));
         Runner runner = runners.findById(runnerId).orElseThrow(() -> new IllegalArgumentException("Runner not found"));
         ProviderAttempt recorded = providerAttempts.findByTask_IdAndRequestIdDigest(task.getId(), submission.requestIdDigest()).orElseGet(() ->
-                providerAttempts.save(new ProviderAttempt(task, runner, submission.provider(), submission.model(), submission.requestIdDigest(),
+                providerAttempts.save(new ProviderAttempt(task, runner, lease, submission.provider(), submission.model(), submission.requestIdDigest(),
                         submission.inputTokens(), submission.outputTokens(), submission.attemptCount(), submission.estimatedCostMicros(),
-                        submission.costKnown(), submission.outcome(), submission.retryable(), submission.category())));
+                        submission.costKnown(), submission.outcome(), submission.retryable(), submission.category(), submission.answeredModel())));
         // The actual usage is now accounted for, so it replaces the temporary worst-case reservation.
         lease.settleReservation();
         long taskSpent = providerAttempts.sumKnownCostByTaskId(task.getId());

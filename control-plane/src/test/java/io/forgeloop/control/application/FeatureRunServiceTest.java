@@ -21,7 +21,7 @@ import org.mockito.Mockito;
 
 class FeatureRunServiceTest {
   private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class); private final PlatformConfigurationService platform=Mockito.mock(PlatformConfigurationService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections, audit, platform);
-  @BeforeEach void configurePlatform(){when(platform.policy()).thenReturn(new io.forgeloop.control.domain.OrganizationPolicy("local-development",100,4,List.of("anthropic"),true));when(platform.requireHarness(Mockito.anyString())).thenReturn(Mockito.mock(io.forgeloop.control.domain.HarnessDefinition.class));}
+  @BeforeEach void configurePlatform(){when(platform.policy()).thenReturn(new io.forgeloop.control.domain.OrganizationPolicy("local-development",100,4,List.of("anthropic"),true));when(platform.requireHarness(Mockito.anyString())).thenReturn(new io.forgeloop.control.domain.HarnessDefinition("local-development","JVM_REACT","Standard Java and React delivery",List.of("PLANNER","BACKEND","FRONTEND"),2));}
   @Test void submissionUsesConnectedRepositoryPolicy() {
     String image = "node@sha256:" + "a".repeat(64);
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of(
@@ -34,6 +34,11 @@ class FeatureRunServiceTest {
     assertEquals("JVM_REACT", run.getHarnessProfile()); assertEquals(3, run.getPolicyRevision()); assertEquals(1, run.getTasks().size()); assertEquals(2, run.getGates().size()); assertEquals(0, run.getCriteria().size()); assertEquals(io.forgeloop.control.domain.RunState.PLANNING, run.getState());
     assertEquals(600, run.getAgentLoopBudget().getMaxWallSeconds());
     assertEquals(new io.forgeloop.control.domain.LoopEnforcement(List.of("src/generated/**", "docs/private/**"), true, "compile"), run.getEnforcement());
+    assertEquals(64, run.getPolicySnapshotSha256().length());
+    assertEquals(true, run.getPolicySnapshot().contains("forgeloop.policy-snapshot/1"));
+    assertEquals(true, run.getPolicySnapshot().contains("src/generated/**"));
+    String submittedPolicySnapshot = run.getPolicySnapshot();
+    String submittedPolicySnapshotSha = run.getPolicySnapshotSha256();
     DeliveryTask planner = run.getTasks().getFirst();
     assertEquals(null, planner.getAgentLoop());
     DeliveryTask writer = run.addPlannedTask("backend", "BACKEND", "Backend", "provider", List.of("src"), 2, 100_000);
@@ -44,6 +49,8 @@ class FeatureRunServiceTest {
     connection.configureEnforcement(List.of(), false, null);
     assertEquals(600, run.getAgentLoopBudget().getMaxWallSeconds(), "the submitted run keeps its policy snapshot");
     assertEquals(new io.forgeloop.control.domain.LoopEnforcement(List.of("src/generated/**", "docs/private/**"), true, "compile"), run.getEnforcement());
+    assertEquals(submittedPolicySnapshot, run.getPolicySnapshot(), "later repository policy edits cannot rewrite the record");
+    assertEquals(submittedPolicySnapshotSha, run.getPolicySnapshotSha256());
     verify(runs).save(run);
   }
   @Test void rejectsBudgetAboveRepositoryPolicy() {

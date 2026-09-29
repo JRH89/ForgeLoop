@@ -51,7 +51,7 @@ public final class OpenAiResponsesProviderClient implements ProviderClient, Conv
         JsonNode response = JSON.readTree(body); StringBuilder output = new StringBuilder();
         for (JsonNode item : response.path("output")) for (JsonNode content : item.path("content")) if ("output_text".equals(content.path("type").asText())) output.append(content.path("text").asText());
         JsonNode usage = response.path("usage");
-        return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null));
+        return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null));
     }
 
     @Override public String serialize(ConversationRequest request) {
@@ -130,6 +130,6 @@ public final class OpenAiResponsesProviderClient implements ProviderClient, Conv
                 : StopReason.END_TURN;
         JsonNode usage = response.path("usage");
         return new ConversationTurn(text.toString(), calls, reason, usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(),
-                response.path("id").asText(null), output, body);
+                response.path("id").asText(null), output, body, response.path("model").asText(null));
     }
 }
