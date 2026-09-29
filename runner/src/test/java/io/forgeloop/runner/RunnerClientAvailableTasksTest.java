@@ -34,9 +34,19 @@ class RunnerClientAvailableTasksTest {
             List<RunnerTask> tasks = client.availableTasks(new RunnerIdentity("runner-1", "credential"));
 
             assertTrue(query.get().contains("redPrerequisite{testTaskId targetSha evidenceDigest}"));
+            assertTrue(query.get().contains("agentLoop{enforcement{protectedPaths allowWorkflowChanges finishGate}}"));
             assertEquals(new RunnerRedPrerequisite("test-writer", "a".repeat(40), "c".repeat(64)),
                     tasks.getFirst().redPrerequisite());
+            assertEquals(new RunnerLoopEnforcement(List.of("src/generated/**"), true, "verify"),
+                    tasks.getFirst().loopEnforcement());
             assertNull(tasks.get(1).redPrerequisite());
+            assertNull(tasks.get(1).loopEnforcement());
+            assertNull(tasks.get(2).loopEnforcement().protectedPaths());
+            assertEquals(HoldClass.RULE_INPUT_MISSING, EnforcementPreflight.check(
+                    EnforcementDescriptor.of(tasks.get(2), List.of()), "a".repeat(40)).orElseThrow().holdClass());
+            assertEquals("", tasks.get(3).loopEnforcement().finishGate());
+            assertEquals(HoldClass.RULE_INPUT_MISSING, EnforcementPreflight.check(
+                    EnforcementDescriptor.of(tasks.get(3), List.of()), "a".repeat(40)).orElseThrow().holdClass());
         } finally {
             server.stop(0);
         }
@@ -45,17 +55,20 @@ class RunnerClientAvailableTasksTest {
     private static String response() {
         return "{\"data\":{\"availableRunnerTasks\":["
                 + task("implementation", "{\"testTaskId\":\"test-writer\",\"targetSha\":\"" + "a".repeat(40)
-                        + "\",\"evidenceDigest\":\"" + "c".repeat(64) + "\"}")
-                + "," + task("ordinary", "null") + "]}}";
+                        + "\",\"evidenceDigest\":\"" + "c".repeat(64) + "\"}",
+                        "{\"enforcement\":{\"protectedPaths\":[\"src/generated/**\"],\"allowWorkflowChanges\":true,\"finishGate\":\"verify\"}}")
+                + "," + task("ordinary", "null", "null")
+                + "," + task("malformed-policy", "null", "{\"enforcement\":{\"protectedPaths\":\"invalid\",\"allowWorkflowChanges\":\"false\",\"finishGate\":42}}")
+                + "," + task("missing-finish-gate", "null", "{\"enforcement\":{\"protectedPaths\":[],\"allowWorkflowChanges\":false}}") + "]}}";
     }
 
-    private static String task(String id, String prerequisite) {
+    private static String task(String id, String prerequisite, String agentLoop) {
         return "{\"id\":\"" + id + "\",\"role\":\"IMPLEMENTATION\",\"title\":\"Implement\","
                 + "\"repository\":\"org/repo\",\"baseBranch\":\"main\",\"executionBaseRef\":\"main\","
                 + "\"sourceRef\":\"issue-1\",\"specification\":\"spec\",\"requiredCapability\":\"provider\","
                 + "\"budgetUsd\":1,\"ownedPaths\":[\"src\"],\"dependencyChangeShas\":[],"
                 + "\"acceptanceCriteria\":[],\"mcpConfigurations\":[],\"writeBoundary\":\"NO_TESTS\","
                 + "\"testPathGlobs\":[\"**/*Test.java\"],\"expectedTests\":[],\"expectedTestsOverflow\":false,"
-                + "\"redPrerequisite\":" + prerequisite + "}";
+                + "\"redPrerequisite\":" + prerequisite + ",\"agentLoop\":" + agentLoop + "}";
     }
 }

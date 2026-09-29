@@ -24,9 +24,12 @@ class GraphQlSchemaTest {
         assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryAgentLoop"));
         assertNotNull(schema.getMutationType().getFieldDefinition("renewTaskLease"));
         assertNotNull(schema.getMutationType().getFieldDefinition("holdTaskLease"));
+        assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryEnforcement"));
         assertNotNull(schema.getMutationType().getFieldDefinition("completeTaskLease"));
         assertNotNull(schema.getObjectType("Task").getFieldDefinition("agentLoop"));
         assertNotNull(schema.getObjectType("Task").getFieldDefinition("redPrerequisite"));
+        assertNotNull(schema.getObjectType("TaskAgentLoop").getFieldDefinition("enforcement"));
         assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("agentLoop"));
+        assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("enforcement"));
     }
 }

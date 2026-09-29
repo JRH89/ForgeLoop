@@ -11,14 +11,14 @@ import java.util.TreeMap;
 
 /** Immutable snapshot of enforcement authority sent with a task, independent of model-visible text. */
 public final class EnforcementDescriptor {
-    public static final String RULES_VERSION = "2";
+    public static final String RULES_VERSION = "3";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final String writeBoundary;
     private final List<String> testPathGlobs;
     private final RunnerRedPrerequisite redPrerequisite;
     private final List<String> protectedPathGlobs;
-    private final boolean allowWorkflowChanges;
+    private final Boolean allowWorkflowChanges;
     private final String finishGate;
     private final List<String> gateNames;
     private final List<String> checkNames;
@@ -27,7 +27,7 @@ public final class EnforcementDescriptor {
     private final String sha256;
 
     private EnforcementDescriptor(String writeBoundary, List<String> testPathGlobs, RunnerRedPrerequisite redPrerequisite,
-                                  List<String> protectedPathGlobs, boolean allowWorkflowChanges, String finishGate,
+                                  List<String> protectedPathGlobs, Boolean allowWorkflowChanges, String finishGate,
                                   List<String> gateNames) {
         this.writeBoundary = writeBoundary;
         this.testPathGlobs = immutableAllowingNulls(testPathGlobs);
@@ -50,13 +50,17 @@ public final class EnforcementDescriptor {
     public static EnforcementDescriptor of(RunnerTask task, List<LoopGate> gates) {
         if (task == null) throw new IllegalArgumentException("Dispatched runner task is required");
         List<String> names = gates == null ? List.of() : gates.stream().map(LoopGate::name).toList();
-        return fromDispatched(task.writeBoundary(), task.testPathGlobs(), task.redPrerequisite(), List.of(), false, null, names);
+        RunnerLoopEnforcement enforcement = task.loopEnforcement();
+        return fromDispatched(task.writeBoundary(), task.testPathGlobs(), task.redPrerequisite(),
+                enforcement == null ? List.of() : enforcement.protectedPaths(),
+                enforcement == null ? Boolean.FALSE : enforcement.allowWorkflowChanges(),
+                enforcement == null ? null : enforcement.finishGate(), names);
     }
 
     /** Kept explicit so malformed wire inputs can be represented and held by preflight instead of defaulted. */
     public static EnforcementDescriptor fromDispatched(String writeBoundary, List<String> testPathGlobs,
                                                         RunnerRedPrerequisite redPrerequisite,
-                                                        List<String> protectedPathGlobs, boolean allowWorkflowChanges,
+                                                        List<String> protectedPathGlobs, Boolean allowWorkflowChanges,
                                                         String finishGate, List<String> gateNames) {
         return new EnforcementDescriptor(writeBoundary, testPathGlobs, redPrerequisite, protectedPathGlobs,
                 allowWorkflowChanges, finishGate, gateNames);
@@ -71,7 +75,7 @@ public final class EnforcementDescriptor {
     public List<String> testPathGlobs() { return testPathGlobs; }
     public RunnerRedPrerequisite redPrerequisite() { return redPrerequisite; }
     public List<String> protectedPathGlobs() { return protectedPathGlobs; }
-    public boolean allowWorkflowChanges() { return allowWorkflowChanges; }
+    public Boolean allowWorkflowChanges() { return allowWorkflowChanges; }
     public String finishGate() { return finishGate; }
     public List<String> gateNames() { return gateNames; }
     public List<String> checkNames() { return checkNames; }

@@ -35,6 +35,19 @@ public class RepositoryConnectionService {
     audit.record("REPOSITORY_AGENT_LOOP_UPDATED", "REPOSITORY_CONNECTION", saved.getId(), "revision=" + saved.getPolicyRevision());
     return saved;
   }
+  @Transactional public RepositoryConnection configureEnforcement(String repository, List<String> protectedPaths,
+                                                                     boolean allowWorkflowChanges, String finishGate) {
+    operators.requireAdministrator();
+    RepositoryConnection connection = requireEnabled(repository);
+    connection.configureEnforcement(protectedPaths, allowWorkflowChanges, finishGate);
+    RepositoryConnection saved = connections.save(connection);
+    var policy = connection.getEnforcement();
+    String paths = String.join("\n", policy.protectedPaths());
+    String gate = policy.finishGate() == null ? "<none>" : policy.finishGate();
+    audit.record("REPOSITORY_ENFORCEMENT_UPDATED", "REPOSITORY_CONNECTION", saved.getId(),
+            "protectedPaths=" + paths + "|allowWorkflowChanges=" + policy.allowWorkflowChanges() + "|finishGate=" + gate);
+    return saved;
+  }
   public RepositoryConnection requireEnabled(String repository) {
     RepositoryConnection connection = connections.findByRepository(repository).orElseThrow(() -> new IllegalStateException("Repository is not connected"));
     if (!connection.belongsTo(operators.organizationId()) || !connection.isEnabled()) throw new IllegalStateException("Repository connection is unavailable");

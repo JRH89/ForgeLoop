@@ -38,6 +38,10 @@ public class ControlPlaneController {
   @MutationMapping public RepositoryConnection configureRepositoryVerification(@Argument String repository, @Argument List<VerificationPolicyInput> policies) { operators.requireAdministrator(); return connections.configureVerification(repository, policies.stream().map(VerificationPolicyInput::toSpec).toList()); }
   @MutationMapping public RepositoryConnection configureRepositoryTestFirst(@Argument String repository, @Argument String testGate, @Argument List<String> testPaths) { return connections.configureTestFirst(repository, testGate, testPaths); }
   @MutationMapping public RepositoryConnection configureRepositoryAgentLoop(@Argument String repository, @Argument AgentLoopBudgetInput budget) { return connections.configureAgentLoop(repository, budget == null ? null : budget.toBudget()); }
+  @MutationMapping public RepositoryConnection configureRepositoryEnforcement(@Argument String repository,
+          @Argument RepositoryEnforcementInput input) {
+    return connections.configureEnforcement(repository, input.protectedPaths(), input.allowWorkflowChanges(), input.finishGate());
+  }
   @MutationMapping public String issueRunnerRegistrationToken(@Argument String organizationId) { operators.requireAdministrator(); operators.requireOrganization(organizationId); return runners.issueRegistrationToken(organizationId); }
   @MutationMapping public RunnerEnrollment registerRunner(@Argument RegisterRunnerInput input) { return runners.register(new RunnerRegistration(input.token(), input.name(), input.version(), input.capabilities())); }
   @MutationMapping public Runner runnerHeartbeat(@Argument String runnerId, @Argument String credential) { return runners.heartbeat(runnerId, credential); }
@@ -60,4 +64,5 @@ public class ControlPlaneController {
   public record AgentLoopBudgetInput(int maxToolCalls, int maxTokens, int maxWallSeconds, int maxConversationBytes) {
     AgentLoopBudget toBudget() { return new AgentLoopBudget(maxToolCalls, maxTokens, maxWallSeconds, maxConversationBytes); }
   }
+  public record RepositoryEnforcementInput(List<String> protectedPaths, boolean allowWorkflowChanges, String finishGate) { }
 }

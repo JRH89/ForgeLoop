@@ -20,12 +20,17 @@ class AgentLoopPolicyPersistenceTest {
     @Test
     void repositoryPolicyAndRunSnapshotRoundTripIndependently() {
         AgentLoopBudget configured = new AgentLoopBudget(40, 200_000, 900, 1_048_576);
+        String image = "node@sha256:" + "a".repeat(64);
         RepositoryConnection repository = new RepositoryConnection(
-                "org", "owner/repository", 42L, "main", "forgeloop", "GENERIC", List.of(), 25.0);
+                "org", "owner/repository", 42L, "main", "forgeloop", "GENERIC",
+                List.of(new VerificationPolicySpec("verify", "CONTAINER", image, List.of("npm", "test"),
+                        "NONE", 300, true, "ALL")), 25.0, true);
         repository.configureAgentLoop(configured);
+        repository.configureEnforcement(List.of("src/generated/**"), true, "verify");
         FeatureRun run = new FeatureRun("org", "owner/repository", "issue-4", "Title", "Spec", 5.0,
                 "GENERIC", "main", repository.getPolicyRevision());
         run.adoptAgentLoop(repository.getAgentLoopBudget());
+        run.snapshotEnforcement(repository.getEnforcement());
 
         entityManager.persist(repository);
         entityManager.persist(run);
@@ -42,5 +47,9 @@ class AgentLoopPolicyPersistenceTest {
         assertEquals(200_000, storedRepositoryPolicy.getMaxTokens());
         assertEquals(900, storedRunSnapshot.getMaxWallSeconds());
         assertEquals(1_048_576, storedRunSnapshot.getMaxConversationBytes());
+        assertEquals(new LoopEnforcement(List.of("src/generated/**"), true, "verify"),
+                entityManager.find(FeatureRun.class, runId).getEnforcement());
+        assertEquals(new LoopEnforcement(List.of("src/generated/**"), true, "verify"),
+                entityManager.find(RepositoryConnection.class, repositoryId).getEnforcement());
     }
 }

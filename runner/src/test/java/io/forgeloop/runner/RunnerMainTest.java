@@ -35,7 +35,8 @@ class RunnerMainTest {
                 "spec", "provider", 1, List.of("src"), List.of(), null, null, null, List.of(), null, null,
                 "main", "main", List.of(), List.of(), "NO_TESTS", List.of("**/*.test.ts"), "JUNIT_XML",
                 List.of("Suite#added"), true, "RED check evidence summary",
-                new RunnerRedPrerequisite("test-task", "a".repeat(40), "c".repeat(64)));
+                new RunnerRedPrerequisite("test-task", "a".repeat(40), "c".repeat(64)),
+                new RunnerLoopEnforcement(List.of("src/generated/**"), true, "verify"));
 
         RunnerTask contextual = RunnerMain.withAdditionalContext(task, "\nextra context");
 
@@ -46,6 +47,7 @@ class RunnerMainTest {
         assertTrue(contextual.expectedTestsOverflow());
         assertEquals("RED check evidence summary", contextual.testFirstEvidence());
         assertEquals(task.redPrerequisite(), contextual.redPrerequisite());
+        assertEquals(task.loopEnforcement(), contextual.loopEnforcement());
     }
 
     @Test

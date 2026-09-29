@@ -191,7 +191,7 @@ public class DeliveryTask {
         if (budget == null) return null;
         List<AgentLoopGate> gates = run.getGates().stream().map(VerificationGate::toAgentLoopGate)
                 .filter(java.util.Objects::nonNull).toList();
-        return new TaskAgentLoop(budget, gates);
+        return new TaskAgentLoop(budget, gates, run.getEnforcement());
     }
     /**
      * Pins a test-first implementation to passing RED evidence without sharing the base-ref

@@ -15,6 +15,8 @@ An organization administrator configures a connected repository through `configu
 
 When a run is submitted, it copies the repository's loop budget and verification gates. Later repository changes do not alter that run. `Task.agentLoop` is non-null only for a snapshotted, source-writing task; planner, integration, review, verification, and unconfigured tasks receive `null`. Only fully specified, digest-pinned gates are included in the loop payload.
 
+The administrator-only `configureRepositoryEnforcement(repository, input)` mutation stores an optional list of protected path globs, an audited opt-out for the built-in `.github/workflows/**` deny, and an optional finish gate that must name one of the repository's verification policies. All three settings are copied into a submitted run and exposed as `Task.agentLoop.enforcement`; existing runs retain their policy snapshot when repository settings change. Custom protected paths use the case-sensitive repository glob language. The workflow opt-out does not remove custom globs, and the finish gate is advisory—it cannot create or replace official verification evidence. See [Agent-loop enforcement](agent-loop-enforcement.md) for rule behavior.
+
 ## Runner lease lifecycle
 
 The runner-facing `renewTaskLease` and `holdTaskLease` mutations require the runner credential, lease id, and nonce. Both require an active, acknowledged lease and an eligible task from a loop-enabled run.

@@ -746,7 +746,7 @@ public final class RunnerMain {
                 task.verificationImageDigest(), task.verificationCommand(), task.verificationNetworkPolicy(),
                 task.verificationTimeoutSeconds(), task.verificationBaseRef(), task.executionBaseRef(),
                 task.acceptanceCriteria(), task.mcpConfigurations(), task.writeBoundary(), task.testPathGlobs(), task.testReportFormat(),
-                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence(), task.redPrerequisite());
+                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence(), task.redPrerequisite(), task.loopEnforcement());
     }
 
     private static String collectMcpOrFail(RunnerClient client, RunnerIdentity identity, RunnerLease lease,

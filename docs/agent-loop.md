@@ -28,7 +28,7 @@ Available tools are:
 
 There is no shell, delete, rename, dependency-install, or unrestricted process tool. Read-only roles receive only the three read tools; integration, planning, and review capabilities do not gain write tools. `run_gate` is only granted to writing roles when gates exist.
 
-The gateway exposes an empty interceptor chain in this slice. Allow/deny/redirect policy enforcement is intentionally deferred to Version 2 security slices 4a–4b.
+The agent-loop gateway uses the descriptor-derived enforcement chain implemented in Version 2 slices 4a–4c. The loop remains dormant until its separate, default-off runner wiring is shipped; see [Agent-loop enforcement](agent-loop-enforcement.md) for rules and current delivery boundaries.
 
 ## Budgets and stopping
 

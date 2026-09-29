@@ -253,6 +253,29 @@ class AgentLoopTest {
     }
 
     @Test
+    void undispatchedFinishGateHoldsBeforeProviderSpend() throws Exception {
+        Path repo = gitRepository("finish-gate-preflight-hold");
+        String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
+        ScriptedClient client = new ScriptedClient();
+        StepJournal journal = new StepJournal(temporaryDirectory.resolve("finish-gate-preflight-hold-state"), "task-1", "lease-1", Clock.systemUTC());
+        ToolRegistry registry = ToolRegistry.standard(new GitWorktreeManager(), null);
+        ToolGateway gateway = new ToolGateway(registry, journal, List.of());
+        EnforcementDescriptor enforcement = EnforcementDescriptor.fromDispatched("ANY", List.of(), null,
+                List.of(), false, "verify", List.of("lint"));
+        LoopSetup setup = new LoopSetup("task-1", "JRH89/agent-loop-test", "lease-1", "IMPLEMENTATION", "Implement a small feature", "small specification",
+                List.of("src/"), List.of(), repo, baseSha, new ProviderExecutionPolicy("openai", "test-model", 1), client,
+                standardBudget(10, 50_000, 65_536), List.of(), gateway, registry, journal, Clock.systemUTC(), new RecordingReporter(),
+                new AtomicBoolean(), 0, 0, enforcement);
+
+        LoopResult result = new AgentLoop().run(setup);
+
+        assertEquals(LoopOutcome.POLICY_HOLD, result.outcome());
+        assertEquals(HoldClass.RULE_INPUT_MISSING, result.holdClass());
+        assertTrue(client.requests.isEmpty());
+        assertTrue(journal.records().stream().noneMatch(row -> row.path("type").asText().equals("TURN_REQUESTED")));
+    }
+
+    @Test
     void missingCurrentRedProofHoldsBeforeTheFirstProviderTurn() throws Exception {
         Path repo = gitRepository("red-prerequisite-hold");
         String baseSha = command("git", "-C", repo.toString(), "rev-parse", "HEAD");
