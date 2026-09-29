@@ -43,9 +43,6 @@ public final class TaskGraphValidator {
             requireDistinctNonBlank(task.dependencies(), "Task dependencies");
             requireDistinctNonBlank(task.ownedPaths(), "Owned paths");
             if (WRITING_ROLES.contains(task.role()) && task.ownedPaths().isEmpty()) throw new IllegalArgumentException("Writing tasks require owned paths");
-            if (WRITING_ROLES.contains(task.role()) && !task.dependencies().isEmpty()) {
-                throw new IllegalArgumentException("Writing tasks must be independent; integration is the only fan-in stage");
-            }
             task.ownedPaths().forEach(this::validatePathPrefix);
         }
         long runBudgetMicros = Math.round(runBudgetUsd * 1_000_000d);
@@ -57,6 +54,12 @@ public final class TaskGraphValidator {
             if (dependency.equals(task.key())) throw new IllegalArgumentException("A task cannot depend on itself");
             if (!tasks.containsKey(dependency)) throw new IllegalArgumentException("Unknown task dependency: " + dependency);
         }));
+        for (PlannedTaskSubmission task : plan.tasks()) {
+            if (WRITING_ROLES.contains(task.role()) && (task.dependencies().size() > 1
+                    || task.dependencies().stream().anyMatch(key -> !WRITING_ROLES.contains(tasks.get(key).role())))) {
+                throw new IllegalArgumentException("A writing task may depend on at most one other writing task");
+            }
+        }
         detectCycles(tasks);
     }
 

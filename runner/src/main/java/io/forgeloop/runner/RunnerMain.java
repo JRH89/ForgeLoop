@@ -579,8 +579,12 @@ public final class RunnerMain {
         try {
             RunnerTask contextualTask = withAdditionalContext(task,
                     collectMcpOrFail(client, identity, lease, task, worktree));
+            List<String> preferredContextPaths = new ArrayList<>(task.ownedPaths());
+            preferredContextPaths.addAll(new GitWorktreeManager().changedFiles(worktree,
+                    checkoutRef(task, task.baseBranch())));
             result = new GuardedPatchWorker().execute(policy, new ProgressProviderClient(new ProviderClientFactory().create(policy), events), task.role(),
-                    task.title(), contextualTask.specification(), worktree, List.of(allowedPrefixes.split(",")), lease.leaseId());
+                    task.title(), contextualTask.specification(), worktree, List.of(allowedPrefixes.split(",")),
+                    preferredContextPaths, lease.leaseId());
         } catch (ProviderExecutionFailure failure) {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(ProviderFailureEvidence.from(policy, failure, lease.leaseId())));
             client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
@@ -608,7 +612,7 @@ public final class RunnerMain {
         RunnerLease lease = client.claimTask(identity, task.id());
         try {
             Path repository = checkout(client,identity,lease,arguments[5],task.repository());
-            Path worktree = new GitWorktreeManager().create(repository, checkoutRef(task,task.baseBranch()), task.id(), Path.of(arguments[6]));
+            Path worktree = createExecutionWorktree(repository, task, Path.of(arguments[6]));
             new RunnerLeaseStore().save(Path.of(arguments[4]), lease);
             client.acknowledgeLease(identity, lease.leaseId(), lease.nonce());
             System.out.println("Task worktree prepared: " + worktree);
@@ -619,6 +623,11 @@ public final class RunnerMain {
     }
     private static Path checkout(RunnerClient client,RunnerIdentity identity,RunnerLease lease,String repositoriesRoot,String expectedRepository)throws Exception{GithubCheckoutGrant grant=client.issueGithubCheckoutGrant(identity,lease);if(!expectedRepository.equals(grant.repository()))throw new IllegalStateException("Checkout grant repository mismatch");return new RepositoryWorkspaceResolver().resolveOrClone(Path.of(repositoriesRoot),grant);}
     private static String checkoutRef(RunnerTask task,String requested){return task.baseBranch().equals(requested)?"refs/remotes/origin/"+task.baseBranch():requested;}
+
+    /** Prepares the same policy-selected base ref that normal task execution uses. */
+    static Path createExecutionWorktree(Path repository, RunnerTask task, Path workspaceRoot) throws Exception {
+        return new GitWorktreeManager().create(repository, checkoutRef(task, task.executionBaseRef()), task.id(), workspaceRoot);
+    }
 
     private static RunnerTask withAdditionalContext(RunnerTask task, String context) {
         if (context == null || context.isBlank()) return task;

@@ -45,13 +45,40 @@ class TaskGraphValidatorTest {
     }
 
     @Test
-    void rejectsWritingTaskDependenciesThatCannotRunBeforeIntegration() {
+    void acceptsAWritingDependencyAndChainedWriterGraph() {
         TaskPlanSubmission plan = new TaskPlanSubmission(List.of("criterion"), List.of(
-                task("implementation", "IMPLEMENTATION", List.of(), List.of("src"), 100),
-                task("test", "INDEPENDENT_TEST", List.of("implementation"), List.of("tests"), 100),
-                task("integration", "INTEGRATION", List.of("implementation", "test"), List.of(), 0)));
+                task("tests", "INDEPENDENT_TEST", List.of(), List.of("tests"), 100),
+                task("backend", "BACKEND", List.of("tests"), List.of("backend"), 100),
+                task("implementation", "IMPLEMENTATION", List.of("backend"), List.of("src"), 100),
+                task("integration", "INTEGRATION", List.of("implementation", "backend", "tests"), List.of(), 0)));
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> validator.validate(plan, 1));
+    }
+
+    @Test
+    void rejectsCyclesBetweenWritingTasks() {
+        TaskPlanSubmission plan = new TaskPlanSubmission(List.of("criterion"), List.of(
+                task("backend", "BACKEND", List.of("frontend"), List.of("backend"), 100),
+                task("frontend", "FRONTEND", List.of("backend"), List.of("frontend"), 100),
+                task("integration", "INTEGRATION", List.of("backend", "frontend"), List.of(), 0)));
 
         assertThrows(IllegalArgumentException.class, () -> validator.validate(plan, 1));
+    }
+
+    @Test
+    void rejectsMultipleOrNonWritingDependenciesForAWriter() {
+        TaskPlanSubmission multipleWriters = new TaskPlanSubmission(List.of("criterion"), List.of(
+                task("tests", "INDEPENDENT_TEST", List.of(), List.of("tests"), 100),
+                task("backend", "BACKEND", List.of(), List.of("backend"), 100),
+                task("implementation", "IMPLEMENTATION", List.of("tests", "backend"), List.of("src"), 100),
+                task("integration", "INTEGRATION", List.of("tests", "backend", "implementation"), List.of(), 0)));
+        TaskPlanSubmission nonWritingDependency = new TaskPlanSubmission(List.of("criterion"), List.of(
+                task("implementation", "IMPLEMENTATION", List.of(), List.of("src"), 100),
+                task("integration", "INTEGRATION", List.of("implementation"), List.of(), 0),
+                task("dependent", "BACKEND", List.of("integration"), List.of("backend"), 100)));
+
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(multipleWriters, 1));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate(nonWritingDependency, 1));
     }
 
     private static PlannedTaskSubmission task(String key, String role, List<String> dependencies, List<String> paths, long budget) {

@@ -13,8 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RunnerDispatchService {
     private final DeliveryTaskRepository tasks;
+    private final ChainedWriterRunnerAffinity writerAffinity;
 
-    public RunnerDispatchService(DeliveryTaskRepository tasks) { this.tasks = tasks; }
+    public RunnerDispatchService(DeliveryTaskRepository tasks, ChainedWriterRunnerAffinity writerAffinity) {
+        this.tasks = tasks;
+        this.writerAffinity = writerAffinity;
+    }
 
     @Transactional(readOnly = true)
     public List<DeliveryTask> available(Runner runner) {
@@ -22,6 +26,7 @@ public class RunnerDispatchService {
         List<DeliveryTask> available = tasks.findByStateIn(List.of(TaskState.PENDING, TaskState.REPAIR_QUEUED)).stream()
                 .filter(task -> runner.hasCapability(task.getRequiredCapability()))
                 .filter(DeliveryTask::dependenciesSatisfied)
+                .filter(task -> writerAffinity.permits(task, runner.getId()))
                 .filter(DeliveryTask::hasBudgetRemaining)
                 .filter(task -> task.getRun().hasBudgetRemaining())
                 .filter(candidate -> active.stream()
