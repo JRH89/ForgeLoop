@@ -6,6 +6,8 @@ import jakarta.persistence.EntityManager;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
+import io.forgeloop.control.application.RunExitMeaning;
+import io.forgeloop.control.application.RunExitMeaningService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -18,6 +20,8 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 class TaskLeaseSpendReservationRepositoryTest {
     @Autowired private EntityManager entityManager;
     @Autowired private TaskLeaseRepository leases;
+    @Autowired private DeliveryTaskRepository tasks;
+    @Autowired private HumanEscalationRepository escalations;
 
     @Test
     void sumsOnlyUnexpiredIncompleteSiblingReservations() throws Exception {
@@ -49,6 +53,34 @@ class TaskLeaseSpendReservationRepositoryTest {
         long activeSiblings = leases.sumActiveReservationsByRunExcludingLease(run.getId(), excluded.getId(), Instant.now());
 
         assertEquals(100, activeSiblings);
+    }
+
+    @Test
+    void derivesHeldRunMeaningFromItsLatestClosedLeaseAndOpenEscalation() {
+        FeatureRun run = new FeatureRun("org", "owner/held", "issue-2", "Held run", "Spec", 5.0,
+                "GENERIC", "main", 1);
+        DeliveryTask task = run.addPlannedTask("held", "IMPLEMENTATION", "Hold for operator", "provider",
+                List.of("src/held"), 1, 1_000);
+        task.transition(TaskState.LEASED);
+        task.hold();
+        run.block();
+        Runner runner = new Runner("org", "runner", "1", List.of("provider"), "credential-hash");
+        TaskLease lease = acknowledgedLease(task, runner, "held");
+        lease.closeForHold("LOOP_BUDGET_EXHAUSTED");
+
+        entityManager.persist(run);
+        entityManager.persist(runner);
+        entityManager.persist(lease);
+        HumanEscalation escalation = new HumanEscalation(run, task, "LOOP_BUDGET_EXHAUSTED", "HIGH",
+                "The agent loop reached its configured bound.");
+        entityManager.persist(escalation);
+        entityManager.flush();
+        entityManager.clear();
+
+        RunExitMeaning meaning = new RunExitMeaningService(leases, escalations, tasks).derive(List.of(run)).get(run.getId());
+
+        assertEquals(AttemptOutcome.STOPPED, meaning.outcome());
+        assertEquals("LOOP_BUDGET_EXHAUSTED", meaning.reason());
     }
 
     private static TaskLease acknowledgedLease(DeliveryTask task, Runner runner, String nonce) {

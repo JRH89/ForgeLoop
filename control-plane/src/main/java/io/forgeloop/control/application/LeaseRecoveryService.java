@@ -29,6 +29,5 @@ public class LeaseRecoveryService {
                     escalations.escalate(lease.getTask(), "ATTEMPT_BUDGET_EXHAUSTED", "Runner lease expired after all autonomous attempts");
             }
         }
-        leases.deleteAll(expired);
     }
 }

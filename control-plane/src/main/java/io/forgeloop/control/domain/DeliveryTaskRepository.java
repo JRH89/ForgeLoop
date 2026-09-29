@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 public interface DeliveryTaskRepository extends JpaRepository<DeliveryTask,String> {
     List<DeliveryTask> findByStateIn(Collection<TaskState> states);
     List<DeliveryTask> findByRun_Id(String runId);
+    List<DeliveryTask> findByRun_IdIn(Collection<String> runIds);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select task from DeliveryTask task where task.run.id = :runId order by task.id")
     List<DeliveryTask> findAllForUpdateByRunId(@Param("runId") String runId);

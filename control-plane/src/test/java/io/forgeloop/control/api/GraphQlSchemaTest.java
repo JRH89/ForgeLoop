@@ -31,5 +31,7 @@ class GraphQlSchemaTest {
         assertNotNull(schema.getObjectType("TaskAgentLoop").getFieldDefinition("enforcement"));
         assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("agentLoop"));
         assertNotNull(schema.getObjectType("RepositoryConnection").getFieldDefinition("enforcement"));
+        assertNotNull(schema.getObjectType("FeatureRun").getFieldDefinition("exitMeaning"));
+        assertNotNull(schema.getObjectType("FeatureRun").getFieldDefinition("exitReason"));
     }
 }

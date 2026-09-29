@@ -23,7 +23,7 @@ class LeaseRecoveryServiceTest {
     private final LeaseRecoveryService recovery = new LeaseRecoveryService(leases, repairs, escalations);
 
     @Test
-    void returnsExpiredLeaseTaskToRepairQueueAndRemovesLease() {
+    void returnsExpiredLeaseTaskToRepairQueueAndRetainsClosedLease() {
         FeatureRun run = new FeatureRun("org/repository", "main", "title", "spec", 1, "GENERIC", 1);
         run.addTask("IMPLEMENTATION", "Implement", "provider");
         TaskLease expired = new TaskLease(run.getTasks().getFirst(), new Runner("org", "runner", "1", List.of("provider"), "hash"),
@@ -35,7 +35,9 @@ class LeaseRecoveryServiceTest {
 
         assertEquals(TaskState.REPAIR_QUEUED, run.getTasks().getFirst().getState());
         verify(repairs).save(Mockito.any());
-        verify(leases).deleteAll(List.of(expired));
+        assertEquals(io.forgeloop.control.domain.AttemptOutcome.HARNESS_FAILURE, expired.getOutcome());
+        assertEquals("LEASE_EXPIRED", expired.getOutcomeCategory());
+        verify(leases, never()).deleteAll(Mockito.any());
     }
 
     @Test
@@ -51,7 +53,9 @@ class LeaseRecoveryServiceTest {
         recovery.recoverExpiredLeases();
 
         verify(repairs, never()).save(Mockito.any());
-        verify(leases).deleteAll(List.of(expired));
+        assertEquals(io.forgeloop.control.domain.AttemptOutcome.STOPPED, expired.getOutcome());
+        assertEquals("LEASE_CLOSED_AFTER_STOP", expired.getOutcomeCategory());
+        verify(leases, never()).deleteAll(Mockito.any());
     }
 
     /** Keeps aggregate setup explicit without exposing mutable task collections in production code. */

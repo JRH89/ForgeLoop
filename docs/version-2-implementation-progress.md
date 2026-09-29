@@ -130,6 +130,15 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Verification:** original control-plane `mvn -B verify` passed (317 tests); runner `mvn -B -Dforgeloop.revision=deadbeef0 verify` passed (255 tests, 5 platform-dependent skips); harness `mvn -B verify` passed (2 tests). V42 applied successfully against an isolated PostgreSQL 18 instance; all 12 new columns and both lease indexes were present. Re-run on the refreshed merged `master` plus 5a: control-plane 326 tests, runner 290 tests (9 platform/live-fixture skips), and harness 2 tests; all had 0 failures/errors. `git diff --check` passed. No provider-backed call was made.
 - **Delivery:** linked [PR #96](https://github.com/JRH89/ForgeLoop/pull/96) implements issue #87 from `feat/5a-run-record-pins-pr`. Full local verification passed; hosted checks are pending.
 
+## Slice 5b - Attempt outcomes and attempt-local routing
+
+- **Issue:** [#88](https://github.com/JRH89/ForgeLoop/issues/88).
+- **Result:** expired lease rows are retained; every new close path records one of `CLEAN`, `FINDINGS`, `HARNESS_FAILURE`, or `STOPPED` and a bounded category. Verification and review repair routing now uses only evidence recorded under the closing lease, and general retry categories prefer the explicit runner category, then that lease's latest provider category, then the role-specific fallback. Test-check verdicts store their result meaning and role-prefixed reason.
+- **Run meaning:** GraphQL exposes derived `FeatureRun.exitMeaning` and `exitReason`; successful, cancelled, held, failed, legacy, and unresolved-escalation cases are covered without persisting a duplicate run summary.
+- **Migration:** V43 adds nullable `task_lease.outcome` and `outcome_category`; `claimed_at` already exists from V39. Existing closed rows remain unclassified rather than receiving invented outcomes.
+- **Verification:** control-plane `mvn -q verify` passed (330 tests, 0 failures/errors/skips). V43 applied on a disposable PostgreSQL 18 instance and both columns were confirmed nullable. JPA-backed tests exercised the new batched outcome queries; `git diff --check` passed. No provider-backed calls, hosted checks, or deployment changes.
+- **Delivery:** implementation commit `8b17e1f` is being validated on a preparation branch stacked on issue #87; issue #88 is linked. No #88 PR will open until #85–#87 merge, preserving one open PR at a time.
+
 ## Update protocol
 
 For each slice, record its linked issue/PR, meaningful commits, behavior, exact verification outcomes, and remaining external or paid validation. Mark complete only after all slice-local work is complete. Keep hosted CI and provider-backed evidence distinct. The product agent loop must stay dormant until the plan explicitly enables it.

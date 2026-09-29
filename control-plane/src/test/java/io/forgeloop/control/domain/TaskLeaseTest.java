@@ -23,6 +23,8 @@ class TaskLeaseTest {
         assertEquals(TaskState.CHANGE_READY, task.getState());
         assertEquals("a".repeat(40), task.getChangeSha());
         assertEquals("a".repeat(40), lease.getResultSha());
+        assertEquals(AttemptOutcome.CLEAN, lease.getOutcome());
+        assertEquals("COMPLETED", lease.getOutcomeCategory());
     }
 
     @Test
@@ -53,6 +55,8 @@ class TaskLeaseTest {
         first.acknowledge();
         first.complete(false);
         assertEquals(TaskState.REPAIR_QUEUED, failing.getState());
+        assertEquals(AttemptOutcome.HARNESS_FAILURE, first.getOutcome());
+        assertEquals("EXECUTION_FAILED", first.getOutcomeCategory());
         assertEquals(TaskState.PENDING, independent.getState());
 
         failing.transition(TaskState.LEASED);
@@ -61,6 +65,7 @@ class TaskLeaseTest {
         second.complete(false);
         assertEquals(TaskState.FAILED, failing.getState());
         assertEquals(RunState.BLOCKED, run.getState());
+        assertEquals(AttemptOutcome.HARNESS_FAILURE, second.getOutcome());
     }
 
     @Test
@@ -102,6 +107,8 @@ class TaskLeaseTest {
         assertEquals(TaskState.INTEGRATED, backend.getState());
         assertEquals(TaskState.INTEGRATED, frontend.getState());
         assertEquals(TaskState.INTEGRATED, integration.getState());
+        assertEquals(AttemptOutcome.CLEAN, lease.getOutcome());
+        assertEquals("COMPLETED", lease.getOutcomeCategory());
     }
 
     @Test
@@ -122,6 +129,8 @@ class TaskLeaseTest {
         assertThrows(IllegalArgumentException.class, () -> lease.renew(renewAt, renewAt));
         lease.closeForHold();
         assertEquals(true, lease.isCompleted());
+        assertEquals(AttemptOutcome.STOPPED, lease.getOutcome());
+        assertEquals("WORKER_DECLINED", lease.getOutcomeCategory());
     }
 
     @Test
@@ -157,6 +166,44 @@ class TaskLeaseTest {
         lease.completeIntegration("b".repeat(40));
 
         assertEquals("b".repeat(40), lease.getResultSha());
+        assertEquals(AttemptOutcome.CLEAN, lease.getOutcome());
+        assertEquals("COMPLETED", lease.getOutcomeCategory());
+    }
+
+    @Test
+    void recordsQualityPlannerAndPolicyHoldMeanings() {
+        Runner runner = new Runner("org", "runner", "1", List.of("provider"), "hash");
+
+        FeatureRun qualityRun = new FeatureRun("owner/quality", "issue-quality", "Quality", "criterion", 5, "GENERIC", 1);
+        qualityRun.addTask("VERIFICATION", "Verify", "provider");
+        DeliveryTask verification = qualityRun.getTasks().getFirst();
+        verification.transition(TaskState.LEASED);
+        TaskLease qualityLease = new TaskLease(verification, runner, "quality", Instant.now().plusSeconds(60));
+        qualityLease.acknowledge();
+        qualityLease.closeForRepairCycle();
+        assertEquals(AttemptOutcome.FINDINGS, qualityLease.getOutcome());
+        assertEquals("VERIFICATION_FAILED", qualityLease.getOutcomeCategory());
+
+        FeatureRun planRun = new FeatureRun("owner/planner", "issue-plan", "Plan", "criterion", 5, "GENERIC", 1);
+        planRun.addTask("PLANNER", "Plan", "provider");
+        DeliveryTask planner = planRun.getTasks().getFirst();
+        planner.transition(TaskState.LEASED);
+        planner.transition(TaskState.VERIFIED);
+        TaskLease plannerLease = new TaskLease(planner, runner, "planner", Instant.now().plusSeconds(60));
+        plannerLease.acknowledge();
+        plannerLease.completePlanning();
+        assertEquals(AttemptOutcome.CLEAN, plannerLease.getOutcome());
+        assertEquals("COMPLETED", plannerLease.getOutcomeCategory());
+
+        FeatureRun holdRun = new FeatureRun("owner/hold", "issue-hold", "Hold", "criterion", 5, "GENERIC", 1);
+        holdRun.addTask("INTEGRATION", "Integrate", "provider");
+        DeliveryTask integration = holdRun.getTasks().getFirst();
+        integration.transition(TaskState.LEASED);
+        TaskLease policyLease = new TaskLease(integration, runner, "policy", Instant.now().plusSeconds(60));
+        policyLease.acknowledge();
+        policyLease.closeForPolicyHold("TEST_BOUNDARY_VIOLATION");
+        assertEquals(AttemptOutcome.STOPPED, policyLease.getOutcome());
+        assertEquals("TEST_BOUNDARY_VIOLATION", policyLease.getOutcomeCategory());
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.forgeloop.control.artifacts.ArtifactStore;
 import io.forgeloop.control.domain.ArtifactMetadata;
 import io.forgeloop.control.domain.ArtifactMetadataRepository;
+import io.forgeloop.control.domain.AttemptOutcome;
 import io.forgeloop.control.domain.DeliveryTask;
 import io.forgeloop.control.domain.FeatureRun;
 import io.forgeloop.control.domain.RepairPackage;
@@ -51,7 +52,7 @@ class TestCheckEvidenceServiceTest {
 
         assertSame(recorded, replayed, "a lost mutation response replays the same evidence after lease closure");
         verify(fixture.check()).transition(TaskState.VERIFIED);
-        verify(fixture.lease()).closeForTestCheck();
+        verify(fixture.lease()).closeForTestCheck(AttemptOutcome.CLEAN, "COMPLETED");
         verify(fixture.run()).evaluateReviewReadiness();
     }
 
@@ -65,7 +66,7 @@ class TestCheckEvidenceServiceTest {
                 recorded.changedFilesEvidence());
         verify(fixture.writer()).transition(TaskState.REPAIR_QUEUED);
         verify(fixture.check()).requeueRedCheckAfterWriterRepair();
-        verify(fixture.lease()).closeForTestCheck();
+        verify(fixture.lease()).closeForTestCheck(AttemptOutcome.FINDINGS, "RED_ADDED_TEST_PASSED");
         ArgumentCaptor<RepairPackage> repair = ArgumentCaptor.forClass(RepairPackage.class);
         verify(fixture.repairs()).save(repair.capture());
         assertEquals(List.of(RED_TEST), repair.getValue().getFailingTests());
@@ -79,7 +80,7 @@ class TestCheckEvidenceServiceTest {
 
         verify(fixture.check()).transition(TaskState.HELD);
         verify(fixture.run()).block();
-        verify(fixture.lease()).closeForTestCheck();
+        verify(fixture.lease()).closeForTestCheck(AttemptOutcome.STOPPED, "GREEN_REPORT_UNREADABLE");
         verify(fixture.escalations()).escalate(fixture.check(), "TEST_CHECK_UNVERIFIABLE",
                 "Test-first check evidence is unverifiable: REPORT_UNREADABLE");
     }
@@ -96,7 +97,7 @@ class TestCheckEvidenceServiceTest {
         verify(fixture.run()).scheduleQualityRepair(eq(fixture.check()), eq("GREEN_FAILED:EXPECTED_TEST_NOT_PASSED"),
                 anyString(), eq(List.of(RED_TEST)));
         verify(fixture.repairs()).save(repair);
-        verify(fixture.lease()).closeForTestCheck();
+        verify(fixture.lease()).closeForTestCheck(AttemptOutcome.FINDINGS, "GREEN_EXPECTED_TEST_NOT_PASSED");
     }
 
     private Fixture fixture(TestCheckBundle bundle) throws Exception {

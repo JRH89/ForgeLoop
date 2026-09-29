@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 public interface ProviderAttemptRepository extends JpaRepository<ProviderAttempt, String> {
     Optional<ProviderAttempt> findByTask_IdAndRequestIdDigest(String taskId, String requestIdDigest);
     Optional<ProviderAttempt> findFirstByTask_IdOrderByRecordedAtDesc(String taskId);
+    Optional<ProviderAttempt> findFirstByLease_IdOrderByRecordedAtDesc(String leaseId);
+    boolean existsByLease_IdAndCategory(String leaseId, String category);
     List<ProviderAttempt> findByTask_IdOrderByRecordedAtAsc(String taskId);
     @Query("select coalesce(sum(attempt.estimatedCostMicros), 0) from ProviderAttempt attempt where attempt.task.id = :taskId and attempt.costKnown = true")
     long sumKnownCostByTaskId(@Param("taskId") String taskId);
