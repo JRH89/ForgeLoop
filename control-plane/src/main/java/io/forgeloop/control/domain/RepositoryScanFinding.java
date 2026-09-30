@@ -11,6 +11,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +32,7 @@ public class RepositoryScanFinding {
     private Integer issueNumber;
     @Column(length = 500) private String issueUrl;
     @OneToMany(mappedBy = "finding", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @BatchSize(size = 50)
     @OrderBy("createdAt ASC") private List<RepositoryIssueProposal> issueProposals = new ArrayList<>();
 
     protected RepositoryScanFinding() { }

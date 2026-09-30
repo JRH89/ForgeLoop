@@ -20,6 +20,16 @@ it('requires an explicit confirmation before starting a potentially paid scan', 
   expect(await screen.findByText('PENDING')).toBeVisible();
 });
 
+it('shows a safe actionable message instead of exposing the Hibernate fetch exception', async () => {
+  const internalError = 'org.hibernate.loader.MultipleBagFetchException: cannot simultaneously fetch multiple bags';
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ errors: [{ message: internalError }] }) })));
+  render(<RepositoryScans repository="owner/repo" isAdmin />);
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('The control plane could not load repository scan data.');
+  expect(alert).not.toHaveTextContent('MultipleBagFetchException');
+});
+
 it('queues issue drafting only after the administrator chooses the extra model call', async () => {
   const pending = { ...proposal, status: 'PENDING', proposedTitle: null, proposedBody: null, acceptanceCriteria: [], model: null, provider: null, costKnown: false };
   const fetch = vi.fn(async (_url: string, init: RequestInit) => {

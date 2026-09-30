@@ -11,10 +11,12 @@ class ProviderHttpErrorsTest {
         assertTrue(failure.getMessage().contains("invalid_request_error: schema is invalid"));
         assertFalse(failure.getMessage().contains("must-not-leak"));
         assertFalse(failure.retryable());
+        assertTrue(Integer.valueOf(400).equals(failure.httpStatus()));
     }
 
     @Test void classifiesCapacityAndServerFailuresAsRetryable() {
         assertTrue(ProviderHttpErrors.from("OpenAI", 429, "{}").retryable());
         assertTrue(ProviderHttpErrors.from("OpenAI", 503, "not-json").retryable());
+        assertTrue(Integer.valueOf(503).equals(ProviderHttpErrors.from("OpenAI", 503, "not-json").httpStatus()));
     }
 }

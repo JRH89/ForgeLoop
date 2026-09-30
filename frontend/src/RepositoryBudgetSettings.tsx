@@ -14,7 +14,7 @@ export default function RepositoryBudgetSettings({ item, organizationLimit, edit
 
   useEffect(() => setBudget(String(item.maxBudgetUsd)), [item.maxBudgetUsd]);
 
-  return <form className="repository-budget-settings" onSubmit={event => {
+  return <form className="repository-setting repository-budget-settings" onSubmit={event => {
     event.preventDefault();
     const maxBudgetUsd = Number(budget);
     if (!Number.isFinite(maxBudgetUsd) || maxBudgetUsd <= 0 || maxBudgetUsd > organizationLimit) {
@@ -28,6 +28,7 @@ export default function RepositoryBudgetSettings({ item, organizationLimit, edit
       .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to save repository budget'))
       .finally(() => setBusy(false));
   }}>
+    <div className="repository-setting-heading"><h4>Run budget</h4><p>Keep issue-triggered work inside the organization limit.</p></div>
     <label>Maximum run budget (USD)
       <input aria-label={`Maximum run budget for ${item.repository}`} type="number" min="0.01" step="0.01"
         max={organizationLimit} value={budget} onChange={event => setBudget(event.target.value)}
@@ -38,7 +39,7 @@ export default function RepositoryBudgetSettings({ item, organizationLimit, edit
         disabled={!editable || busy}/>
     </label>
     <small>Issue-triggered runs use this repository ceiling. It must not exceed the organization limit (${organizationLimit}); existing runs keep their original budget.</small>
-    {editable && <button disabled={busy}>Save repository budget</button>}
+    {editable && <button type="submit" className="secondary" disabled={busy}>{busy ? 'Saving…' : 'Save budget'}</button>}
     {error && <p role="alert">{error}</p>}
   </form>;
 }

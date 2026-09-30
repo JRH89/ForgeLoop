@@ -3,6 +3,7 @@ package io.forgeloop.runner;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -24,6 +25,15 @@ class AnthropicMessagesProviderClientTest {
         assertEquals("json_schema", root.path("output_config").path("format").path("type").asText());
         assertTrue(root.path("output_config").path("format").path("schema").path("required").isArray());
         assertFalse(root.has("output_format"));
+    }
+
+    @Test void sendsRepositoryScanSchemaWithoutAnthropicUnsupportedArrayAndStringBounds() throws Exception {
+        String body = AnthropicMessagesProviderClient.requestBody(new ProviderRequest("claude-sonnet-5", "instructions", "input", 6000,
+                StructuredOutputSchemas.repositoryScan()));
+        var schema = new ObjectMapper().readTree(body).path("output_config").path("format").path("schema");
+
+        assertNull(schema.findValue("maxItems"));
+        assertNull(schema.findValue("maxLength"));
     }
 
     @Test void serializesToolCallsWithVendorReplayAndToolResultsBeforeFollowingText() throws Exception {

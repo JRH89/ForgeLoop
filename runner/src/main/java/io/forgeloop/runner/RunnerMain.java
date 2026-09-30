@@ -688,6 +688,7 @@ public final class RunnerMain {
         String worktreeId = "scan_" + scan.id().replace("-", "");
         Path repository = null;
         boolean worktreeCreated = false;
+        ProviderExecutionPolicy policy = null;
         try {
             GithubCheckoutGrant checkout = new GithubCheckoutGrant(scan.repository(), scan.baseBranch(), scan.token());
             repository = new RepositoryWorkspaceResolver().resolveOrClone(repositoriesRoot, checkout);
@@ -696,7 +697,7 @@ public final class RunnerMain {
             worktreeCreated = true;
             String commitSha = worktrees.headSha(worktree);
             String context = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"), 48 * 1024);
-            ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("REPOSITORY_SCAN");
+            policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("REPOSITORY_SCAN");
             RepositoryScanResult result = new RepositoryScanWorker().execute(policy, new ProviderClientFactory().create(policy),
                     context, commitSha, scan.id());
             client.completeRepositoryScan(identity, scan, result);
@@ -705,6 +706,12 @@ public final class RunnerMain {
         } catch (Exception failure) {
             try { client.failRepositoryScan(identity, scan); }
             catch (Exception reportFailure) { System.err.println("Could not report repository scan failure: " + reportFailure.getClass().getSimpleName()); }
+            if (failure instanceof ProviderExecutionFailure providerFailure && policy != null) {
+                Integer status = providerFailure.providerFailure().httpStatus();
+                System.err.println("Repository scan provider failure: provider=" + policy.provider() + ", model=" + policy.model()
+                        + ", attempts=" + providerFailure.attemptCount() + ", retryable=" + providerFailure.providerFailure().retryable()
+                        + (status == null ? ", httpStatus=unavailable" : ", httpStatus=" + status));
+            }
             System.err.println("Repository scan failed: " + failure.getClass().getSimpleName());
         } finally {
             if (worktreeCreated && repository != null) {

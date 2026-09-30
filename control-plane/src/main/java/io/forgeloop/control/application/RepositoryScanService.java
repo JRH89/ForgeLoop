@@ -50,7 +50,12 @@ public class RepositoryScanService {
     @Transactional(readOnly = true)
     public List<RepositoryScan> list(String repository) {
         requireEnabled(repository);
-        return scans.findTop10ByOrganizationIdAndRepositoryOrderByCreatedAtDesc(operators.organizationId(), repository);
+        List<RepositoryScan> result = scans.findTop10ByOrganizationIdAndRepositoryOrderByCreatedAtDesc(
+                operators.organizationId(), repository);
+        // Initialize the lazy proposal histories before leaving this transaction (OSIV is disabled).
+        // Hibernate batches these secondary loads instead of joining two List/bag collections at once.
+        result.forEach(scan -> scan.getFindings().forEach(RepositoryScanFinding::getProposal));
+        return result;
     }
 
     /** Claims a single queued scan in a transaction so two runners cannot both analyze it. */
