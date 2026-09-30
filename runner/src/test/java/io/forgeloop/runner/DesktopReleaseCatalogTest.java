@@ -3,6 +3,7 @@ package io.forgeloop.runner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,6 +21,31 @@ class DesktopReleaseCatalogTest {
         assertEquals("forgeloop-runner-1.0.10-windows-x64.msi", selected.filename());
         assertEquals("a".repeat(64), selected.sha256());
         assertEquals("https://github.com/JRH89/ForgeLoop/releases/download/desktop-v1.0.10-preview.1/forgeloop-runner-1.0.10-windows-x64.msi", selected.packageUrl().toString());
+    }
+
+    @Test void selectsEachLinuxFormatAsADistinctUpdaterTarget() throws Exception {
+        String feed = JSON.writeValueAsString(array(release("1.0.10", true)));
+        for (String format : List.of("deb", "rpm", "appimage")) {
+            var selected = DesktopReleaseCatalog.latest(feed, new DesktopReleaseCatalog.Target("linux", "x64", format));
+            assertNotNull(selected, format);
+            assertEquals("forgeloop-runner-1.0.10-linux-x64." + (format.equals("appimage") ? "AppImage" : format), selected.filename());
+        }
+    }
+
+    @Test void keepsLegacyDebOnlyReleaseAvailableDuringMigration() throws Exception {
+        ObjectNode legacy = release("1.0.5", true);
+        ArrayNode assets = (ArrayNode) legacy.path("assets");
+        for (int index = assets.size() - 1; index >= 0; index--) {
+            if (!assets.get(index).path("name").asText().matches(".*\\.(msi|dmg|deb)$")) assets.remove(index);
+        }
+
+        String feed = JSON.writeValueAsString(array(legacy));
+        var deb = DesktopReleaseCatalog.latest(feed, new DesktopReleaseCatalog.Target("linux", "x64", "deb"));
+        var rpm = DesktopReleaseCatalog.latest(feed, new DesktopReleaseCatalog.Target("linux", "x64", "rpm"));
+
+        assertNotNull(deb);
+        assertEquals("forgeloop-runner-1.0.5-linux-x64.deb", deb.filename());
+        assertNull(rpm);
     }
 
     @Test void prefersStableReleaseOverPreviewOfSameVersion() throws Exception {
@@ -57,6 +83,20 @@ class DesktopReleaseCatalogTest {
         assertEquals(switch (target.platform()) { case "windows" -> "msi"; case "macos" -> "dmg"; default -> "deb"; }, target.extension());
         assertFalse(target.platform().equals("windows") && target.architecture().equals("arm64"));
         assertFalse(target.platform().equals("linux") && target.architecture().equals("arm64"));
+        assertThrows(IllegalArgumentException.class, () -> new DesktopReleaseCatalog.Target("windows", "x64", "rpm"));
+        assertThrows(IllegalArgumentException.class, () -> new DesktopReleaseCatalog.Target("linux", "arm64", "appimage"));
+        if (target.platform().equals("linux")) {
+            String previous = System.getProperty("forgeloop.desktop.package");
+            try {
+                System.setProperty("forgeloop.desktop.package", "rpm");
+                assertEquals("rpm", DesktopReleaseCatalog.Target.current().extension());
+                System.setProperty("forgeloop.desktop.package", "appimage");
+                assertEquals("appimage", DesktopReleaseCatalog.Target.current().extension());
+            } finally {
+                if (previous == null) System.clearProperty("forgeloop.desktop.package");
+                else System.setProperty("forgeloop.desktop.package", previous);
+            }
+        }
     }
 
     private static ArrayNode array(ObjectNode... releases) {
@@ -74,6 +114,8 @@ class DesktopReleaseCatalogTest {
         add(assets, version, tag, "macos", "arm64", "dmg");
         add(assets, version, tag, "macos", "x64", "dmg");
         add(assets, version, tag, "linux", "x64", "deb");
+        add(assets, version, tag, "linux", "x64", "rpm");
+        add(assets, version, tag, "linux", "x64", "AppImage");
         return release;
     }
 

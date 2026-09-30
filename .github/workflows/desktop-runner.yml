@@ -7,7 +7,7 @@ on:
     inputs:
       package-version:
         type: string
-        default: '1.0.4'
+        default: '1.0.6'
 permissions: {contents: read}
 jobs:
   package:
@@ -19,10 +19,12 @@ jobs:
           - {os: windows-latest, type: msi, platform: windows, architecture: x64}
           - {os: macos-15, type: dmg, platform: macos, architecture: arm64}
           - {os: macos-15-intel, type: dmg, platform: macos, architecture: x64}
-          - {os: ubuntu-latest, type: deb, platform: linux, architecture: x64}
+          - {os: ubuntu-22.04, type: deb, platform: linux, architecture: x64}
+          - {os: ubuntu-22.04, type: rpm, platform: linux, architecture: x64}
+          - {os: ubuntu-22.04, type: appimage, platform: linux, architecture: x64}
     runs-on: ${{ matrix.os }}
     env:
-      PACKAGE_VERSION: ${{ inputs.package-version || '1.0.4' }}
+      PACKAGE_VERSION: ${{ inputs.package-version || '1.0.6' }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -33,7 +35,21 @@ jobs:
         working-directory: runner
       - name: Install Linux desktop keyring test dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring xvfb
+        run: sudo apt-get update && sudo apt-get install -y fakeroot file libsecret-tools gnome-keyring xvfb rpm
+      - name: Download verified AppImage packaging tool
+        if: matrix.type == 'appimage'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tool="$RUNNER_TEMP/appimagetool-x86_64.AppImage"
+          curl --fail --location --retry 3 --output "$tool" https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  '"$tool" | sha256sum --check --status
+          chmod +x "$tool"
+          runtime="$RUNNER_TEMP/appimage-runtime-x86_64"
+          curl --fail --location --retry 3 --output "$runtime" https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
+          echo '156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074  '"$runtime" | sha256sum --check --status
+          echo "APPIMAGETOOL_RUNTIME_PATH=$runtime" >> "$GITHUB_ENV"
+          echo "APPIMAGETOOL_PATH=$tool" >> "$GITHUB_ENV"
       - name: Test Linux native key storage in an isolated session
         if: runner.os == 'Linux'
         env: {FORGELOOP_TEST_KEYRING: 'true'}
@@ -56,19 +72,21 @@ jobs:
             # Windows jpackage launchers are GUI processes, so their stdout is not capturable.
             # Validate both launcher metadata and its generated JVM option, then launch it.
             $configuration = "$root/app/ForgeLoop Runner.cfg"
-            if (-not (Test-Path -LiteralPath $configuration)) { throw 'Packaged launcher configuration missing' }
-            $configText = Get-Content -LiteralPath $configuration -Raw
-            if (-not $configText.Contains("-Dforgeloop.desktop.version=$env:PACKAGE_VERSION")) { throw 'Packaged launcher version option missing' }
             if ((Get-Item -LiteralPath $launcher).VersionInfo.ProductVersion -ne $env:PACKAGE_VERSION) { throw 'Packaged Windows executable version mismatch' }
             $process = Start-Process -FilePath $launcher -ArgumentList '--version' -Wait -PassThru -WindowStyle Hidden
             if ($process.ExitCode -ne 0) { throw 'Packaged Windows launcher failed' }
           }
           else {
             # Exercise jpackage's launcher so this verifies its embedded version option too.
+            if ($IsMacOS) { $configuration = "$root.app/Contents/app/ForgeLoop Runner.cfg" }
+            else { $configuration = "$root/lib/app/ForgeLoop Runner.cfg" }
             $actualVersion = & $launcher --version
             if ($LASTEXITCODE -ne 0) { throw 'Packaged runtime failed' }
             if ($actualVersion.Trim() -ne $env:PACKAGE_VERSION) { throw "Packaged version mismatch: $actualVersion" }
           }
+          if (-not (Test-Path -LiteralPath $configuration)) { throw 'Packaged launcher configuration missing' }
+          $configText = Get-Content -LiteralPath $configuration -Raw
+          if (-not $configText.Contains("-Dforgeloop.desktop.version=$env:PACKAGE_VERSION")) { throw 'Packaged launcher version option missing' }
       - name: Build unsigned native development installer
         shell: pwsh
         run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer -PackageVersion $env:PACKAGE_VERSION
@@ -76,11 +94,11 @@ jobs:
         if: runner.os != 'Linux'
         shell: pwsh
         run: ./scripts/Test-DesktopPackage.ps1 -PackageType '${{ matrix.type }}'
-      - name: Verify installed Linux runtime and keyring integration
+      - name: Verify installed Linux package and keyring integration
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; pwsh -File scripts/Test-DesktopPackage.ps1 -PackageType deb'
+          xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; pwsh -File scripts/Test-DesktopPackage.ps1 -PackageType ${{ matrix.type }}'
       - name: Build previous installer revision for upgrade regression
         if: runner.os == 'Windows'
         shell: pwsh
@@ -94,10 +112,10 @@ jobs:
         run: ./scripts/Prepare-DesktopRelease.ps1 -Version $env:PACKAGE_VERSION -Platform '${{ matrix.platform }}' -Architecture '${{ matrix.architecture }}' -PackageType '${{ matrix.type }}'
       - uses: actions/upload-artifact@v7
         with:
-          name: desktop-release-${{ matrix.platform }}-${{ matrix.architecture }}
+          name: desktop-release-${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.type }}
           path: artifacts/release/*
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
-          name: desktop-setup-screenshot-${{ matrix.os }}
+          name: desktop-setup-screenshot-${{ matrix.platform }}-${{ matrix.architecture }}-${{ matrix.type }}
           path: runner/target/desktop-*.png

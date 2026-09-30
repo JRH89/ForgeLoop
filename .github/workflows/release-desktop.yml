@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'New installer version (for example 1.0.4); published versions cannot be replaced'
+        description: 'New installer version (for example 1.0.6); published versions cannot be replaced'
         required: true
-        default: '1.0.4'
+        default: '1.0.6'
         type: string
 permissions:
   contents: read
@@ -56,13 +56,13 @@ jobs:
         run: |
           set -euo pipefail
           cd release
-          for target in windows-x64.msi macos-arm64.dmg macos-x64.dmg linux-x64.deb; do
+          for target in windows-x64.msi macos-arm64.dmg macos-x64.dmg linux-x64.deb linux-x64.rpm linux-x64.AppImage; do
             test -s "forgeloop-runner-$VERSION-$target"
             sha256sum --check "forgeloop-runner-$VERSION-$target.sha256"
           done
           # Recompute the aggregate with LF line endings: Windows companions can
           # contain CRLF, which breaks the filename used for remote digest lookup.
-          sha256sum *.msi *.dmg *.deb > SHA256SUMS
+          sha256sum *.msi *.dmg *.deb *.rpm *.AppImage > SHA256SUMS
           tag="desktop-v$VERSION-preview.1"
           # Draft assets are invisible to the public feed until every upload completes.
           gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --latest=false \

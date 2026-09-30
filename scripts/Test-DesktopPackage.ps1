@@ -1,8 +1,9 @@
-param([Parameter(Mandatory=$true)][ValidateSet('msi','dmg','deb')][string]$PackageType)
+param([Parameter(Mandatory=$true)][ValidateSet('msi','dmg','deb','rpm','appimage')][string]$PackageType)
 $ErrorActionPreference='Stop'
 # Installation mutates only disposable hosted CI machines; never run on a user's workstation.
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Native installation smoke tests run only on disposable GitHub Actions hosts.' }
-$package=Get-ChildItem 'artifacts/native-installer/packages' -Filter "*.$PackageType" | Select-Object -First 1
+$assetExtension=if ($PackageType -eq 'appimage') { 'AppImage' } else { $PackageType }
+$package=Get-ChildItem 'artifacts/native-installer/packages' -Filter "*.$assetExtension" | Select-Object -First 1
 if (-not $package) { throw 'Native package is missing' }
 if ($PackageType -eq 'msi') {
     $installDirectory=Join-Path $env:RUNNER_TEMP ('forgeloop-install-'+[guid]::NewGuid().ToString('N'))
@@ -42,7 +43,7 @@ if ($PackageType -eq 'msi') {
         & (Join-Path $mount 'ForgeLoop Runner.app/Contents/MacOS/ForgeLoop Runner') --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Packaged macOS app failed' }
     } finally { & hdiutil detach $mount }
-} else {
+} elseif ($PackageType -eq 'deb') {
     # Hosted Ubuntu is a minimal server image. Supply the standard desktop menu
     # directory that a desktop distribution provides before testing its shortcut.
     & sudo install -d /usr/share/desktop-directories
@@ -54,11 +55,48 @@ if ($PackageType -eq 'msi') {
         # Resolve the executable from this package's inventory, not a guessed layout.
         $launchers=@((& dpkg-query -L forgeloop-runner) | Where-Object { $_.EndsWith('/bin/ForgeLoop Runner') })
         if ($launchers.Count -ne 1 -or -not $launchers[0].StartsWith('/opt/forgeloop-runner/')) { throw 'Unexpected installed package launcher layout' }
+        $configuration=Join-Path (Split-Path (Split-Path $launchers[0] -Parent) -Parent) 'lib/app/ForgeLoop Runner.cfg'
+        if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=deb')) { throw 'DEB updater target option is missing' }
         $expectedHash=(Get-FileHash 'artifacts/native-installer/icons/forgeloop.png').Hash
         $matchingIcons=@((& dpkg-query -L forgeloop-runner) | Where-Object { $_.EndsWith('.png') -and (Get-FileHash -LiteralPath $_).Hash -eq $expectedHash })
         if ($matchingIcons.Count -eq 0) { throw 'Linux package favicon is missing' }
         & $launchers[0] --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Installed Linux launcher failed' }
     } finally { & sudo apt-get remove -y forgeloop-runner }
+} elseif ($PackageType -eq 'rpm') {
+    # CI is Ubuntu, so install without RPM dependency resolution after the Linux
+    # keyring tools are provisioned explicitly above.
+    # Match a normal desktop host: RPM scriptlets register and remove a menu
+    # entry, but the minimal Ubuntu runner image omits this standard directory.
+    & sudo install -d /usr/share/desktop-directories
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop menu fixture setup failed' }
+    & sudo rpm --install --nodeps $package.FullName
+    if ($LASTEXITCODE -ne 0) { throw 'RPM installation failed' }
+    try {
+        # Query as root, matching the install operation and avoiding differences
+        # in RPM database permissions across minimal Ubuntu runner images.
+        $installedFiles=@(& sudo rpm -ql forgeloop-runner)
+        if ($LASTEXITCODE -ne 0) { throw 'RPM package inventory query failed' }
+        $launchers=@($installedFiles | Where-Object { $_.EndsWith('/bin/ForgeLoop Runner') })
+        if ($launchers.Count -ne 1 -or -not $launchers[0].StartsWith('/opt/forgeloop-runner/')) {
+            throw "Unexpected installed RPM launcher layout (matches=$($launchers.Count); inventory=$($installedFiles -join ', '))"
+        }
+        $configuration=Join-Path (Split-Path (Split-Path $launchers[0] -Parent) -Parent) 'lib/app/ForgeLoop Runner.cfg'
+        if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=rpm')) { throw 'RPM updater target option is missing' }
+        $expectedHash=(Get-FileHash 'artifacts/native-installer/icons/forgeloop.png').Hash
+        $matchingIcons=@($installedFiles | Where-Object { $_.EndsWith('.png') -and (Test-Path -LiteralPath $_) -and (Get-FileHash -LiteralPath $_).Hash -eq $expectedHash })
+        if ($matchingIcons.Count -eq 0) { throw 'RPM package favicon is missing' }
+        & $launchers[0] --self-test
+        if ($LASTEXITCODE -ne 0) { throw 'Installed RPM launcher failed' }
+    } finally {
+        & sudo rpm --erase forgeloop-runner
+        if ($LASTEXITCODE -ne 0) { throw 'Test RPM uninstall failed' }
+    }
+} else {
+    $configuration='artifacts/native-installer/appimage/ForgeLoop Runner.AppDir/lib/app/ForgeLoop Runner.cfg'
+    if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=appimage')) { throw 'AppImage updater target option is missing' }
+    $env:APPIMAGE_EXTRACT_AND_RUN='1'
+    & $package.FullName --self-test
+    if ($LASTEXITCODE -ne 0) { throw 'AppImage launcher failed' }
 }
 Write-Output 'Native package launch passed without enrollment or provider calls.'
