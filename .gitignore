@@ -12,6 +12,9 @@ evidence/
 artifacts/
 frontend/.prerender/
 forgeloop-dev.2026-09-20.private-key.pem
+# Local Cloudflare Tunnel credentials must stay outside version control.
+credentials*.json
+deploy/cloudflared/*.json
 # Internal planning notes and unreleased Version 2 design specifications.
 docs/2026-09-2026-roadmap.md
 docs/Version_2/
