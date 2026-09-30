@@ -46,7 +46,7 @@ jobs:
         working-directory: runner
       - name: Install Linux desktop keyring test dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot file libsecret-tools gnome-keyring xvfb rpm zstd
+        run: sudo apt-get update && sudo apt-get install -y fakeroot file libsecret-tools gnome-keyring xvfb rpm xdg-utils zstd
       - name: Test Linux native key storage in an isolated session
         if: runner.os == 'Linux'
         env: {FORGELOOP_TEST_KEYRING: 'true'}
@@ -84,6 +84,21 @@ jobs:
           if (-not (Test-Path -LiteralPath $configuration)) { throw 'Packaged launcher configuration missing' }
           $configText = Get-Content -LiteralPath $configuration -Raw
           if (-not $configText.Contains("-Dforgeloop.desktop.version=$env:PACKAGE_VERSION")) { throw 'Packaged launcher version option missing' }
+      - name: Install pinned WiX tools for Windows ARM64 packaging
+        if: matrix.platform == 'windows' && matrix.architecture == 'arm64'
+        shell: pwsh
+        run: |
+          # The Windows ARM runner image omits WiX; use the official portable v3.14.1 archive.
+          $archive = Join-Path $env:RUNNER_TEMP 'wix314-binaries.zip'
+          Invoke-WebRequest -Uri 'https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip' -OutFile $archive
+          $digest = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($digest -ne '6ac824e1642d6f7277d0ed7ea09411a508f6116ba6fae0aa5f2c7daa2ff43d31') { throw 'WiX Toolset checksum mismatch' }
+          $toolDirectory = Join-Path $env:RUNNER_TEMP 'wix314'
+          Expand-Archive -LiteralPath $archive -DestinationPath $toolDirectory
+          foreach ($tool in @('candle.exe', 'light.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $toolDirectory $tool))) { throw "WiX tool missing: $tool" }
+          }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $toolDirectory
       - name: Build unsigned native development installer
         shell: pwsh
         run: ./scripts/Build-DesktopRunner.ps1 -PackageType '${{ matrix.type }}' -OutputDirectory artifacts/native-installer -PackageVersion $env:PACKAGE_VERSION

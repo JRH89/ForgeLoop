@@ -23,13 +23,14 @@ docker run --rm --platform linux/amd64 \
   --env INSTALL_PACKAGE="$([[ "$architecture" == x64 ]] && echo true || echo false)" \
   --volume "$package:/tmp/forgeloop-runner.pkg.tar.zst:ro" \
   archlinux:base bash -euc '
-    pacman -Syu --noconfirm
+    # Pacman's syscall sandbox cannot initialize inside Docker's default seccomp profile.
+    pacman -Syu --disable-sandbox --noconfirm
     tar --zstd -xOf /tmp/forgeloop-runner.pkg.tar.zst .PKGINFO | grep -Fx "arch = $TARGET_ARCH"
     tar --zstd -tf /tmp/forgeloop-runner.pkg.tar.zst | grep -Fx "usr/bin/forgeloop-runner"
     tar --zstd -tf /tmp/forgeloop-runner.pkg.tar.zst | grep -Fx "usr/share/applications/forgeloop-runner.desktop"
     if [[ "$INSTALL_PACKAGE" == true ]]; then
-      pacman -S --noconfirm --needed libsecret gtk3 libx11 libxext libxi libxrender libxtst libxrandr libxinerama libxcursor libxfixes libxcb fontconfig freetype2
-      pacman -U --noconfirm /tmp/forgeloop-runner.pkg.tar.zst
+      pacman -S --disable-sandbox --noconfirm --needed libsecret gtk3 libx11 libxext libxi libxrender libxtst libxrandr libxinerama libxcursor libxfixes libxcb fontconfig freetype2
+      pacman -U --disable-sandbox --noconfirm /tmp/forgeloop-runner.pkg.tar.zst
       /usr/bin/forgeloop-runner --version
       pacman -Rns --noconfirm forgeloop-runner
     fi

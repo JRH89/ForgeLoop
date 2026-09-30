@@ -79,7 +79,8 @@ docker run --rm --platform linux/amd64 \
   --volume "$build_root:/build" \
   --workdir /build \
   archlinux:base-devel bash -euc '
-    pacman -Syu --noconfirm
+    # Pacman's syscall sandbox cannot initialize inside Docker's default seccomp profile.
+    pacman -Syu --disable-sandbox --noconfirm
     # makepkg.conf selects the package ABI; override it for the ARM payload
     # because this clean packaging container intentionally runs x64 tooling.
     cp /etc/makepkg.conf /build/makepkg.conf
