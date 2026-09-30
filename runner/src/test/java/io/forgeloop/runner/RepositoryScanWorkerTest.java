@@ -1,6 +1,10 @@
 package io.forgeloop.runner;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 
 class RepositoryScanWorkerTest {
@@ -24,5 +28,34 @@ class RepositoryScanWorkerTest {
         assertThrows(GuardedPatchFailure.class, () -> new RepositoryScanWorker().execute(policy, hallucinated, CONTEXT, COMMIT, "scan-2"));
         ProviderClient malformed = ignored -> new ProviderResult("not json", 2, 1, "request-3");
         assertThrows(GuardedPatchFailure.class, () -> new RepositoryScanWorker().execute(policy, malformed, CONTEXT, COMMIT, "scan-3"));
+    }
+
+    @Test void keepsLocalOutputBoundsAfterProviderSchemaIsMadePortable() throws Exception {
+        assertRejected(13, 1, 1);
+        assertRejected(1, 11, 1);
+        assertRejected(1, 1, 7);
+    }
+
+    private void assertRejected(int findingCount, int fileCount, int criterionCount) throws Exception {
+        ObjectMapper json = new ObjectMapper();
+        JsonNode template = json.readTree(FINDING).path("findings").get(0);
+        ArrayNode findings = json.createArrayNode();
+        for (int findingIndex = 0; findingIndex < findingCount; findingIndex++) {
+            ObjectNode finding = (ObjectNode) template.deepCopy();
+            ArrayNode files = json.createArrayNode();
+            for (int fileIndex = 0; fileIndex < fileCount; fileIndex++) files.add("src/Validator.java");
+            ArrayNode criteria = json.createArrayNode();
+            for (int criterionIndex = 0; criterionIndex < criterionCount; criterionIndex++) criteria.add("Check case " + criterionIndex);
+            finding.set("affectedFiles", files);
+            finding.set("acceptanceCriteria", criteria);
+            findings.add(finding);
+        }
+        ObjectNode root = json.createObjectNode();
+        root.set("findings", findings);
+        String output = json.writeValueAsString(root);
+        ProviderClient provider = ignored -> new ProviderResult(output, 5, 3, "bounded-scan");
+
+        assertThrows(GuardedPatchFailure.class,
+                () -> new RepositoryScanWorker().execute(policy, provider, CONTEXT, COMMIT, "bounded-scan"));
     }
 }

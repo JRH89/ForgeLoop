@@ -20,7 +20,8 @@ final class ProviderHttpErrors {
         }
         String summary = provider + " provider request failed with HTTP " + statusCode;
         if (detail != null) summary += " (" + detail + ")";
-        return new ProviderException(summary, statusCode == 408 || statusCode == 409 || statusCode == 429 || statusCode >= 500);
+        return new ProviderException(summary, statusCode == 408 || statusCode == 409 || statusCode == 429 || statusCode >= 500,
+                null, statusCode);
     }
 
     private static String clean(String value) {

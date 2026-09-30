@@ -51,7 +51,8 @@ public final class AnthropicMessagesProviderClient implements ProviderClient, Co
         payload.put("max_tokens", request.maxOutputTokens());
         payload.put("messages", List.of(Map.of("role", "user", "content", request.input())));
         if (request.outputSchema() != null) {
-            payload.put("output_config", Map.of("format", Map.of("type", "json_schema", "schema", request.outputSchema())));
+            payload.put("output_config", Map.of("format", Map.of("type", "json_schema",
+                    "schema", AnthropicSchemaCompatibility.normalize(request.outputSchema()))));
         }
         return JSON.writeValueAsString(payload);
     }
