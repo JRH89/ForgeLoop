@@ -75,6 +75,7 @@ DESKTOP
 }
 PKGBUILD
 
+# The inline Docker command is single-quoted; keep its body free of apostrophes.
 docker run --rm --platform linux/amd64 \
   --env TARGET_ARCH="$package_arch" \
   --env PACKAGE_FILENAME="$artifact_name" \
@@ -83,7 +84,7 @@ docker run --rm --platform linux/amd64 \
   --workdir /build \
   archlinux:base-devel bash -euc '
     printf "Arch artifact handoff target: %s/%s\n" /package-output "$PACKAGE_FILENAME"
-    # Pacman's syscall sandbox cannot initialize inside Docker's default seccomp profile.
+    # Pacman sandbox support is incompatible with the default Docker seccomp profile.
     pacman -Syu --disable-sandbox --noconfirm
     # makepkg.conf selects the package ABI; override it for the ARM payload
     # because this clean packaging container intentionally runs x64 tooling.
