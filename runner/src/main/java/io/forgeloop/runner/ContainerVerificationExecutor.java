@@ -131,7 +131,7 @@ public final class ContainerVerificationExecutor {
         dockerCommand.add(image);
         // The fixed bootstrap copies the read-only source into an ephemeral filesystem. Policy argv is
         // forwarded as positional arguments and is never interpolated into shell source.
-        dockerCommand.addAll(List.of("sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /workspace/.tmp /workspace/.m2/repository && exec \"$@\"", "forgeloop-verify"));
+        dockerCommand.addAll(List.of("sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /tmp/home /tmp/cache /workspace/.tmp /workspace/.m2/repository && exec \"$@\"", "forgeloop-verify"));
         dockerCommand.addAll(command);
         return List.copyOf(dockerCommand);
     }

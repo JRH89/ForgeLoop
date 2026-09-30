@@ -4,7 +4,10 @@ COPY pom.xml .
 COPY src src
 RUN mvn -q verify
 FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S forgeloop && adduser -S forgeloop -G forgeloop
+# A fresh named artifact volume inherits this path's ownership when Docker initializes it.
+RUN addgroup -S forgeloop && adduser -S forgeloop -G forgeloop \
+    && mkdir -p /var/lib/forgeloop/artifacts \
+    && chown forgeloop:forgeloop /var/lib/forgeloop/artifacts
 WORKDIR /app
 COPY --from=build /app/target/control-plane-0.1.0.jar app.jar
 USER forgeloop

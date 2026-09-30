@@ -71,7 +71,7 @@ class ContainerVerificationExecutorTest {
                 "--env", "XDG_CACHE_HOME=/tmp/cache", "--env", "MAVEN_CONFIG=/tmp/m2",
                 "--env", "MAVEN_OPTS=-Dmaven.repo.local=/workspace/.m2/repository -Djansi.tmpdir=/workspace/.tmp",
                 "--env", "npm_config_cache=/tmp/npm", "--network", "none", "node@sha256:" + "a".repeat(64),
-                "sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /workspace/.tmp /workspace/.m2/repository && exec \"$@\"",
+                "sh", "-c", "cp -a /source/. /workspace/ && mkdir -p /tmp/home /tmp/cache /workspace/.tmp /workspace/.m2/repository && exec \"$@\"",
                 "forgeloop-verify", "npm", "test"), command);
         assertFalse(command.contains("type=bind,src=" + evidence.resolve("test-report") + ",dst=/forgeloop/test-report"));
     }
