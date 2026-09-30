@@ -96,6 +96,8 @@ docker run --rm --platform linux/amd64 \
     fi
     tar --zstd -xOf "$package_file" .PKGINFO | grep -Fx "arch = $TARGET_ARCH"
     cp "$package_file" /build/forgeloop-runner-output.pkg.tar.zst
+    # makepkg runs as builder; restore host traversal after changing the mounted directory owner.
+    chmod 755 /build
   '
 
 if [[ ! -s "$build_root/forgeloop-runner-output.pkg.tar.zst" ]]; then
