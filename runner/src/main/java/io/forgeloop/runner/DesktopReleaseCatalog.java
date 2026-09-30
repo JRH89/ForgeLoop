@@ -15,13 +15,13 @@ public final class DesktopReleaseCatalog {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String REPOSITORY = "https://github.com/JRH89/ForgeLoop";
     private static final Pattern TAG = Pattern.compile("^desktop-v(\\d+\\.\\d+\\.\\d+)(?:-preview\\.(\\d+))?$");
-    private static final Pattern ASSET = Pattern.compile("^forgeloop-runner-(\\d+\\.\\d+\\.\\d+)-(windows|macos|linux)-(x64|arm64)\\.(msi|dmg|deb)$");
+    private static final Pattern ASSET = Pattern.compile("^forgeloop-runner-(\\d+\\.\\d+\\.\\d+)-(windows|macos|linux)-(x64|arm64)\\.(msi|dmg|deb|rpm|AppImage)$");
 
     public record Target(String platform, String architecture, String extension) {
         public Target {
             if (!List.of("windows", "macos", "linux").contains(platform)
                     || !List.of("x64", "arm64").contains(architecture)
-                    || !List.of("msi", "dmg", "deb").contains(extension)) {
+                    || !supportedPackage(platform, architecture, extension)) {
                 throw new IllegalArgumentException("Unsupported desktop package target");
             }
         }
@@ -30,8 +30,25 @@ public final class DesktopReleaseCatalog {
                     : com.sun.jna.Platform.isMac() ? "macos"
                     : com.sun.jna.Platform.isLinux() ? "linux" : "unsupported";
             String architecture = normalizeArchitecture(com.sun.jna.Platform.ARCH);
-            String extension = switch (platform) { case "windows" -> "msi"; case "macos" -> "dmg"; case "linux" -> "deb"; default -> ""; };
+            String extension = switch (platform) {
+                case "windows" -> "msi";
+                case "macos" -> "dmg";
+                case "linux" -> configuredLinuxPackage();
+                default -> "";
+            };
             return new Target(platform, architecture, extension);
+        }
+        private static String configuredLinuxPackage() {
+            String configured = System.getProperty("forgeloop.desktop.package", "deb").toLowerCase(java.util.Locale.ROOT);
+            return List.of("deb", "rpm", "appimage").contains(configured) ? configured : "deb";
+        }
+        private static boolean supportedPackage(String platform, String architecture, String extension) {
+            return switch (platform) {
+                case "windows" -> architecture.equals("x64") && extension.equals("msi");
+                case "macos" -> List.of("x64", "arm64").contains(architecture) && extension.equals("dmg");
+                case "linux" -> architecture.equals("x64") && List.of("deb", "rpm", "appimage").contains(extension.toLowerCase(java.util.Locale.ROOT));
+                default -> false;
+            };
         }
         private static String normalizeArchitecture(String value) {
             String arch = value.toLowerCase(java.util.Locale.ROOT);
@@ -84,10 +101,9 @@ public final class DesktopReleaseCatalog {
         for (JsonNode asset : entry.path("assets")) {
             Matcher filename = ASSET.matcher(text(asset, "name"));
             if (!filename.matches() || !"uploaded".equals(text(asset, "state")) || asset.path("size").asLong(0) <= 0) continue;
-            String assetVersion = filename.group(1), platform = filename.group(2), architecture = filename.group(3), extension = filename.group(4);
-            String expectedExtension = switch (platform) { case "windows" -> "msi"; case "macos" -> "dmg"; default -> "deb"; };
-            String key = platform + "/" + architecture;
-            if (!version.equals(assetVersion) || !expectedExtension.equals(extension) || targets.contains(key)) {
+            String assetVersion = filename.group(1), platform = filename.group(2), architecture = filename.group(3), extension = filename.group(4).toLowerCase(java.util.Locale.ROOT);
+            String key = platform + "/" + architecture + "/" + extension;
+            if (!version.equals(assetVersion) || !Target.supportedPackage(platform, architecture, extension) || targets.contains(key)) {
                 invalidPackage = true;
                 continue;
             }
@@ -100,10 +116,15 @@ public final class DesktopReleaseCatalog {
                 continue;
             }
             if (platform.equals(target.platform()) && architecture.equals(target.architecture())
-                    && extension.equals(target.extension())) packageAsset = asset;
+                    && extension.equalsIgnoreCase(target.extension())) packageAsset = asset;
         }
-        List<String> expectedTargets = List.of("windows/x64", "macos/arm64", "macos/x64", "linux/x64");
-        if (invalidPackage || !targets.containsAll(expectedTargets) || targets.size() != expectedTargets.size() || packageAsset == null) return null;
+        List<String> legacyTargets = List.of("windows/x64/msi", "macos/arm64/dmg", "macos/x64/dmg", "linux/x64/deb");
+        List<String> currentTargets = List.of("windows/x64/msi", "macos/arm64/dmg", "macos/x64/dmg",
+                "linux/x64/deb", "linux/x64/rpm", "linux/x64/appimage");
+        // Keep existing DEB releases usable, but reject incomplete uploads from the expanded matrix.
+        boolean completeTargetSet = (targets.size() == legacyTargets.size() && targets.containsAll(legacyTargets))
+                || (targets.size() == currentTargets.size() && targets.containsAll(currentTargets));
+        if (invalidPackage || !completeTargetSet || packageAsset == null) return null;
         String packageName = text(packageAsset, "name");
         String digest = text(packageAsset, "digest");
         URI packageUrl = URI.create(text(packageAsset, "browser_download_url"));
