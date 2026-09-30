@@ -1,6 +1,8 @@
 package io.forgeloop.control.integrations.github;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 
 import io.forgeloop.control.application.AuditLedgerService;
@@ -10,6 +12,7 @@ import io.forgeloop.control.domain.GithubPublication;
 import io.forgeloop.control.domain.GithubPublicationRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +26,7 @@ class GithubAutoMergeServiceTest {
 
     @Test void mergesOnlyTheRecordedHeadAfterEveryCheckPasses() {
         GithubPublication publication = pendingPublication();
+        publication.linkSourceIssue(9);
         RepositoryConnection connection = mock(RepositoryConnection.class);
         FeatureRun run = mock(FeatureRun.class);
         when(run.getId()).thenReturn("run-1");
@@ -38,6 +42,9 @@ class GithubAutoMergeServiceTest {
         service.reconcile("acme/app", "a".repeat(40), 7);
 
         assertEquals("b".repeat(40), publication.getMergeSha());
+        assertEquals(9, publication.getSourceIssueNumber());
+        assertNotNull(publication.getSourceIssueClosedAt());
+        verify(github).closeIssue(7, "acme/app", 9);
         verify(run).completeDelivery();
         verify(audit).record("GITHUB_PR_AUTO_MERGED", "FEATURE_RUN", "run-1", "b".repeat(40));
     }
@@ -59,6 +66,7 @@ class GithubAutoMergeServiceTest {
     @Test void recordsHumanMergedPullRequestAndCompletesApprovedRunIdempotently() {
         GithubPublication publication = new GithubPublication("run-1", "acme/app", "forgeloop/run-1", "run-1");
         publication.recordPullRequest(42, false);
+        publication.linkSourceIssue(9);
         RepositoryConnection connection = mock(RepositoryConnection.class);
         FeatureRun run = mock(FeatureRun.class);
         when(run.getId()).thenReturn("run-1");
@@ -74,8 +82,32 @@ class GithubAutoMergeServiceTest {
         service.recordMergedPullRequest("acme/app", 42, 7, "merge-sha");
 
         assertEquals("merge-sha", publication.getMergeSha());
+        assertNotNull(publication.getSourceIssueClosedAt());
+        verify(github, times(1)).closeIssue(7, "acme/app", 9);
         verify(run, times(1)).completeDelivery();
         verify(audit).record("GITHUB_PR_MERGED", "FEATURE_RUN", "run-1", "merge-sha");
+    }
+
+    @Test void retriesAFailedSourceIssueClosureWithoutRepeatingTheMerge() {
+        GithubPublication publication = pendingPublication();
+        publication.linkSourceIssue(9);
+        publication.recordMerge("b".repeat(40));
+        RepositoryConnection connection = mock(RepositoryConnection.class);
+        when(publications.findByMergedAtIsNotNullAndSourceIssueNumberIsNotNullAndSourceIssueClosedAtIsNull())
+                .thenReturn(List.of(publication));
+        when(connections.findByRepository("acme/app")).thenReturn(Optional.of(connection));
+        when(connection.isEnabled()).thenReturn(true);
+        when(connection.getInstallationId()).thenReturn(7L);
+        doThrow(new IllegalStateException("GitHub temporarily unavailable"))
+                .doNothing().when(github).closeIssue(7, "acme/app", 9);
+
+        service.reconcilePending();
+        assertNull(publication.getSourceIssueClosedAt());
+        service.reconcilePending();
+
+        assertNotNull(publication.getSourceIssueClosedAt());
+        verify(github, times(2)).closeIssue(7, "acme/app", 9);
+        verify(github, never()).mergePullRequest(anyLong(), anyString(), anyLong(), anyString());
     }
 
     private static GithubPublication pendingPublication() {

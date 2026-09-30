@@ -14,4 +14,6 @@ public interface GithubPublicationRepository extends JpaRepository<GithubPublica
     Optional<GithubPublication> findByRepositoryAndPullRequestNumber(String repository, Long pullRequestNumber);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<GithubPublication> findByAutoMergeRequestedTrueAndMergedAtIsNullAndPullRequestNumberIsNotNull();
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<GithubPublication> findByMergedAtIsNotNullAndSourceIssueNumberIsNotNullAndSourceIssueClosedAtIsNull();
 }

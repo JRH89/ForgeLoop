@@ -30,15 +30,14 @@ public class GithubDeliveryService {
         if (publication.getHeadSha() == null || !publication.getHeadSha().equals(github.getBranchHead(installationId, run.getRepository(), publication.getBranch()))) throw new IllegalStateException("Runner-pushed branch head does not match the integrated commit");
         if (publication.getCheckRunId() == null) { publication.recordCheckRun(github.createCompletedCheck(installationId, run.getRepository(), publication.getHeadSha(), "ForgeLoop verification", summary)); audit.record("GITHUB_CHECK_RUN_CREATED", "FEATURE_RUN", run.getId(), publication.getHeadSha()); }
         boolean autoMerge = policies != null && policies.findById(run.getOrganizationId()).map(policy -> policy.isAutoMergeEnabled()).orElse(false);
+        GithubSourceIssue.fromSourceRef(run.getSourceRef()).ifPresent(issue -> publication.linkSourceIssue(issue.number()));
         if (publication.getPullRequestNumber() == null) { publication.recordPullRequest(github.createPullRequest(installationId, run.getRepository(), publication.getBranch(), run.getBaseBranch(), run.getTitle(), pullRequestBody(run, summary), !autoMerge), autoMerge); audit.record(autoMerge ? "GITHUB_AUTO_MERGE_PR_CREATED" : "GITHUB_DRAFT_PR_CREATED", "FEATURE_RUN", run.getId(), String.valueOf(publication.getPullRequestNumber())); }
         return publications.save(publication);
     }
 
-    /** Links issue-originated work so GitHub closes the source issue when the verified PR merges. */
+    /** Links issue-originated work; merge reconciliation also closes it explicitly and retries failures. */
     static String pullRequestBody(FeatureRun run, String summary) {
-        if (run.getSourceRef() != null && run.getSourceRef().matches("issue-[1-9][0-9]*")) {
-            return summary + "\n\nCloses #" + run.getSourceRef().substring("issue-".length());
-        }
-        return summary;
+        return GithubSourceIssue.fromSourceRef(run.getSourceRef())
+                .map(issue -> summary + "\n\nCloses #" + issue.number()).orElse(summary);
     }
 }

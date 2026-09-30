@@ -43,8 +43,10 @@ public class GithubAutoMergeService {
         if (publication == null || publication.getMergedAt() != null) return;
         publication.recordMerge(mergeSha);
         FeatureRun run = runs.findById(publication.getFeatureRunId()).orElseThrow(() -> new IllegalStateException("Feature run was not found"));
+        linkSourceIssue(publication, run);
         if (run.getState() != io.forgeloop.control.domain.RunState.COMPLETE && run.isApproved()) run.completeDelivery();
         audit.record("GITHUB_PR_MERGED", "FEATURE_RUN", run.getId(), mergeSha);
+        closeSourceIssue(publication, installationId);
     }
 
     /** Retries pending decisions so a transient webhook or GitHub outage cannot strand an eligible PR. */
@@ -60,6 +62,7 @@ public class GithubAutoMergeService {
                 log.warn("Auto-merge reconciliation will retry for publication {}: {}", publication.getId(), exception.getMessage());
             }
         }
+        reconcilePendingIssueClosures();
     }
 
     private void reconcile(GithubPublication publication, long installationId) {
@@ -72,7 +75,40 @@ public class GithubAutoMergeService {
         String mergeSha = github.mergePullRequest(installationId, publication.getRepository(), publication.getPullRequestNumber(), publication.getHeadSha());
         publication.recordMerge(mergeSha);
         FeatureRun run = runs.findById(publication.getFeatureRunId()).orElseThrow(() -> new IllegalStateException("Feature run was not found"));
+        linkSourceIssue(publication, run);
         run.completeDelivery();
         audit.record("GITHUB_PR_AUTO_MERGED", "FEATURE_RUN", run.getId(), mergeSha);
+        closeSourceIssue(publication, installationId);
+    }
+
+    /** Reconciles source-issue closure separately so a GitHub permission or network error cannot undo a merge. */
+    private void reconcilePendingIssueClosures() {
+        for (GithubPublication publication : publications.findByMergedAtIsNotNullAndSourceIssueNumberIsNotNullAndSourceIssueClosedAtIsNull()) {
+            try {
+                RepositoryConnection connection = connections.findByRepository(publication.getRepository()).orElse(null);
+                if (connection != null && connection.isEnabled()) closeSourceIssue(publication, connection.getInstallationId());
+            } catch (RuntimeException exception) {
+                log.warn("Source issue closure will retry for publication {}: {}", publication.getId(), exception.getMessage());
+            }
+        }
+    }
+
+    private void linkSourceIssue(GithubPublication publication, FeatureRun run) {
+        if (publication.getSourceIssueNumber() != null) return;
+        GithubSourceIssue.fromSourceRef(run.getSourceRef()).ifPresent(issue -> publication.linkSourceIssue(issue.number()));
+    }
+
+    private void closeSourceIssue(GithubPublication publication, long installationId) {
+        Integer issueNumber = publication.getSourceIssueNumber();
+        if (issueNumber == null || publication.getMergedAt() == null || publication.getSourceIssueClosedAt() != null) return;
+        try {
+            github.closeIssue(installationId, publication.getRepository(), issueNumber);
+            publication.recordSourceIssueClosed();
+            audit.record("GITHUB_SOURCE_ISSUE_CLOSED", "FEATURE_RUN", publication.getFeatureRunId(),
+                    publication.getRepository() + "#" + issueNumber);
+        } catch (RuntimeException exception) {
+            // Keep merge completion intact; the scheduled closure sweep retries this idempotent operation.
+            log.warn("Source issue closure will retry for publication {}: {}", publication.getId(), exception.getMessage());
+        }
     }
 }

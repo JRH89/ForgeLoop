@@ -25,7 +25,7 @@ class GithubDeliveryServiceTest {
         when(run.getId()).thenReturn("run-3");when(run.getRepository()).thenReturn("acme/ticketly");when(run.getBaseBranch()).thenReturn("main");when(run.getSourceRef()).thenReturn("issue-42");when(run.getTitle()).thenReturn("Fix ticket");when(run.getState()).thenReturn(RunState.READY_FOR_REVIEW);when(run.isApproved()).thenReturn(true);
         GithubPublication publication=new GithubPublication("run-3","acme/ticketly","forgeloop/run-3","key");publication.recordHeadSha("a".repeat(40));when(publications.findByFeatureRunId("run-3")).thenReturn(Optional.of(publication));when(publications.save(any())).thenAnswer(call->call.getArgument(0));when(api.getBranchHead(7,"acme/ticketly","forgeloop/run-3")).thenReturn("a".repeat(40));when(api.createCompletedCheck(anyLong(),anyString(),anyString(),anyString(),anyString())).thenReturn(4L);when(api.createPullRequest(anyLong(),anyString(),anyString(),anyString(),anyString(),anyString(),anyBoolean())).thenReturn(5L);
         GithubPublication delivered=new GithubDeliveryService(publications,api,audit).deliverPushed(run,7,"verified");
-        assertEquals(5L,delivered.getPullRequestNumber());verify(api).createPullRequest(7,"acme/ticketly","forgeloop/run-3","main","Fix ticket","verified\n\nCloses #42",true);
+        assertEquals(5L,delivered.getPullRequestNumber());assertEquals(42,delivered.getSourceIssueNumber());verify(api).createPullRequest(7,"acme/ticketly","forgeloop/run-3","main","Fix ticket","verified\n\nCloses #42",true);
     }
     @Test void doesNotInventIssueLinksForNonIssueSources() {
         FeatureRun run=mock(FeatureRun.class);when(run.getSourceRef()).thenReturn("manual-1");

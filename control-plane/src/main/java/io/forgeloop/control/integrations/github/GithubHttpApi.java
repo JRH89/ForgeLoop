@@ -89,6 +89,12 @@ public class GithubHttpApi implements GithubApi, GithubIssueReader {
         if (number < 1 || !url.startsWith("https://github.com/")) throw new IllegalStateException("GitHub issue receipt was invalid");
         return new GithubIssueReceipt(number, url);
     }
+    @Override public void closeIssue(long installationId, String repository, int issueNumber) {
+        if (issueNumber < 1 || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))
+            throw new IllegalArgumentException("Invalid repository or issue number");
+        request(installationId, "PATCH", "/repos/" + repository + "/issues/" + issueNumber,
+                Map.of("state", "closed", "state_reason", "completed"));
+    }
     @Override public boolean checksPass(long installationId, String repository, String headSha) {
         JsonNode checks = request(installationId, "GET", "/repos/" + repository + "/commits/" + headSha + "/check-runs?filter=latest&per_page=100", Map.of());
         if (checks.path("total_count").asInt() == 0) return false;
