@@ -107,7 +107,8 @@ class DesktopReleaseCatalogTest {
                 System.setProperty("forgeloop.desktop.package", "rpm");
                 assertEquals("rpm", DesktopReleaseCatalog.Target.current().extension());
                 System.setProperty("forgeloop.desktop.package", "appimage");
-                assertEquals("appimage", DesktopReleaseCatalog.Target.current().extension());
+                assertEquals(target.architecture().equals("x64") ? "appimage" : "deb",
+                        DesktopReleaseCatalog.Target.current().extension());
                 System.setProperty("forgeloop.desktop.package", "tar.gz");
                 assertEquals("tar.gz", DesktopReleaseCatalog.Target.current().extension());
                 System.setProperty("forgeloop.desktop.package", "pkg.tar.zst");

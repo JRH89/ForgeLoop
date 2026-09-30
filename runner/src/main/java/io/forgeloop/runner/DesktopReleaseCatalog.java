@@ -33,13 +33,14 @@ public final class DesktopReleaseCatalog {
             String extension = switch (platform) {
                 case "windows" -> "msi";
                 case "macos" -> "dmg";
-                case "linux" -> configuredLinuxPackage();
+                case "linux" -> configuredLinuxPackage(architecture);
                 default -> "";
             };
             return new Target(platform, architecture, extension);
         }
-        private static String configuredLinuxPackage() {
+        private static String configuredLinuxPackage(String architecture) {
             String configured = System.getProperty("forgeloop.desktop.package", "deb").toLowerCase(java.util.Locale.ROOT);
+            if (configured.equals("appimage") && !architecture.equals("x64")) return "deb";
             return List.of("deb", "rpm", "appimage", "tar.gz", "pkg.tar.zst").contains(configured) ? configured : "deb";
         }
         private static boolean supportedPackage(String platform, String architecture, String extension) {
