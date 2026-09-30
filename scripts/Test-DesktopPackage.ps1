@@ -66,6 +66,10 @@ if ($PackageType -eq 'msi') {
 } elseif ($PackageType -eq 'rpm') {
     # CI is Ubuntu, so install without RPM dependency resolution after the Linux
     # keyring tools are provisioned explicitly above.
+    # Match a normal desktop host: RPM scriptlets register and remove a menu
+    # entry, but the minimal Ubuntu runner image omits this standard directory.
+    & sudo install -d /usr/share/desktop-directories
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop menu fixture setup failed' }
     & sudo rpm --install --nodeps $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'RPM installation failed' }
     try {
