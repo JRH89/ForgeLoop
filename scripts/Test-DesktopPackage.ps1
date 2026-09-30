@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][ValidateSet('msi','dmg','deb','rpm','appimage')][string]$PackageType)
+param([Parameter(Mandatory=$true)][ValidateSet('msi','dmg','deb','rpm','appimage','tar.gz','pkg.tar.zst')][string]$PackageType)
 $ErrorActionPreference='Stop'
 # Installation mutates only disposable hosted CI machines; never run on a user's workstation.
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Native installation smoke tests run only on disposable GitHub Actions hosts.' }
@@ -92,11 +92,32 @@ if ($PackageType -eq 'msi') {
         & sudo rpm --erase forgeloop-runner
         if ($LASTEXITCODE -ne 0) { throw 'Test RPM uninstall failed' }
     }
-} else {
+} elseif ($PackageType -eq 'appimage') {
     $configuration='artifacts/native-installer/appimage/ForgeLoop Runner.AppDir/lib/app/ForgeLoop Runner.cfg'
     if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=appimage')) { throw 'AppImage updater target option is missing' }
     $env:APPIMAGE_EXTRACT_AND_RUN='1'
     & $package.FullName --self-test
     if ($LASTEXITCODE -ne 0) { throw 'AppImage launcher failed' }
+} elseif ($PackageType -eq 'tar.gz') {
+    $extractDirectory=Join-Path $env:RUNNER_TEMP ('forgeloop-portable-'+[guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $extractDirectory | Out-Null
+    try {
+        & tar -xzf $package.FullName -C $extractDirectory
+        if ($LASTEXITCODE -ne 0) { throw 'Portable archive extraction failed' }
+        $root=Join-Path $extractDirectory 'forgeloop-runner'
+        $configuration=Join-Path $root 'ForgeLoop Runner/lib/app/ForgeLoop Runner.cfg'
+        $launcher=Join-Path $root 'run-forgeloop-runner.sh'
+        if (-not (Test-Path -LiteralPath $launcher)) { throw 'Portable launcher is missing' }
+        if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=tar.gz')) { throw 'Portable update target option is missing' }
+        & $launcher --self-test
+        if ($LASTEXITCODE -ne 0) { throw 'Portable Linux launcher failed' }
+    } finally { Remove-Item -LiteralPath $extractDirectory -Recurse -Force }
+} else {
+    $metadata=@(& tar --zstd -xOf $package.FullName .PKGINFO)
+    if ($LASTEXITCODE -ne 0 -or -not ($metadata -match '^pkgname = forgeloop-runner$')) { throw 'Arch package metadata is invalid' }
+    $expectedArchitecture=if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant() -eq 'arm64') { 'aarch64' } else { 'x86_64' }
+    if (-not ($metadata -match "^arch = $expectedArchitecture$")) { throw "Arch package architecture metadata mismatch: expected $expectedArchitecture" }
+    $configuration='artifacts/native-installer/packages/ForgeLoop Runner/lib/app/ForgeLoop Runner.cfg'
+    if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=pkg.tar.zst')) { throw 'Arch package source app image has the wrong updater target' }
 }
 Write-Output 'Native package launch passed without enrollment or provider calls.'

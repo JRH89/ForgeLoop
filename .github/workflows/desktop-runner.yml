@@ -1,7 +1,7 @@
 name: Desktop runner packages
 on:
   pull_request:
-    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Test-DesktopPackage.ps1', 'scripts/Test-DesktopUpgrade.ps1', 'scripts/Prepare-DesktopRelease.ps1', '.github/workflows/desktop-runner.yml', '.github/workflows/release-desktop.yml']
+    paths: ['runner/**', 'scripts/Build-DesktopRunner.ps1', 'scripts/Build-ArchPackage.sh', 'scripts/Test-DesktopPackage.ps1', 'scripts/Test-ArchPackage.sh', 'scripts/Test-DesktopUpgrade.ps1', 'scripts/Prepare-DesktopRelease.ps1', '.github/workflows/desktop-runner.yml', '.github/workflows/release-desktop.yml']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -11,17 +11,23 @@ on:
 permissions: {contents: read}
 jobs:
   package:
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include:
           - {os: windows-latest, type: msi, platform: windows, architecture: x64}
+          - {os: windows-11-arm, type: msi, platform: windows, architecture: arm64}
           - {os: macos-15, type: dmg, platform: macos, architecture: arm64}
           - {os: macos-15-intel, type: dmg, platform: macos, architecture: x64}
           - {os: ubuntu-22.04, type: deb, platform: linux, architecture: x64}
           - {os: ubuntu-22.04, type: rpm, platform: linux, architecture: x64}
-          - {os: ubuntu-22.04, type: appimage, platform: linux, architecture: x64}
+          - {os: ubuntu-22.04, type: tar.gz, platform: linux, architecture: x64}
+          - {os: ubuntu-22.04, type: pkg.tar.zst, platform: linux, architecture: x64}
+          - {os: ubuntu-24.04-arm, type: deb, platform: linux, architecture: arm64}
+          - {os: ubuntu-24.04-arm, type: rpm, platform: linux, architecture: arm64}
+          - {os: ubuntu-24.04-arm, type: tar.gz, platform: linux, architecture: arm64}
+          - {os: ubuntu-24.04-arm, type: pkg.tar.zst, platform: linux, architecture: arm64}
     runs-on: ${{ matrix.os }}
     env:
       PACKAGE_VERSION: ${{ inputs.package-version || '1.0.6' }}
@@ -29,27 +35,18 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: '21', cache: maven}
+      - name: Enable x64 Arch package tools on the ARM64 host
+        if: matrix.platform == 'linux' && matrix.architecture == 'arm64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: amd64
       - name: Test runner and desktop logic
         if: runner.os != 'Linux'
         run: mvn -B verify
         working-directory: runner
       - name: Install Linux desktop keyring test dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot file libsecret-tools gnome-keyring xvfb rpm
-      - name: Download verified AppImage packaging tool
-        if: matrix.type == 'appimage'
-        shell: bash
-        run: |
-          set -euo pipefail
-          tool="$RUNNER_TEMP/appimagetool-x86_64.AppImage"
-          curl --fail --location --retry 3 --output "$tool" https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
-          echo 'ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  '"$tool" | sha256sum --check --status
-          chmod +x "$tool"
-          runtime="$RUNNER_TEMP/appimage-runtime-x86_64"
-          curl --fail --location --retry 3 --output "$runtime" https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
-          echo '156f4bdbde9c52d01814600013e0a273f0118dc2de98975f3c8c63427ec79074  '"$runtime" | sha256sum --check --status
-          echo "APPIMAGETOOL_RUNTIME_PATH=$runtime" >> "$GITHUB_ENV"
-          echo "APPIMAGETOOL_PATH=$tool" >> "$GITHUB_ENV"
+        run: sudo apt-get update && sudo apt-get install -y fakeroot file libsecret-tools gnome-keyring xvfb rpm zstd
       - name: Test Linux native key storage in an isolated session
         if: runner.os == 'Linux'
         env: {FORGELOOP_TEST_KEYRING: 'true'}
@@ -99,6 +96,10 @@ jobs:
         shell: bash
         run: |
           xvfb-run -a dbus-run-session -- bash -c 'printf "ci-only-unlock" | gnome-keyring-daemon --unlock --components=secrets; pwsh -File scripts/Test-DesktopPackage.ps1 -PackageType ${{ matrix.type }}'
+      - name: Install and verify native Arch package
+        if: matrix.platform == 'linux' && matrix.type == 'pkg.tar.zst'
+        shell: bash
+        run: bash scripts/Test-ArchPackage.sh artifacts/native-installer/packages/forgeloop-runner-${PACKAGE_VERSION}-linux-${{ matrix.architecture }}.pkg.tar.zst ${{ matrix.architecture }}
       - name: Build previous installer revision for upgrade regression
         if: runner.os == 'Windows'
         shell: pwsh

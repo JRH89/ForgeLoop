@@ -15,7 +15,7 @@ public final class DesktopReleaseCatalog {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String REPOSITORY = "https://github.com/JRH89/ForgeLoop";
     private static final Pattern TAG = Pattern.compile("^desktop-v(\\d+\\.\\d+\\.\\d+)(?:-preview\\.(\\d+))?$");
-    private static final Pattern ASSET = Pattern.compile("^forgeloop-runner-(\\d+\\.\\d+\\.\\d+)-(windows|macos|linux)-(x64|arm64)\\.(msi|dmg|deb|rpm|AppImage)$");
+    private static final Pattern ASSET = Pattern.compile("^forgeloop-runner-(\\d+\\.\\d+\\.\\d+)-(windows|macos|linux)-(x64|arm64)\\.(msi|dmg|deb|rpm|AppImage|tar\\.gz|pkg\\.tar\\.zst)$");
 
     public record Target(String platform, String architecture, String extension) {
         public Target {
@@ -40,13 +40,15 @@ public final class DesktopReleaseCatalog {
         }
         private static String configuredLinuxPackage() {
             String configured = System.getProperty("forgeloop.desktop.package", "deb").toLowerCase(java.util.Locale.ROOT);
-            return List.of("deb", "rpm", "appimage").contains(configured) ? configured : "deb";
+            return List.of("deb", "rpm", "appimage", "tar.gz", "pkg.tar.zst").contains(configured) ? configured : "deb";
         }
         private static boolean supportedPackage(String platform, String architecture, String extension) {
             return switch (platform) {
-                case "windows" -> architecture.equals("x64") && extension.equals("msi");
+                case "windows" -> List.of("x64", "arm64").contains(architecture) && extension.equals("msi");
                 case "macos" -> List.of("x64", "arm64").contains(architecture) && extension.equals("dmg");
-                case "linux" -> architecture.equals("x64") && List.of("deb", "rpm", "appimage").contains(extension.toLowerCase(java.util.Locale.ROOT));
+                case "linux" -> List.of("x64", "arm64").contains(architecture)
+                        && (List.of("deb", "rpm", "tar.gz", "pkg.tar.zst").contains(extension.toLowerCase(java.util.Locale.ROOT))
+                        || architecture.equals("x64") && extension.equalsIgnoreCase("appimage"));
                 default -> false;
             };
         }
@@ -121,9 +123,14 @@ public final class DesktopReleaseCatalog {
         List<String> legacyTargets = List.of("windows/x64/msi", "macos/arm64/dmg", "macos/x64/dmg", "linux/x64/deb");
         List<String> currentTargets = List.of("windows/x64/msi", "macos/arm64/dmg", "macos/x64/dmg",
                 "linux/x64/deb", "linux/x64/rpm", "linux/x64/appimage");
-        // Keep existing DEB releases usable, but reject incomplete uploads from the expanded matrix.
+        List<String> expandedTargets = List.of(
+                "windows/x64/msi", "windows/arm64/msi", "macos/arm64/dmg", "macos/x64/dmg",
+                "linux/x64/deb", "linux/x64/rpm", "linux/x64/tar.gz", "linux/x64/pkg.tar.zst",
+                "linux/arm64/deb", "linux/arm64/rpm", "linux/arm64/tar.gz", "linux/arm64/pkg.tar.zst");
+        // Accept published migration-era releases while requiring every new target.
         boolean completeTargetSet = (targets.size() == legacyTargets.size() && targets.containsAll(legacyTargets))
-                || (targets.size() == currentTargets.size() && targets.containsAll(currentTargets));
+                || (targets.size() == currentTargets.size() && targets.containsAll(currentTargets))
+                || (targets.size() == expandedTargets.size() && targets.containsAll(expandedTargets));
         if (invalidPackage || !completeTargetSet || packageAsset == null) return null;
         String packageName = text(packageAsset, "name");
         String digest = text(packageAsset, "digest");
