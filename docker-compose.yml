@@ -8,20 +8,21 @@ services:
     environment:
       POSTGRES_DB: forgeloop
       POSTGRES_USER: forgeloop
-      POSTGRES_PASSWORD: forgeloop
+      POSTGRES_PASSWORD: ${FORGELOOP_DATABASE_PASSWORD:?Set FORGELOOP_DATABASE_PASSWORD in the project .env}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U forgeloop -d forgeloop"]
       interval: 5s
       timeout: 3s
       retries: 10
-    ports: ["5432:5432"]
+    # Local diagnostics only; public traffic reaches the app through Cloudflare Tunnel.
+    ports: ["127.0.0.1:5432:5432"]
   control-plane:
     build: ./control-plane
     restart: unless-stopped
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/forgeloop
       SPRING_DATASOURCE_USERNAME: forgeloop
-      SPRING_DATASOURCE_PASSWORD: forgeloop
+      SPRING_DATASOURCE_PASSWORD: ${FORGELOOP_DATABASE_PASSWORD:?Set FORGELOOP_DATABASE_PASSWORD in the project .env}
       # Flyway owns schema changes; Hibernate only verifies the migrated schema.
       SPRING_JPA_DDL_AUTO: validate
       FORGELOOP_SECURITY_MODE: ${FORGELOOP_SECURITY_MODE:-github}
@@ -58,7 +59,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    ports: ["8090:8090"]
+    # Keep the API reachable to host-side tools without exposing it to the LAN/Internet.
+    ports: ["127.0.0.1:8090:8090"]
   web:
     build:
       context: .
@@ -68,7 +70,8 @@ services:
     restart: unless-stopped
     depends_on:
       control-plane: { condition: service_healthy }
-    ports: ["5173:80"]
+    # Keep the UI available for local checks; production ingress is the tunnel container.
+    ports: ["127.0.0.1:5173:80"]
   webhook-edge:
     image: nginx:1.29-alpine
     restart: unless-stopped
@@ -85,7 +88,7 @@ services:
     environment:
       PGHOST: postgres
       PGUSER: forgeloop
-      PGPASSWORD: forgeloop
+      PGPASSWORD: ${FORGELOOP_DATABASE_PASSWORD:?Set FORGELOOP_DATABASE_PASSWORD in the project .env}
       PGDATABASE: forgeloop
       BACKUP_INTERVAL_SECONDS: "21600"
     volumes:
