@@ -59,6 +59,7 @@ import RunRecordSettings from "./RunRecordSettings";
 import RepositoryBudgetSettings from "./RepositoryBudgetSettings";
 import "./styles.css";
 import "./dashboard-responsive.css";
+import "./repository-settings.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
 const retryable = new Set(["FAILED", "HELD", "RETRYABLE_FAILURE"]);
@@ -95,7 +96,7 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
           remains on an authorized runner.
         </p>
       </section>
-      <section className="panel">
+      <section className="panel connected-repositories">
         <div className="section-heading">
           <div>
             <h2>Connected repositories</h2>
@@ -110,13 +111,18 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
         </div>
         {items.length ? (
           items.map((item) => (
-            <div className="item" key={item.id}>
-              <div>
-                <b>{item.repository}</b>
-                <small>
-                  {item.defaultBranch} · {item.issueLabel} ·{" "}
-                  {item.requiredGates.join(", ")}
-                </small>
+            <article className="repository-card" key={item.id}>
+              <div className="repository-card-heading">
+                <div className="repository-identity">
+                  <span className="repository-identity-icon" aria-hidden="true"><GitBranch size={18}/></span>
+                  <div>
+                    <h3>{item.repository}</h3>
+                    <p>{item.defaultBranch} · {item.issueLabel} · {item.requiredGates.join(", ")}</p>
+                  </div>
+                </div>
+                <span className="status complete">Policy v{item.policyRevision}</span>
+              </div>
+              <div className="repository-settings-grid">
                 <IntakeSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
                 {organizationLimit !== undefined
                   ? <RepositoryBudgetSettings item={item} organizationLimit={organizationLimit} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
@@ -124,12 +130,9 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
                     ? <p role="alert">Unable to show the repository budget control: {configurationError}</p>
                     : <p role="status">Loading the organization budget limit…</p>}
                 <RunRecordSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
-                <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
               </div>
-              <span className="status complete">
-                Policy v{item.policyRevision}
-              </span>
-            </div>
+              <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
+            </article>
           ))
         ) : (
           <p className="empty">No repositories are authorized yet.</p>

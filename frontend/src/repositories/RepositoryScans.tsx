@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ScanSearch } from 'lucide-react';
 import {
   approveIssueProposal,
   loadRepositoryScans,
@@ -21,6 +22,16 @@ const proposalCost = (proposal: RepositoryIssueProposal) => proposal.costKnown
   ? `~$${(proposal.estimatedCostMicros / 1_000_000).toFixed(4)}`
   : 'N/A';
 
+/** Keep persistence and infrastructure exceptions out of the customer-facing message. */
+function scanErrorMessage(reason: unknown, fallback: string) {
+  const message = reason instanceof Error ? reason.message : '';
+  if (!message) return fallback;
+  if (/(?:Exception|org\.hibernate|org\.springframework|SQLState|SQLGrammarException)/i.test(message)) {
+    return 'The control plane could not load repository scan data. Refresh the page and try again; contact support if the problem continues.';
+  }
+  return message;
+}
+
 /** Manual runner-backed analysis. Draft generation is separately metered and publication always needs review. */
 export default function RepositoryScans({ repository, isAdmin }: { repository: string; isAdmin: boolean }) {
   const [scans, setScans] = useState<RepositoryScan[]>([]);
@@ -30,7 +41,7 @@ export default function RepositoryScans({ repository, isAdmin }: { repository: s
   const [drafts, setDrafts] = useState<Record<string, IssueDraft>>({});
   const [error, setError] = useState('');
   const refresh = useCallback(() => loadRepositoryScans(repository).then(setScans)
-    .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to load repository scans')), [repository]);
+    .catch(reason => setError(scanErrorMessage(reason, 'Unable to load repository scans'))), [repository]);
 
   useEffect(() => { void refresh(); }, [refresh]);
   const active = scans.some(scan => scan.status === 'PENDING' || scan.status === 'RUNNING'
@@ -58,7 +69,7 @@ export default function RepositoryScans({ repository, isAdmin }: { repository: s
     setError('');
     void requestRepositoryScan(repository)
       .then(scan => { setScans(current => [scan, ...current.filter(item => item.id !== scan.id)].slice(0, 10)); setConfirming(false); })
-      .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to start repository scan'))
+      .catch(reason => setError(scanErrorMessage(reason, 'Unable to start repository scan')))
       .finally(() => setBusy(false));
   };
 
@@ -67,7 +78,7 @@ export default function RepositoryScans({ repository, isAdmin }: { repository: s
     setError('');
     void requestIssueProposal(scan.id, finding.id)
       .then(proposal => updateProposal(scan.id, finding.id, proposal))
-      .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to queue issue proposal'))
+      .catch(reason => setError(scanErrorMessage(reason, 'Unable to queue issue proposal')))
       .finally(() => setWorkingOn(''));
   };
 
@@ -82,7 +93,7 @@ export default function RepositoryScans({ repository, isAdmin }: { repository: s
     setError('');
     void approveIssueProposal(proposal.id, draft.title, draft.body, criteria)
       .then(updated => updateProposal(scan.id, finding.id, updated))
-      .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to publish the reviewed issue'))
+      .catch(reason => setError(scanErrorMessage(reason, 'Unable to publish the reviewed issue')))
       .finally(() => setWorkingOn(''));
   };
 
@@ -91,7 +102,7 @@ export default function RepositoryScans({ repository, isAdmin }: { repository: s
     setError('');
     void rejectIssueProposal(proposal.id)
       .then(updated => updateProposal(scan.id, finding.id, updated))
-      .catch(reason => setError(reason instanceof Error ? reason.message : 'Unable to reject issue proposal'))
+      .catch(reason => setError(scanErrorMessage(reason, 'Unable to reject issue proposal')))
       .finally(() => setWorkingOn(''));
   };
 
@@ -106,8 +117,11 @@ export default function RepositoryScans({ repository, isAdmin }: { repository: s
 
   return <section className="repository-scans" aria-label={`Repository analysis for ${repository}`}>
     <div className="repository-scans-heading">
-      <div><h3>Repository issue scan</h3><p>Find evidence-backed work proposals from the current default branch.</p></div>
-      {isAdmin && !confirming && <button type="button" className="secondary" onClick={() => setConfirming(true)} disabled={active}>Analyze repository</button>}
+      <div className="repository-scan-title">
+        <span className="repository-scan-icon" aria-hidden="true"><ScanSearch size={19}/></span>
+        <div><p className="repository-scan-kicker">Read-only analysis</p><h3>Repository issue scan</h3><p>Find evidence-backed work proposals from the current default branch.</p></div>
+      </div>
+      {isAdmin && !confirming && <button type="button" className="secondary" onClick={() => setConfirming(true)} disabled={active}><ScanSearch size={15} aria-hidden="true"/>Analyze repository</button>}
     </div>
     {confirming && <div className="repository-scan-confirm">
       <p>This read-only scan sends a bounded repository context, with common credentials and private keys redacted, to the provider configured on your runner. Provider charges may apply. ForgeLoop stores findings and usage metadata, not the source context; it will not edit files or create GitHub issues automatically.</p>

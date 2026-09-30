@@ -9,7 +9,7 @@ it('persists the explicit assignee and surfaces failures',async()=>{
   render(<IntakeSettings item={{repository:'org/repo'} as RepositoryConnection} editable onSaved={()=>{}}/>);
   fireEvent.click(screen.getByRole('checkbox',{name:'Wait for assignment on org/repo'}));
   fireEvent.change(screen.getByRole('textbox'),{target:{value:'worker'}});
-  fireEvent.click(screen.getByRole('button',{name:'Save intake setting'}));
+  fireEvent.click(screen.getByRole('button',{name:'Save intake settings'}));
   expect(await screen.findByRole('alert')).toHaveTextContent('Access denied');
   expect(JSON.parse(String(fetch.mock.calls[0][1].body)).variables).toEqual({repository:'org/repo',requireAssignee:true,requiredAssignee:'worker'});
 });

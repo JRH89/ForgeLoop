@@ -55,8 +55,22 @@ for (const width of [320, 390, 430, 768, 1440]) {
     await fits(page);
     if (width <= 760) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Repositories', exact: true }).click();
+    if (width <= 760) {
+      const menuToggle = page.getByRole('button', { name: 'Open navigation' });
+      await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.locator('.console-sidebar')).toHaveCSS('visibility', 'hidden');
+    }
     await expect(page.getByRole('heading', { name: 'Connected repositories', exact: true })).toBeVisible();
+    const repositoryCard = page.locator('.repository-card');
+    await expect(repositoryCard).toHaveCount(1);
+    for (const setting of ['Issue intake', 'Run budget', 'Run records', 'Repository issue scan']) {
+      await expect(repositoryCard.getByRole('heading', { name: setting, exact: true })).toBeVisible();
+    }
+    if (width <= 760) {
+      expect(await page.locator('.repository-settings-grid').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
+    }
     await fits(page);
+    await page.screenshot({ path: `../evidence/forgeloop-ui/repository-settings-${width}.png`, fullPage: true });
     if (width <= 760) await page.getByRole('button', { name: 'Open navigation' }).click();
     await page.getByRole('button', { name: 'Harness & policy', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Execution policy', exact: true })).toBeVisible();

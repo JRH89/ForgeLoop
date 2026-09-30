@@ -20,7 +20,7 @@ it('requires an explicit admin save and reports the saved run-record opt-in', as
   render(<RunRecordSettings item={item} editable onSaved={onSaved}/>);
 
   fireEvent.click(screen.getByRole('checkbox', { name: 'Save run records for org/repo' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save run-record setting' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save record setting' }));
 
   expect(await screen.findByRole('checkbox', { name: 'Save run records for org/repo' })).toBeChecked();
   expect(onSaved).toHaveBeenCalledWith(saved);
@@ -33,5 +33,5 @@ it('keeps the control read-only for non-admin members', () => {
   render(<RunRecordSettings item={item} editable={false} onSaved={() => {}}/>);
 
   expect(screen.getByRole('checkbox', { name: 'Save run records for org/repo' })).toBeDisabled();
-  expect(screen.queryByRole('button', { name: 'Save run-record setting' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save record setting' })).not.toBeInTheDocument();
 });

@@ -20,7 +20,7 @@ it('saves a repository ceiling and reports the persisted policy', async () => {
   render(<RepositoryBudgetSettings item={item} organizationLimit={5} editable onSaved={onSaved}/>);
 
   fireEvent.change(screen.getByRole('spinbutton', { name: 'Maximum run budget for JRH89/Ticketly' }), { target: { value: '5' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Save repository budget' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save budget' }));
 
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
   expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).variables)
@@ -31,7 +31,7 @@ it('keeps budget controls unavailable to non-admin members', () => {
   render(<RepositoryBudgetSettings item={item} organizationLimit={5} editable={false} onSaved={() => {}}/>);
 
   expect(screen.getByRole('spinbutton', { name: 'Maximum run budget for JRH89/Ticketly' })).toBeDisabled();
-  expect(screen.queryByRole('button', { name: 'Save repository budget' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save budget' })).not.toBeInTheDocument();
 });
 
 it('rejects values above the organization limit before making a request', async () => {
