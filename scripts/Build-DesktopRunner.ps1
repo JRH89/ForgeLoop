@@ -1,9 +1,7 @@
 param(
-    [ValidateSet('app-image','msi','dmg','deb','rpm','appimage')][string]$PackageType='app-image',
+    [ValidateSet('app-image','msi','dmg','deb','rpm','tar.gz','pkg.tar.zst')][string]$PackageType='app-image',
     [string]$OutputDirectory='artifacts/desktop-runner',
-    [ValidatePattern('^[1-9][0-9]*\.[0-9]+\.[0-9]+$')][string]$PackageVersion='1.0.6',
-    [string]$AppImageToolPath=$env:APPIMAGETOOL_PATH,
-    [string]$AppImageRuntimePath=$env:APPIMAGETOOL_RUNTIME_PATH
+    [ValidatePattern('^[1-9][0-9]*\.[0-9]+\.[0-9]+$')][string]$PackageVersion='1.0.6'
 )
 $ErrorActionPreference='Stop'
 # Native packages are built on their target OS. jlink retains java for the worker child JVM.
@@ -26,9 +24,10 @@ if (-not (Test-Path -LiteralPath $icon)) { throw 'Native launcher icon is missin
 $runtime=Join-Path $output 'runtime'
 & jlink --add-modules java.base,java.desktop,java.net.http,java.logging,java.management,java.naming,java.security.jgss,java.instrument,jdk.unsupported,jdk.crypto.ec --strip-debug --no-header-files --no-man-pages --output $runtime
 if ($LASTEXITCODE -ne 0) { throw 'Runtime build failed' }
-# Apple's CFBundleVersion requires a positive first component. Installer revision
-# is independent of the runner protocol version and is not a production-readiness claim.
-$jpackageType=if ($PackageType -eq 'appimage') { 'app-image' } else { $PackageType }
+# Portable and Arch packages use jpackage's native app-image as their payload.
+# Apple's CFBundleVersion requires a positive first component; the installer
+# revision is not a production-readiness claim.
+$jpackageType=if ($PackageType -in @('tar.gz','pkg.tar.zst')) { 'app-image' } else { $PackageType }
 $arguments=@('--type',$jpackageType,'--name','ForgeLoop Runner','--app-version',$PackageVersion,'--java-options',"-Dforgeloop.desktop.version=$PackageVersion",'--vendor','Hooker Hill Studios','--description','Self-hosted ForgeLoop runner (development preview)','--input',$inputDirectory,'--main-jar','runner.jar','--main-class','io.forgeloop.runner.DesktopRunner','--runtime-image',$runtime,'--dest',(Join-Path $output 'packages'))
 if ($PackageType -ne 'app-image') { $arguments+=@('--java-options',"-Dforgeloop.desktop.package=$PackageType") }
 $arguments+=@('--icon',$icon)
@@ -41,53 +40,46 @@ if ($PackageType -in @('deb','rpm')) {
 }
 & jpackage @arguments
 if ($LASTEXITCODE -ne 0) { throw 'Desktop packaging failed' }
-if ($PackageType -eq 'appimage') {
-    if (-not $IsLinux) { throw 'AppImage packages must be built on Linux.' }
-    if (-not $AppImageToolPath -or -not (Test-Path -LiteralPath $AppImageToolPath)) { throw 'Set APPIMAGETOOL_PATH to the verified x86_64 appimagetool binary.' }
-    if (-not $AppImageRuntimePath -or -not (Test-Path -LiteralPath $AppImageRuntimePath)) { throw 'Set APPIMAGETOOL_RUNTIME_PATH to the verified x86_64 AppImage runtime.' }
-
-    # jpackage supplies the bundled JVM and launcher; AppRun is the relocatable AppImage entry point.
+if ($PackageType -in @('tar.gz','pkg.tar.zst')) {
+    if (-not $IsLinux) { throw 'Portable Linux packages must be built on Linux.' }
     $image=Join-Path (Join-Path $output 'packages') 'ForgeLoop Runner'
-    if (-not (Test-Path -LiteralPath (Join-Path $image 'bin/ForgeLoop Runner'))) { throw 'jpackage app-image is missing its Linux launcher.' }
-    $appDirectory=Join-Path (Join-Path $output 'appimage') 'ForgeLoop Runner.AppDir'
-    New-Item -ItemType Directory -Path $appDirectory -Force | Out-Null
-    Get-ChildItem -LiteralPath $image -Force | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $appDirectory -Recurse -Force }
-    New-Item -ItemType Directory -Path (Join-Path $appDirectory 'usr/share/applications') -Force | Out-Null
-    New-Item -ItemType Directory -Path (Join-Path $appDirectory 'usr/share/icons/hicolor/256x256/apps') -Force | Out-Null
-    Copy-Item -LiteralPath $icon -Destination (Join-Path $appDirectory 'forgeloop.png')
-    Copy-Item -LiteralPath $icon -Destination (Join-Path $appDirectory 'usr/share/icons/hicolor/256x256/apps/forgeloop.png')
-    $appRun=@'
+    $launcher=Join-Path $image 'bin/ForgeLoop Runner'
+    if (-not (Test-Path -LiteralPath $launcher)) { throw 'jpackage app-image is missing its Linux launcher.' }
+    $architecture=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
+    if ($architecture -eq 'x64') { $architecture='x64' }
+    elseif ($architecture -eq 'arm64') { $architecture='arm64' }
+    else { throw "Unsupported Linux architecture: $architecture" }
+
+    if ($PackageType -eq 'tar.gz') {
+        $portableRoot=Join-Path $output 'portable/forgeloop-runner'
+        $appDirectory=Join-Path $portableRoot 'ForgeLoop Runner'
+        New-Item -ItemType Directory -Path $appDirectory -Force | Out-Null
+        Get-ChildItem -LiteralPath $image -Force | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $appDirectory -Recurse -Force }
+        $runScript=@'
 #!/bin/sh
 set -eu
-APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
-exec "$APPDIR/bin/ForgeLoop Runner" "$@"
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec "$ROOT/ForgeLoop Runner/bin/ForgeLoop Runner" "$@"
 '@
-    $desktop=@'
-[Desktop Entry]
-Name=ForgeLoop Runner
-Comment=Run ForgeLoop tasks on infrastructure you control
-Exec=AppRun %U
-Icon=forgeloop
-Type=Application
-Terminal=false
-Categories=Development;Utility;
+        $readme=@'
+ForgeLoop Runner portable Linux build
+
+Extract this archive and launch it with ./run-forgeloop-runner.sh. Java is
+bundled. Git and Docker are required for repository work. Linux credential
+storage requires secret-tool and an unlocked Secret Service keyring.
 '@
-    [IO.File]::WriteAllText((Join-Path $appDirectory 'AppRun'),$appRun.TrimStart(),[Text.UTF8Encoding]::new($false))
-    [IO.File]::WriteAllText((Join-Path $appDirectory 'forgeloop.desktop'),$desktop.TrimStart(),[Text.UTF8Encoding]::new($false))
-    Copy-Item -LiteralPath (Join-Path $appDirectory 'forgeloop.desktop') -Destination (Join-Path $appDirectory 'usr/share/applications/forgeloop.desktop')
-    & chmod 755 (Join-Path $appDirectory 'AppRun')
-    if ($LASTEXITCODE -ne 0) { throw 'Could not mark the AppImage entry point executable.' }
-    $appImage=Join-Path (Join-Path $output 'packages') "forgeloop-runner-$PackageVersion-linux-x64.AppImage"
-    $previousArchitecture=$env:ARCH
-    $previousExtractMode=$env:APPIMAGE_EXTRACT_AND_RUN
-    try {
-        $env:ARCH='x86_64'
-        $env:APPIMAGE_EXTRACT_AND_RUN='1'
-        & $AppImageToolPath --runtime-file $AppImageRuntimePath $appDirectory $appImage
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $appImage)) { throw 'AppImage creation failed.' }
-    } finally {
-        $env:ARCH=$previousArchitecture
-        $env:APPIMAGE_EXTRACT_AND_RUN=$previousExtractMode
+        [IO.File]::WriteAllText((Join-Path $portableRoot 'run-forgeloop-runner.sh'),$runScript.TrimStart(),[Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $portableRoot 'README.txt'),$readme.TrimStart(),[Text.UTF8Encoding]::new($false))
+        & chmod 755 (Join-Path $portableRoot 'run-forgeloop-runner.sh')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not mark the portable launcher executable.' }
+        $archive=Join-Path (Join-Path $output 'packages') "forgeloop-runner-$PackageVersion-linux-$architecture.tar.gz"
+        & tar -czf $archive -C (Split-Path $portableRoot -Parent) 'forgeloop-runner'
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $archive)) { throw 'Portable Linux archive creation failed.' }
+    } else {
+        $archBuilder=Join-Path $repository 'scripts/Build-ArchPackage.sh'
+        if (-not (Test-Path -LiteralPath $archBuilder)) { throw 'Arch package builder script is missing.' }
+        & bash $archBuilder $image $icon $PackageVersion $architecture (Join-Path $output 'packages')
+        if ($LASTEXITCODE -ne 0) { throw 'Arch package build failed.' }
     }
 }
 Get-ChildItem -LiteralPath (Join-Path $output 'packages') -File | ForEach-Object {

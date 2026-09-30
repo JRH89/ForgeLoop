@@ -2,16 +2,16 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[1-9][0-9]*\.[0-9]+\.[0-9]+$')][string]$Version,
     [Parameter(Mandatory)][ValidateSet('windows','macos','linux')][string]$Platform,
     [Parameter(Mandatory)][ValidateSet('x64','arm64')][string]$Architecture,
-    [Parameter(Mandatory)][ValidateSet('msi','dmg','deb','rpm','appimage')][string]$PackageType
+    [Parameter(Mandatory)][ValidateSet('msi','dmg','deb','rpm','tar.gz','pkg.tar.zst')][string]$PackageType
 )
 $ErrorActionPreference='Stop'
-$allowedTypes=@{windows=@('msi');macos=@('dmg');linux=@('deb','rpm','appimage')}[$Platform]
+$allowedTypes=@{windows=@('msi');macos=@('dmg');linux=@('deb','rpm','tar.gz','pkg.tar.zst')}[$Platform]
 if ($PackageType -notin $allowedTypes) { throw 'Installer type does not match platform.' }
 # Verify the actual build host; never label an Intel binary as an ARM package.
 $actualArchitecture=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
 if ($Architecture -ne $actualArchitecture) { throw "Expected $Architecture build host, got $actualArchitecture" }
-$assetExtension=if ($PackageType -eq 'appimage') { 'AppImage' } else { $PackageType }
-$packages=@(Get-ChildItem -LiteralPath 'artifacts/native-installer/packages' -Filter "*.$assetExtension" -File)
+$assetExtension=$PackageType
+$packages=@(Get-ChildItem -LiteralPath 'artifacts/native-installer/packages' -File | Where-Object { $_.Name.EndsWith(".$assetExtension",[StringComparison]::OrdinalIgnoreCase) })
 if ($packages.Count -ne 1) { throw 'Expected exactly one verified native installer.' }
 $package=$packages[0]
 $hash=(Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant()

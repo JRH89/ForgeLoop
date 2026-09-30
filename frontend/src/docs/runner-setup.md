@@ -2,12 +2,14 @@
 
 Open [Download runner](/app/runner-downloads) for the latest published desktop
 preview. Downloads come from GitHub Releases and do not require signing in.
-Choose Windows x64, macOS Apple Silicon (arm64) or Intel (x64), or a Linux x64
-package: DEB for Debian/Ubuntu/Mint, RPM for Fedora, or AppImage for Arch and
-other compatible desktop distributions. Java is bundled; Git and Docker are required.
+Choose Windows x64/ARM64, macOS Apple Silicon (arm64) or Intel (x64), or a Linux
+x64/arm64 package: DEB for Debian/Ubuntu, RPM for Fedora/RHEL/openSUSE, a portable
+`.tar.gz` archive, or a native Arch `.pkg.tar.zst` package for x64 and ARM64.
+Arch and Omarchy users can install the matching package with `sudo pacman -U`
+followed by the downloaded `.pkg.tar.zst` filename.
+The portable archive works without AppImage or FUSE. Java is bundled; Git and
+Docker are required.
 
-AppImage may require FUSE 2. If it is unavailable, try
-`APPIMAGE_EXTRACT_AND_RUN=1 ./forgeloop-runner-VERSION-linux-x64.AppImage`.
 Linux credential storage requires `secret-tool` and an unlocked desktop Secret
 Service keyring; install the libsecret command-line tools for your distribution.
 

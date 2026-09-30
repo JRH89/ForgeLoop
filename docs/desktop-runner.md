@@ -84,10 +84,12 @@ the installation.
 
 Build the tested runner JAR (`mvn verify` in `runner`), then run
 `scripts/Build-DesktopRunner.ps1` with PowerShell 7 on the target OS. Its default
-is a self-contained app image; `-PackageType msi`, `dmg`, or `deb` builds a native
-development installer. The CI matrix builds on Windows, macOS and Linux and
-smoke-tests each bundled runtime. OS/architecture support follows that matrix,
-not an assertion that every Linux distribution or CPU has been tested.
+is a self-contained app image; `-PackageType msi`, `dmg`, `deb`, `rpm`, `tar.gz`,
+or `pkg.tar.zst` builds a native or portable development package. The CI matrix
+builds Windows x64/ARM64, macOS Intel/Apple Silicon, and Linux x64/arm64. Linux
+packages are smoke-tested, including a pacman install on Arch. OS/architecture
+support follows that matrix, not an assertion that every distribution or CPU has
+been tested.
 
 Native packaging uses [jpackage](https://docs.oracle.com/en/java/javase/21/jpackage/packaging-tool-user-guide.pdf)
 and an explicit jlink runtime retaining the child-JVM launcher. Native credential
@@ -133,7 +135,7 @@ settings save, or work start, not simply to render the window.
 Offline regression coverage includes pairing pending/success/timeout/cancellation,
 connection errors, saved-window restoration without decrypting keys, diagnostics
 redaction, and child-worker start/pause/restart against a loopback fake control
-plane. Native package CI covers all three supported build targets; Windows also
-tests 1.0.0-to-1.0.1 installer replacement and private-state survival across
+plane. Native package CI covers all supported operating systems and
+architectures; Windows also tests 1.0.0-to-1.0.1 installer replacement and private-state survival across
 uninstall/reinstall. These checks do not replace real-provider delivery evidence
 or actual OS sign-in/reboot acceptance. Public previews use the GitHub release feed.
