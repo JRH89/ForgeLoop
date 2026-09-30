@@ -179,26 +179,23 @@ databases at the same public hostname.
 
 ### Existing Compose database password
 
-The former Compose file initialized PostgreSQL with the known development
-password `forgeloop`. The updated stack requires a unique password and applies it
-to PostgreSQL, the control plane, and scheduled backups. If retaining a database
+The former Compose file initialized PostgreSQL with a credential checked into
+source control. The updated stack requires a unique password and applies it to
+PostgreSQL, the control plane, and scheduled backups. If retaining a database
 volume created by that older configuration, changing `.env` alone is not enough:
 PostgreSQL only applies `POSTGRES_PASSWORD` when initializing an empty volume.
-Before recreating the services, rotate the database role password interactively
-while the old container is running:
+Set the new unique `FORGELOOP_DATABASE_PASSWORD` in `.env`, then rotate the
+database role password interactively while the existing container is running:
 
 ```bash
-FORGELOOP_DATABASE_PASSWORD=forgeloop docker compose exec -it postgres \
-  psql -U forgeloop -d postgres
+docker compose exec -it postgres psql -U forgeloop -d postgres
 ```
 
 At the `psql` prompt, run `\password forgeloop`, enter the new random value
-twice, then `\q`. Save that same value as `FORGELOOP_DATABASE_PASSWORD` in the
-protected `.env` and recreate services. The old value shown above applies only
-to databases initialized by the previous checked-in Compose configuration; if
-the database already has another password, use its current credential for the
-one-time `docker compose exec` environment override. Do not put the new secret
-in the command line.
+twice, then `\q`. Use the same value for `FORGELOOP_DATABASE_PASSWORD` in the
+protected `.env`, then recreate services. Keep credentials out of shell history
+and command-line arguments; if local PostgreSQL authentication prompts for a
+password, enter the current value interactively.
 
 To avoid Cloudflare distributing requests between two separate databases:
 
