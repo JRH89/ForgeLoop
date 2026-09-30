@@ -23,6 +23,7 @@ class GraphQlSchemaTest {
 
         assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryAgentLoop"));
         assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryRunRecord"));
+        assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryBudget"));
         assertNotNull(schema.getMutationType().getFieldDefinition("renewTaskLease"));
         assertNotNull(schema.getMutationType().getFieldDefinition("holdTaskLease"));
         assertNotNull(schema.getMutationType().getFieldDefinition("configureRepositoryEnforcement"));

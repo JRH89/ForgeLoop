@@ -55,12 +55,19 @@ public class TaskLeaseService {
         if (conflict) throw new IllegalStateException("Task path ownership conflicts with active work");
         TaskLease existing = leases.findFirstByTask_IdOrderByExpiresAtDesc(taskId).orElse(null);
         if (existing != null && existing.active()) throw new IllegalStateException("Task already has an active lease");
+        // Lease recovery may already have returned this task to the repair queue
+        // while leaving its run blocked after a prior completion request failed.
+        boolean resumeBlockedRun = task.getState() == TaskState.REPAIR_QUEUED
+                && task.getRun().getState() == RunState.BLOCKED;
         String nonce = secret();
         TaskLease lease = new TaskLease(task, runner, hash(nonce), Instant.now().plus(task.leaseDuration()));
         lease.captureInputRefs(LeaseInputReferences.capture(task));
         lease = leases.save(lease);
         task.transition(TaskState.LEASED);
-        if (!"PLANNER".equals(task.getRole())) task.getRun().startExecution();
+        if (!"PLANNER".equals(task.getRole())) {
+            if (resumeBlockedRun) task.getRun().resumeAfterRetry(task);
+            task.getRun().startExecution();
+        }
         return new LeaseGrant(lease, nonce);
     }
 
@@ -280,6 +287,13 @@ public class TaskLeaseService {
     @Transactional public String requireActiveTaskId(String leaseId, String runnerId, String nonce) {
         TaskLease lease = validatedLease(leaseId, runnerId, nonce);
         if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Operation requires an active acknowledged lease");
+        return lease.getTaskId();
+    }
+
+    /** Allows the initial repository checkout grant for a claimed lease before the runner acknowledges it. */
+    @Transactional public String requireActiveTaskIdForCheckout(String leaseId, String runnerId, String nonce) {
+        TaskLease lease = validatedLease(leaseId, runnerId, nonce);
+        if (!lease.active()) throw new IllegalStateException("Repository checkout requires an active lease");
         return lease.getTaskId();
     }
 

@@ -26,4 +26,7 @@ public class OperatorWorkflowController {
     @MutationMapping public RepositoryConnection configureRepositoryIntake(@Argument String repository, @Argument boolean requireAssignee, @Argument String requiredAssignee) {
         return connections.configureIntake(repository, requireAssignee, requiredAssignee);
     }
+    @MutationMapping public RepositoryConnection configureRepositoryBudget(@Argument String repository, @Argument double maxBudgetUsd) {
+        return connections.configureBudget(repository, maxBudgetUsd);
+    }
 }

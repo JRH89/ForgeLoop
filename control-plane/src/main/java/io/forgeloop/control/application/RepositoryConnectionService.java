@@ -3,6 +3,8 @@ package io.forgeloop.control.application;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
 import io.forgeloop.control.domain.AgentLoopBudget;
+import io.forgeloop.control.domain.OrganizationPolicy;
+import io.forgeloop.control.domain.OrganizationPolicyRepository;
 import io.forgeloop.control.security.OperatorContext;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -12,9 +14,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RepositoryConnectionService {
   private final RepositoryConnectionRepository connections;
+  private final OrganizationPolicyRepository policies;
   private final OperatorContext operators;
   private final AuditLedgerService audit;
-  public RepositoryConnectionService(RepositoryConnectionRepository connections, OperatorContext operators, AuditLedgerService audit) { this.connections = connections; this.operators = operators; this.audit = audit; }
+  public RepositoryConnectionService(RepositoryConnectionRepository connections, OrganizationPolicyRepository policies,
+                                    OperatorContext operators, AuditLedgerService audit) {
+    this.connections = connections; this.policies = policies; this.operators = operators; this.audit = audit;
+  }
   @Transactional public RepositoryConnection register(RepositoryRegistration input) {
     if (connections.findByRepository(input.repository()).isPresent()) throw new IllegalStateException("Repository is already connected");
     RepositoryConnection connection = new RepositoryConnection(operators.organizationId(), input.repository(), input.installationId(), input.defaultBranch(), input.issueLabel(), input.harnessProfile(), input.requiredGates(), input.maxBudgetUsd());
@@ -44,6 +50,21 @@ public class RepositoryConnectionService {
             "enabled=" + enabled + "|revision=" + saved.getPolicyRevision());
     return saved;
   }
+  @Transactional public RepositoryConnection configureBudget(String repository, double maxBudgetUsd) {
+    operators.requireAdministrator();
+    RepositoryConnection connection = requireEnabled(repository);
+    OrganizationPolicy policy = policies.findById(connection.getOrganizationId())
+            .orElseThrow(() -> new IllegalStateException("Organization policy is not configured"));
+    if (!policy.permitsBudget(maxBudgetUsd)) {
+      throw new IllegalArgumentException("Repository run budget must be positive and no greater than the organization limit ($"
+              + policy.getMaxRunBudgetUsd() + ")");
+    }
+    connection.configureMaxBudgetUsd(maxBudgetUsd);
+    RepositoryConnection saved = connections.save(connection);
+    audit.record("REPOSITORY_BUDGET_UPDATED", "REPOSITORY_CONNECTION", saved.getId(),
+            "maxBudgetUsd=" + maxBudgetUsd + "|revision=" + saved.getPolicyRevision());
+    return saved;
+  }
   @Transactional public RepositoryConnection configureEnforcement(String repository, List<String> protectedPaths,
                                                                      boolean allowWorkflowChanges, String finishGate) {
     operators.requireAdministrator();
@@ -60,6 +81,27 @@ public class RepositoryConnectionService {
   public RepositoryConnection requireEnabled(String repository) {
     RepositoryConnection connection = connections.findByRepository(repository).orElseThrow(() -> new IllegalStateException("Repository is not connected"));
     if (!connection.belongsTo(operators.organizationId()) || !connection.isEnabled()) throw new IllegalStateException("Repository connection is unavailable");
+    return connection;
+  }
+  /** Reattaches a connection proven by a verified GitHub webhook without using an operator session. */
+  @Transactional(readOnly = true)
+  public RepositoryConnection requireEnabledForWebhookIssue(String repository, String organizationId, String connectionId) {
+    RepositoryConnection connection = connections.findForIssueIntakeById(connectionId)
+            .orElseThrow(() -> new IllegalStateException("Repository connection is unavailable"));
+    if (!connection.isEnabled() || !connection.getRepository().equals(repository)
+            || !connection.belongsTo(organizationId)) {
+      throw new IllegalStateException("Repository connection is unavailable");
+    }
+    return connection;
+  }
+  /** Resolves repository access from a persisted run's organization, not a browser operator session. */
+  @Transactional(readOnly = true)
+  public RepositoryConnection requireEnabledForRun(String repository, String organizationId) {
+    RepositoryConnection connection = connections.findByRepository(repository)
+            .orElseThrow(() -> new IllegalStateException("Repository connection is unavailable"));
+    if (!connection.isEnabled() || !connection.belongsTo(organizationId)) {
+      throw new IllegalStateException("Repository connection is unavailable");
+    }
     return connection;
   }
   @Transactional(readOnly = true)

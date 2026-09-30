@@ -100,8 +100,27 @@ class FeatureRunServiceTest {
   @Test void issueIntakeReusesExistingSourceRun() {
     FeatureRun existing = new FeatureRun("acme/support", "issue-142", "Assignment", "- criterion", 10, "JVM_REACT", 1);
     when(runs.findByRepositoryAndSourceRef("acme/support", "issue-142")).thenReturn(java.util.Optional.of(existing));
-    assertEquals(existing, service.submitIssue(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- criterion", 10)));
+    assertEquals(existing, service.submitIssue(new FeatureSubmission("acme/support", "issue-142", "Assignment", "- criterion", 10), null));
     verify(runs, never()).save(any());
+  }
+  @Test void issueIntakeCapsRunBudgetAtTheLowerRepositoryAndOrganizationLimits() {
+    String image = "node@sha256:" + "a".repeat(64);
+    RepositoryConnection connection = new RepositoryConnection("local-development", "JRH89/Ticketly", 1, "master", "forgeloop", "GENERIC", List.of(
+            new VerificationPolicySpec("unit", "CONTAINER", image, List.of("npm", "run", "test"), "NONE", 300, true, "ALL")), 25, true);
+    when(platform.organizationPolicy("local-development")).thenReturn(new io.forgeloop.control.domain.OrganizationPolicy("local-development", 5, 4,
+            List.of("anthropic"), false, true));
+    when(platform.requireHarnessForOrganization("local-development", "GENERIC")).thenReturn(
+            new io.forgeloop.control.domain.HarnessDefinition("local-development", "GENERIC", "Standard delivery", List.of("PLANNER", "BACKEND"), 2));
+    when(connections.requireEnabledForWebhookIssue("JRH89/Ticketly", "local-development", connection.getId()))
+            .thenReturn(connection);
+    when(runs.save(any(FeatureRun.class))).thenAnswer(call -> call.getArgument(0));
+
+    FeatureRun run = service.submitIssue(new FeatureSubmission("JRH89/Ticketly", "issue-99", "Count characters", "- Show a live count", 25), connection);
+
+    assertEquals(5, run.getBudgetUsd());
+    verify(runs).save(run);
+    verify(connections, never()).requireEnabled("JRH89/Ticketly");
+    verify(connections).requireEnabledForWebhookIssue("JRH89/Ticketly", "local-development", connection.getId());
   }
   @Test void transitionRequiresAccessToTheTaskRunRepository() {
     FeatureRun run = new FeatureRun("local-development", "acme/support", "issue-1", "Title", "- criterion", 10, "JVM_REACT", 1);

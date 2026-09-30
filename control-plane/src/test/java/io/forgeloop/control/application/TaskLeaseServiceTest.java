@@ -65,6 +65,40 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void claimingLeaseRecoveredTaskResumesItsBlockedRunAtomically() {
+        FeatureRun run = activeRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        task.transition(TaskState.REPAIR_QUEUED);
+        run.block();
+        Runner runner = new Runner("org", "node", "1", List.of("provider"), "credential-hash");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+        when(runners.findById("runner")).thenReturn(Optional.of(runner));
+        when(leases.findFirstByTask_IdOrderByExpiresAtDesc("task")).thenReturn(Optional.empty());
+        when(leases.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        LeaseGrant grant = service.claim("task", "runner");
+
+        assertEquals(TaskState.LEASED, task.getState());
+        assertEquals(RunState.EXECUTING, run.getState());
+        org.junit.jupiter.api.Assertions.assertNotNull(grant.lease());
+    }
+
+    @Test
+    void onlyLeaseBoundRepositoryCheckoutIsAllowedBeforeAcknowledgement() {
+        TaskLease lease = mock(TaskLease.class);
+        when(leases.findById("lease")).thenReturn(Optional.of(lease));
+        when(lease.belongsTo("runner")).thenReturn(true);
+        when(lease.matchesNonceHash(any())).thenReturn(true);
+        when(lease.active()).thenReturn(true);
+        when(lease.isAcknowledged()).thenReturn(false);
+        when(lease.getTaskId()).thenReturn("task");
+
+        assertEquals("task", service.requireActiveTaskIdForCheckout("lease", "runner", "nonce"));
+        assertThrows(IllegalStateException.class, () -> service.requireActiveTaskId("lease", "runner", "nonce"));
+    }
+
+    @Test
     void claimRefusesAChainedWriterOnARunnerWithoutItsDependencyCommit() {
         FeatureRun run = new FeatureRun("org", "a/b", "issue-1", "x", "spec", 1, "GENERIC", "main", 1);
         DeliveryTask predecessor = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 100_000);

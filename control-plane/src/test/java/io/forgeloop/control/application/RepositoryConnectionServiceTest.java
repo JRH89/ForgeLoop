@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
 import io.forgeloop.control.domain.AgentLoopBudget;
+import io.forgeloop.control.domain.OrganizationPolicy;
+import io.forgeloop.control.domain.OrganizationPolicyRepository;
 import io.forgeloop.control.security.OperatorContext;
 import io.forgeloop.control.domain.OrganizationMembershipRepository;
 import java.util.List;
@@ -23,12 +25,25 @@ import org.mockito.Mockito;
 
 class RepositoryConnectionServiceTest {
   private final RepositoryConnectionRepository repository = Mockito.mock(RepositoryConnectionRepository.class);
+  private final OrganizationPolicyRepository policies = Mockito.mock(OrganizationPolicyRepository.class);
   private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class);
-  private final RepositoryConnectionService service = new RepositoryConnectionService(repository,
+  private final RepositoryConnectionService service = new RepositoryConnectionService(repository, policies,
           new OperatorContext("development", "local-development", Mockito.mock(OrganizationMembershipRepository.class)), audit);
   @Test void registersARepositoryWithPolicy() { when(repository.findByRepository("acme/support")).thenReturn(Optional.empty()); when(repository.save(any(RepositoryConnection.class))).thenAnswer(call -> call.getArgument(0)); RepositoryConnection connection = service.register(new RepositoryRegistration("acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile", "browser"), 20)); assertEquals("forgeloop", connection.getIssueLabel()); assertEquals(List.of("compile", "browser"), connection.getRequiredGates()); }
   @Test void rejectsDuplicateRepository() { when(repository.findByRepository("acme/support")).thenReturn(Optional.of(new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20))); assertThrows(IllegalStateException.class, () -> service.register(new RepositoryRegistration("acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20))); }
   @Test void rejectsConnectionOwnedByAnotherOrganization() { when(repository.findByRepository("other/support")).thenReturn(Optional.of(new RepositoryConnection("other", "other/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20))); assertThrows(IllegalStateException.class, () -> service.requireEnabled("other/support")); }
+  @Test void resolvesRunnerAccessFromThePersistedRunOrganization() {
+    RepositoryConnection connection = new RepositoryConnection("run-org", "acme/runner", 12, "main", "forgeloop", "GENERIC", List.of("unit"), 5);
+    when(repository.findByRepository("acme/runner")).thenReturn(Optional.of(connection));
+
+    assertEquals(connection, service.requireEnabledForRun("acme/runner", "run-org"));
+  }
+  @Test void rejectsRunnerAccessWhenTheRunAndRepositoryOrganizationsDiffer() {
+    RepositoryConnection connection = new RepositoryConnection("repository-org", "acme/runner", 12, "main", "forgeloop", "GENERIC", List.of("unit"), 5);
+    when(repository.findByRepository("acme/runner")).thenReturn(Optional.of(connection));
+
+    assertThrows(IllegalStateException.class, () -> service.requireEnabledForRun("acme/runner", "different-org"));
+  }
   @Test void listsOnlyTheCurrentOrganizationsPolicyFetchedConnections() { RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20); when(repository.findByOrganizationId("local-development")).thenReturn(List.of(connection)); assertEquals(List.of(connection), service.list()); }
   @Test void configuresTestFirstForAnEnabledRepository() {
     RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("unit"), 20);
@@ -73,10 +88,49 @@ class RepositoryConnectionServiceTest {
     OperatorContext viewer = Mockito.mock(OperatorContext.class);
     doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))
             .when(viewer).requireAdministrator();
-    RepositoryConnectionService restricted = new RepositoryConnectionService(repository, viewer, audit);
+    RepositoryConnectionService restricted = new RepositoryConnectionService(repository, policies, viewer, audit);
 
     assertThrows(org.springframework.security.access.AccessDeniedException.class,
             () -> restricted.configureRunRecord("acme/support", true));
+    verify(repository, never()).findByRepository("acme/support");
+  }
+  @Test void configuresAuditedRepositoryBudgetWithinTheOrganizationLimit() {
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 25);
+    when(repository.findByRepository("acme/support")).thenReturn(Optional.of(connection));
+    when(policies.findById("local-development")).thenReturn(Optional.of(
+            new OrganizationPolicy("local-development", 5, 4, List.of("anthropic"), false, false)));
+    when(repository.save(any(RepositoryConnection.class))).thenAnswer(call -> call.getArgument(0));
+
+    RepositoryConnection configured = service.configureBudget("acme/support", 5);
+
+    assertEquals(5, configured.getMaxBudgetUsd());
+    assertEquals(2, configured.getPolicyRevision());
+    verify(repository).save(connection);
+    verify(audit).record("REPOSITORY_BUDGET_UPDATED", "REPOSITORY_CONNECTION", connection.getId(),
+            "maxBudgetUsd=5.0|revision=2");
+  }
+  @Test void rejectsRepositoryBudgetAboveOrganizationLimitWithoutChangingPolicy() {
+    RepositoryConnection connection = new RepositoryConnection("local-development", "acme/support", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 25);
+    when(repository.findByRepository("acme/support")).thenReturn(Optional.of(connection));
+    when(policies.findById("local-development")).thenReturn(Optional.of(
+            new OrganizationPolicy("local-development", 5, 4, List.of("anthropic"), false, false)));
+
+    assertThrows(IllegalArgumentException.class, () -> service.configureBudget("acme/support", 5.01));
+    assertThrows(IllegalArgumentException.class, () -> service.configureBudget("acme/support", 0));
+
+    assertEquals(25, connection.getMaxBudgetUsd());
+    assertEquals(1, connection.getPolicyRevision());
+    verify(repository, never()).save(any(RepositoryConnection.class));
+    verify(audit, never()).record(eq("REPOSITORY_BUDGET_UPDATED"), any(), any(), any());
+  }
+  @Test void repositoryBudgetMutationRequiresAdministratorBeforeLoadingRepository() {
+    OperatorContext viewer = Mockito.mock(OperatorContext.class);
+    doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))
+            .when(viewer).requireAdministrator();
+    RepositoryConnectionService restricted = new RepositoryConnectionService(repository, policies, viewer, audit);
+
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> restricted.configureBudget("acme/support", 5));
     verify(repository, never()).findByRepository("acme/support");
   }
   @Test void configuresAuditedEnforcementAndCanRestoreRepositoryDefaults() {
@@ -119,7 +173,7 @@ class RepositoryConnectionServiceTest {
     io.forgeloop.control.security.OperatorContext viewer = Mockito.mock(io.forgeloop.control.security.OperatorContext.class);
     doThrow(new org.springframework.security.access.AccessDeniedException("administrator required"))
             .when(viewer).requireAdministrator();
-    RepositoryConnectionService restricted = new RepositoryConnectionService(repository, viewer, audit);
+    RepositoryConnectionService restricted = new RepositoryConnectionService(repository, policies, viewer, audit);
     assertThrows(org.springframework.security.access.AccessDeniedException.class,
             () -> restricted.configureEnforcement("acme/support", List.of(), false, null));
     verify(repository, never()).findByRepository("acme/support");

@@ -106,6 +106,6 @@ public class GithubWebhookController {
         if (!GithubIssueIntakePolicy.reasons(connection, issue).isEmpty()) return;
         String specification = issue.path("body").asText();
         runs.submitIssue(new FeatureSubmission(repository, "issue-" + issue.path("number").asText(), issue.path("title").asText(), specification,
-                connection.getMaxBudgetUsd()));
+                connection.getMaxBudgetUsd()), connection);
     }
 }

@@ -40,7 +40,7 @@ public class GithubRunnerPushService {
     @Transactional
     public GithubPushGrant grant(String leaseId, String runnerId, String nonce) {
         DeliveryTask task = integrationTask(leases.requireActiveTaskId(leaseId, runnerId, nonce));
-        RepositoryConnection connection = connections.requireEnabled(task.getRepository());
+        RepositoryConnection connection = connections.requireEnabledForRun(task.getRepository(), task.getRun().getOrganizationId());
         GithubPublication publication = publications.findByFeatureRunId(task.getRun().getId())
                 .orElseGet(() -> publications.save(new GithubPublication(task.getRun().getId(), task.getRepository(),
                         "forgeloop/" + task.getRun().getId(), task.getRun().getId())));
@@ -58,7 +58,7 @@ public class GithubRunnerPushService {
     @Transactional(noRollbackFor = TestBoundaryViolationException.class)
     public TaskLease complete(String leaseId, String runnerId, String nonce, String integratedSha) {
         DeliveryTask task = integrationTask(leases.requireActiveTaskId(leaseId, runnerId, nonce));
-        RepositoryConnection connection = connections.requireEnabled(task.getRepository());
+        RepositoryConnection connection = connections.requireEnabledForRun(task.getRepository(), task.getRun().getOrganizationId());
         GithubPublication publication = publications.findByFeatureRunId(task.getRun().getId())
                 .orElseThrow(() -> new IllegalStateException("GitHub push grant was not issued"));
         String remoteHead = github.getBranchHead(connection.getInstallationId(), task.getRepository(), publication.getBranch());

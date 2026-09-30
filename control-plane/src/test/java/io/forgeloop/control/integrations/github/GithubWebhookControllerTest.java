@@ -46,7 +46,7 @@ class GithubWebhookControllerTest {
 
         assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
         verify(deliveries).save(any());
-        verify(runs).submitIssue(any());
+        verify(runs).submitIssue(any(), any());
     }
 
     @Test
@@ -63,7 +63,7 @@ class GithubWebhookControllerTest {
         assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-duplicate", "issues", signature(body), body).getStatusCode());
 
         verify(deliveries).save(any());
-        verify(runs).submitIssue(any());
+        verify(runs).submitIssue(any(), any());
     }
 
     @Test
@@ -113,9 +113,9 @@ class GithubWebhookControllerTest {
         controller.receive("waiting", "issues", signature(waiting), waiting);
         String noLabel = template.formatted("assigned", "[]", "[{\"login\":\"worker\"}]");
         controller.receive("no-label", "issues", signature(noLabel), noLabel);
-        verify(runs, never()).submitIssue(any());
+        verify(runs, never()).submitIssue(any(), any());
         String ready = template.formatted("assigned", "[{\"name\":\"forgeloop\"}]", "[{\"login\":\"Worker\"}]");
         controller.receive("ready", "issues", signature(ready), ready);
-        verify(runs).submitIssue(any());
+        verify(runs).submitIssue(any(), any());
     }
 }

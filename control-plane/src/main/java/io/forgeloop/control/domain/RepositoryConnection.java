@@ -72,6 +72,14 @@ public class RepositoryConnection {
     agentLoopBudget = budget == null ? null : budget.copy();
     policyRevision++;
   }
+  /** Sets a positive per-run ceiling; the service also enforces the organization-wide hard limit. */
+  public void configureMaxBudgetUsd(double budgetUsd) {
+    if (!Double.isFinite(budgetUsd) || budgetUsd <= 0) {
+      throw new IllegalArgumentException("Repository run budget must be a positive finite amount");
+    }
+    maxBudgetUsd = budgetUsd;
+    policyRevision++;
+  }
   /** Opts this repository into uploading verbatim, redacted run-record segments. */
   public void configureRunRecord(boolean enabled) {
     runRecordEnabled = enabled;

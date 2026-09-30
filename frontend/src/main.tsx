@@ -56,6 +56,7 @@ import IssueChatPage from "./issue-chat/IssueChatPage";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
 import RunRecordSettings from "./RunRecordSettings";
+import RepositoryBudgetSettings from "./RepositoryBudgetSettings";
 import "./styles.css";
 import "./dashboard-responsive.css";
 
@@ -76,6 +77,13 @@ const stamp = (value: string) =>
   }).format(new Date(value));
 
 function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnection[]; operator:OperatorSession; onSaved:(item:RepositoryConnection)=>void }) {
+  const [organizationLimit, setOrganizationLimit] = useState<number>();
+  const [configurationError, setConfigurationError] = useState('');
+  useEffect(() => {
+    void loadPlatformConfiguration()
+      .then(configuration => setOrganizationLimit(configuration.policy.maxRunBudgetUsd))
+      .catch(reason => setConfigurationError(reason instanceof Error ? reason.message : 'Unable to load the organization budget'));
+  }, []);
   return (
     <>
       <section className="hero">
@@ -110,6 +118,11 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
                   {item.requiredGates.join(", ")}
                 </small>
                 <IntakeSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
+                {organizationLimit !== undefined
+                  ? <RepositoryBudgetSettings item={item} organizationLimit={organizationLimit} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
+                  : configurationError
+                    ? <p role="alert">Unable to show the repository budget control: {configurationError}</p>
+                    : <p role="status">Loading the organization budget limit…</p>}
                 <RunRecordSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
                 <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
               </div>

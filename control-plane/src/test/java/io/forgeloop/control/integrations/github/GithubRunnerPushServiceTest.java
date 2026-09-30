@@ -44,7 +44,8 @@ class GithubRunnerPushServiceTest {
         when(task.getRepository()).thenReturn("acme/ticketly");
         when(task.getRun()).thenReturn(run);
         when(run.getId()).thenReturn("run-1");
-        when(connections.requireEnabled("acme/ticketly")).thenReturn(connection);
+        when(run.getOrganizationId()).thenReturn("org-1");
+        when(connections.requireEnabledForRun("acme/ticketly", "org-1")).thenReturn(connection);
         when(connection.getInstallationId()).thenReturn(7L);
     }
 
