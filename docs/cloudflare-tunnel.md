@@ -43,6 +43,11 @@ openssl version
 Do not expose ports 5432, 8090, or 5173 in the server firewall or cloud firewall.
 Compose binds them to `127.0.0.1` for local diagnostics only. The tunnel reaches
 the application through the private Compose network.
+If a default diagnostic port is occupied, set `FORGELOOP_POSTGRES_HOST_PORT`,
+`FORGELOOP_API_HOST_PORT`, `FORGELOOP_WEB_HOST_PORT`, or
+`FORGELOOP_WEBHOOK_HOST_PORT` in the server `.env` to unused ports. These
+settings change only the host-side loopback bindings; container ports and the
+tunnel's internal service addresses do not change.
 
 ## Install a new server
 
@@ -125,7 +130,8 @@ the application through the private Compose network.
 
    ```bash
    sudo install -d -o root -g root -m 700 /etc/forgeloop/secrets
-   sudo install -o root -g root -m 600 "$HOME/forgeloop-tunnel.json" \
+   # The pinned cloudflared image runs as UID/GID 65532 and needs read access.
+   sudo install -o root -g 65532 -m 640 "$HOME/forgeloop-tunnel.json" \
      /etc/forgeloop/secrets/credentials.json
    ```
 
@@ -144,8 +150,8 @@ the application through the private Compose network.
    cd /opt/forgeloop
    sudo docker compose up -d --build --wait
    sudo docker compose ps
-   curl -fsS http://127.0.0.1:8090/actuator/health/readiness
-   curl -fsSI http://127.0.0.1:5173/
+   curl -fsS "http://$(docker compose port control-plane 8090)/actuator/health/readiness"
+   curl -fsSI "http://$(docker compose port web 80)/"
    ```
 
    Confirm PostgreSQL, `control-plane`, `web`, `webhook-edge`, and

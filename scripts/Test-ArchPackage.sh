@@ -28,9 +28,12 @@ docker run --rm --platform linux/amd64 \
     tar --zstd -xOf /tmp/forgeloop-runner.pkg.tar.zst .PKGINFO | grep -Fx "arch = $TARGET_ARCH"
     tar --zstd -tf /tmp/forgeloop-runner.pkg.tar.zst | grep -Fx "usr/bin/forgeloop-runner"
     tar --zstd -tf /tmp/forgeloop-runner.pkg.tar.zst | grep -Fx "usr/share/applications/forgeloop-runner.desktop"
+    tar --zstd -tf /tmp/forgeloop-runner.pkg.tar.zst | grep -Fx "opt/forgeloop-runner/bin/ForgeLoop Runner"
+    tar --zstd -xOf /tmp/forgeloop-runner.pkg.tar.zst usr/bin/forgeloop-runner | grep -Fx "exec \"/opt/forgeloop-runner/bin/ForgeLoop Runner\" \"\$@\""
     if [[ "$INSTALL_PACKAGE" == true ]]; then
       pacman -S --disable-sandbox --noconfirm --needed libsecret gtk3 libx11 libxext libxi libxrender libxtst libxrandr libxinerama libxcursor libxfixes libxcb fontconfig freetype2
       pacman -U --disable-sandbox --noconfirm /tmp/forgeloop-runner.pkg.tar.zst
+      test -x "/opt/forgeloop-runner/bin/ForgeLoop Runner"
       /usr/bin/forgeloop-runner --version
       pacman -Rns --noconfirm forgeloop-runner
     fi

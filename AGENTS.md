@@ -26,3 +26,7 @@ Work autonomously and continuously toward the user's overall goal.
   - you are genuinely blocked.
 - Progress updates are not completion. Do not end a turn solely to summarize progress.
 - Before finishing, review the original request and verify that every requested item has been completed.
+
+## Git remotes
+
+When a push is requested for this repository, push the same intended branch and commits to both `origin` (Gitea) and `github` (GitHub). Verify the remotes and the changes being published first. Do not push secrets or unrelated changes.

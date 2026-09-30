@@ -15,7 +15,7 @@ services:
       timeout: 3s
       retries: 10
     # Local diagnostics only; public traffic reaches the app through Cloudflare Tunnel.
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${FORGELOOP_POSTGRES_HOST_PORT:-5432}:5432"]
   control-plane:
     build: ./control-plane
     restart: unless-stopped
@@ -60,7 +60,7 @@ services:
       timeout: 5s
       retries: 10
     # Keep the API reachable to host-side tools without exposing it to the LAN/Internet.
-    ports: ["127.0.0.1:8090:8090"]
+    ports: ["127.0.0.1:${FORGELOOP_API_HOST_PORT:-8090}:8090"]
   web:
     build:
       context: .
@@ -71,7 +71,7 @@ services:
     depends_on:
       control-plane: { condition: service_healthy }
     # Keep the UI available for local checks; production ingress is the tunnel container.
-    ports: ["127.0.0.1:5173:80"]
+    ports: ["127.0.0.1:${FORGELOOP_WEB_HOST_PORT:-5173}:80"]
   webhook-edge:
     image: nginx:1.29-alpine
     restart: unless-stopped
@@ -80,7 +80,7 @@ services:
     depends_on:
       control-plane: { condition: service_healthy }
     # Loopback-only: the tunnel container reaches this service over the Docker network.
-    ports: ["127.0.0.1:8091:8080"]
+    ports: ["127.0.0.1:${FORGELOOP_WEBHOOK_HOST_PORT:-8091}:8080"]
   database-backup:
     image: postgres:18-alpine
     restart: unless-stopped

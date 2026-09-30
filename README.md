@@ -64,6 +64,7 @@ This is an evolving portfolio product, not a claim that every production launch 
 
 - [Reliability and recovery](docs/reliability.md)
 - [Linux server deployment and Cloudflare Tunnel](docs/cloudflare-tunnel.md)
+- [Gitea webhook deployment](docs/cicd-deployment.md)
 - [Deferred launch checks](docs/deferred-launch-checks.md)
 - [Desktop release workflow](docs/desktop-releases.md)
 - [Public website verification](docs/public-website.md)

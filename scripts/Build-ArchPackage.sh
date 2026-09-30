@@ -40,7 +40,7 @@ icon_sha256=$(sha256sum "$build_root/forgeloop.png" | cut -d ' ' -f1)
 cat > "$build_root/forgeloop-runner" <<'WRAPPER'
 #!/usr/bin/env sh
 set -eu
-exec "/opt/forgeloop-runner/ForgeLoop Runner/bin/ForgeLoop Runner" "$@"
+exec "/opt/forgeloop-runner/bin/ForgeLoop Runner" "$@"
 WRAPPER
 chmod 755 "$build_root/forgeloop-runner"
 wrapper_sha256=$(sha256sum "$build_root/forgeloop-runner" | cut -d ' ' -f1)
