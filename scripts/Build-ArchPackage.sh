@@ -82,6 +82,7 @@ docker run --rm --platform linux/amd64 \
   --volume "$output:/package-output" \
   --workdir /build \
   archlinux:base-devel bash -euc '
+    printf "Arch artifact handoff target: %s/%s\n" /package-output "$PACKAGE_FILENAME"
     # Pacman's syscall sandbox cannot initialize inside Docker's default seccomp profile.
     pacman -Syu --disable-sandbox --noconfirm
     # makepkg.conf selects the package ABI; override it for the ARM payload
@@ -101,9 +102,11 @@ docker run --rm --platform linux/amd64 \
     # Keep the host artifact outside the builder-owned staging directory.
     cp "$package_file" "/package-output/$PACKAGE_FILENAME"
     chmod 644 "/package-output/$PACKAGE_FILENAME"
+    find /package-output -maxdepth 1 -type f -printf "Arch artifact in container: %f (%s bytes)\n"
   '
 
 if [[ ! -s "$output/$artifact_name" ]]; then
-  echo 'makepkg did not create the expected Arch package' >&2
+  echo "Arch package missing on host: $output/$artifact_name" >&2
+  find "$output" -maxdepth 1 -type f -printf 'Host output file: %f (%s bytes)\n' >&2
   exit 1
 fi
