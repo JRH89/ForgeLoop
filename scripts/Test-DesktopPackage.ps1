@@ -73,12 +73,18 @@ if ($PackageType -eq 'msi') {
     & sudo rpm --install --nodeps $package.FullName
     if ($LASTEXITCODE -ne 0) { throw 'RPM installation failed' }
     try {
-        $launchers=@((& rpm -ql forgeloop-runner) | Where-Object { $_.EndsWith('/bin/ForgeLoop Runner') })
-        if ($launchers.Count -ne 1 -or -not $launchers[0].StartsWith('/opt/forgeloop-runner/')) { throw 'Unexpected installed RPM launcher layout' }
+        # Query as root, matching the install operation and avoiding differences
+        # in RPM database permissions across minimal Ubuntu runner images.
+        $installedFiles=@(& sudo rpm -ql forgeloop-runner)
+        if ($LASTEXITCODE -ne 0) { throw 'RPM package inventory query failed' }
+        $launchers=@($installedFiles | Where-Object { $_.EndsWith('/bin/ForgeLoop Runner') })
+        if ($launchers.Count -ne 1 -or -not $launchers[0].StartsWith('/opt/forgeloop-runner/')) {
+            throw "Unexpected installed RPM launcher layout (matches=$($launchers.Count); inventory=$($installedFiles -join ', '))"
+        }
         $configuration=Join-Path (Split-Path (Split-Path $launchers[0] -Parent) -Parent) 'lib/app/ForgeLoop Runner.cfg'
         if (-not (Test-Path -LiteralPath $configuration) -or -not (Get-Content -LiteralPath $configuration -Raw).Contains('-Dforgeloop.desktop.package=rpm')) { throw 'RPM updater target option is missing' }
         $expectedHash=(Get-FileHash 'artifacts/native-installer/icons/forgeloop.png').Hash
-        $matchingIcons=@((& rpm -ql forgeloop-runner) | Where-Object { $_.EndsWith('.png') -and (Test-Path -LiteralPath $_) -and (Get-FileHash -LiteralPath $_).Hash -eq $expectedHash })
+        $matchingIcons=@($installedFiles | Where-Object { $_.EndsWith('.png') -and (Test-Path -LiteralPath $_) -and (Get-FileHash -LiteralPath $_).Hash -eq $expectedHash })
         if ($matchingIcons.Count -eq 0) { throw 'RPM package favicon is missing' }
         & $launchers[0] --self-test
         if ($LASTEXITCODE -ne 0) { throw 'Installed RPM launcher failed' }
