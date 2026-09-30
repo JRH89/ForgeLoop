@@ -87,12 +87,20 @@ docker run --rm --platform linux/amd64 \
     printf "\\nCARCH=\\\"%s\\\"\\n" "$TARGET_ARCH" >> /build/makepkg.conf
     useradd --create-home builder
     chown -R builder:builder /build
-    su builder -c "cd /build && makepkg --config /build/makepkg.conf --nodeps --noconfirm --cleanbuild"
+    su builder -c "cd /build && PKGDEST=/build makepkg --config /build/makepkg.conf --nodeps --noconfirm --cleanbuild"
+    package_file=$(find /build -maxdepth 1 -type f -name "forgeloop-runner-*.pkg.tar.zst" -print -quit)
+    if [[ -z "$package_file" ]]; then
+      echo "makepkg completed without an Arch package; build directory contains:" >&2
+      find /build -maxdepth 2 -type f -printf "%p\\n" >&2
+      exit 1
+    fi
+    tar --zstd -xOf "$package_file" .PKGINFO | grep -Fx "arch = $TARGET_ARCH"
+    cp "$package_file" /build/forgeloop-runner-output.pkg.tar.zst
   '
 
-if [[ ! -s "$build_root/forgeloop-runner-$version-1-$package_arch.pkg.tar.zst" ]]; then
+if [[ ! -s "$build_root/forgeloop-runner-output.pkg.tar.zst" ]]; then
   echo 'makepkg did not create the expected Arch package' >&2
   exit 1
 fi
-cp "$build_root/forgeloop-runner-$version-1-$package_arch.pkg.tar.zst" \
+cp "$build_root/forgeloop-runner-output.pkg.tar.zst" \
   "$output/forgeloop-runner-$version-linux-$architecture.pkg.tar.zst"
