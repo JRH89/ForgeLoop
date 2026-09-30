@@ -1,6 +1,7 @@
 package io.forgeloop.control.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,7 +17,9 @@ import java.util.List;
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = {"task_id", "attempt"}))
 public class RepairPackage {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
-    @ManyToOne(optional = false) private DeliveryTask task;
+    // A quality-repair package may be saved before the new repair task is flushed
+    // through its run collection, so persist that task as part of this association.
+    @ManyToOne(optional = false, cascade = CascadeType.PERSIST) private DeliveryTask task;
     private int attempt;
     @Column(nullable = false, length = 80) private String failureCategory;
     @Column(length = 64) private String changeSha;
