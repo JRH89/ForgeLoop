@@ -30,6 +30,7 @@ command -v docker >/dev/null || { echo 'Docker is required to build a pacman pac
 build_root=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/forgeloop-arch.XXXXXX")
 trap 'rm -rf -- "$build_root"' EXIT
 mkdir -p "$output"
+artifact_name="forgeloop-runner-$version-linux-$architecture.pkg.tar.zst"
 cp "$icon" "$build_root/forgeloop.png"
 tar -czf "$build_root/forgeloop-runner-payload.tar.gz" -C "$(dirname "$app_image")" "$(basename "$app_image")"
 payload_sha256=$(sha256sum "$build_root/forgeloop-runner-payload.tar.gz" | cut -d ' ' -f1)
@@ -76,7 +77,9 @@ PKGBUILD
 
 docker run --rm --platform linux/amd64 \
   --env TARGET_ARCH="$package_arch" \
+  --env PACKAGE_FILENAME="$artifact_name" \
   --volume "$build_root:/build" \
+  --volume "$output:/package-output" \
   --workdir /build \
   archlinux:base-devel bash -euc '
     # Pacman's syscall sandbox cannot initialize inside Docker's default seccomp profile.
@@ -95,14 +98,12 @@ docker run --rm --platform linux/amd64 \
       exit 1
     fi
     tar --zstd -xOf "$package_file" .PKGINFO | grep -Fx "arch = $TARGET_ARCH"
-    cp "$package_file" /build/forgeloop-runner-output.pkg.tar.zst
-    # makepkg runs as builder; restore host traversal after changing the mounted directory owner.
-    chmod 755 /build
+    # Keep the host artifact outside the builder-owned staging directory.
+    cp "$package_file" "/package-output/$PACKAGE_FILENAME"
+    chmod 644 "/package-output/$PACKAGE_FILENAME"
   '
 
-if [[ ! -s "$build_root/forgeloop-runner-output.pkg.tar.zst" ]]; then
+if [[ ! -s "$output/$artifact_name" ]]; then
   echo 'makepkg did not create the expected Arch package' >&2
   exit 1
 fi
-cp "$build_root/forgeloop-runner-output.pkg.tar.zst" \
-  "$output/forgeloop-runner-$version-linux-$architecture.pkg.tar.zst"
