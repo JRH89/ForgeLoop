@@ -29,6 +29,8 @@ command -v docker >/dev/null || { echo 'Docker is required to build a pacman pac
 
 build_root=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/forgeloop-arch.XXXXXX")
 trap 'rm -rf -- "$build_root"' EXIT
+host_uid=$(id -u)
+host_gid=$(id -g)
 mkdir -p "$output"
 artifact_name="forgeloop-runner-$version-linux-$architecture.pkg.tar.zst"
 cp "$icon" "$build_root/forgeloop.png"
@@ -79,11 +81,15 @@ PKGBUILD
 docker run --rm --platform linux/amd64 \
   --env TARGET_ARCH="$package_arch" \
   --env PACKAGE_FILENAME="$artifact_name" \
+  --env HOST_UID="$host_uid" \
+  --env HOST_GID="$host_gid" \
   --volume "$build_root:/build" \
   --volume "$output:/package-output" \
   --workdir /build \
   archlinux:base-devel bash -euc '
     printf "Arch artifact handoff target: %s/%s\n" /package-output "$PACKAGE_FILENAME"
+    : "${HOST_UID:?The host UID must be provided for build cleanup}"
+    : "${HOST_GID:?The host GID must be provided for build cleanup}"
     # Pacman sandbox support is incompatible with the default Docker seccomp profile.
     pacman -Syu --disable-sandbox --noconfirm
     # makepkg.conf selects the package ABI; override it for the ARM payload
@@ -104,6 +110,8 @@ docker run --rm --platform linux/amd64 \
     cp "$package_file" "/package-output/$PACKAGE_FILENAME"
     chmod 644 "/package-output/$PACKAGE_FILENAME"
     find /package-output -maxdepth 1 -type f -printf "Arch artifact in container: %f (%s bytes)\n"
+    # Return the temporary staging tree to the runner so its EXIT cleanup can remove it.
+    chown -R "$HOST_UID:$HOST_GID" /build
   '
 
 if [[ ! -s "$output/$artifact_name" ]]; then
