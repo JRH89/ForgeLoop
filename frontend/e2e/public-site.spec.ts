@@ -131,6 +131,13 @@ test('static assets, sitemap, and canonical redirects work',async({request})=>{
   expect(redirect.headers().location).toMatch(/\/about$/);
 });
 
+test('about page omits the studio credit and footer has no studio link',async({page})=>{
+  await page.goto('/about');
+  await expect(page.getByRole('heading',{name:'Built by Hooker Hill Studios',exact:true})).toHaveCount(0);
+  await expect(page.locator('.footer-note a[href="https://hookerhillstudios.com"]')).toHaveCount(0);
+  await expect(page.locator('.footer-note')).toContainText('© 2026 Hooker Hill Studios.');
+});
+
 test('article cards open from their read action and every page has distinct artwork',async({page,request})=>{
   for(const article of articles){
     await page.goto('/blog');
