@@ -172,7 +172,8 @@ The new desktop app includes Java and guides you through **Connect → Provider 
 Run**. In Connect, **Check requirements** verifies Git and that Docker can reach
 a Linux-container engine. If a tool is missing or stopped, the app explains the
 next step and opens the official Git and Docker installation guide for Windows,
-macOS, or Linux. Connect checks again before creating browser approval; Start
+macOS, or Linux. These checks only inspect readiness; start Docker manually for
+first-time pairing. Connect checks again before creating browser approval; Start
 checks once more immediately before work can be claimed. No enrollment token is
 copied. Connect opens GitHub sign-in and an administrator approval page; compare
 the fingerprint in both windows. Choose a model, save your API key in your
@@ -183,6 +184,23 @@ lookup date and published source; use manual prices for account-specific terms.
 If no verified rate is available or the catalog cannot be reached, save the
 model without prices and cost will display N/A rather than $0. No provider call
 is made during setup.
+
+When you select **Start runner**, the app can start an installed local Docker
+engine on Windows, macOS, or Linux and wait up to two minutes for Linux
+containers. Starting Docker itself does not call a model. Progress appears in
+the log; **Cancel Docker startup** stops the wait and leaves the runner stopped,
+although Docker may remain open. Linux system services may ask for administrator
+authentication through your desktop. Complete Docker's first-run setup and any
+permission prompts before retrying.
+
+Git and Docker still need to be installed. The app does not install software,
+enable Docker at boot, change container mode, or replace your selected Docker
+context. Stopped remote/custom endpoints and access problems show the next step rather
+than starting another engine. **Check requirements** and pairing do not start
+Docker or claim work. Readiness checks and the runner keep the original Docker
+connection even if Docker Desktop changes the CLI's default context. Restoring
+that default is best-effort; after cancelling a slow Desktop launch, check your
+CLI context before other Docker work.
 
 On reopening, **Run** is selected when your setup is saved. An empty key field
 does not mean your key was lost: leave it blank to retain the stored key.
@@ -204,7 +222,8 @@ then close the app before installing. Compare all 64 SHA-256 characters after
 download; a matching checksum confirms file integrity, not publisher identity.
 
 Use **Pause after current work** before closing or updating. Optional sign-in
-startup can spend API credits and requires Docker and an unlocked keyring.
+startup follows the same Docker startup checks, can spend API credits once work
+starts, and requires an unlocked keyring.
 Windows uses DPAPI, macOS uses Keychain, and all Linux package formats require
 libsecret tools and an unlocked desktop keyring. Headless Linux servers should use the CLI below.
 Current desktop installers are unsigned previews; Windows or macOS may show

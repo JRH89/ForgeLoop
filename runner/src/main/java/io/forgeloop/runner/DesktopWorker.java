@@ -18,6 +18,10 @@ public final class DesktopWorker {
     }
     public synchronized boolean pausing(){return running()&&pauseRequested;}
     public synchronized void start(DesktopConfiguration config,String key,Consumer<String> log)throws Exception{
+        start(config,key,log,Map.of());
+    }
+    /** Keep the verified local engine selected even if Docker Desktop changes the global CLI context. */
+    synchronized void start(DesktopConfiguration config,String key,Consumer<String> log,Map<String,String> dockerEnvironment)throws Exception{
         if(running())throw new IllegalStateException("Runner is already working");
         Files.deleteIfExists(directory.resolve("pause"));
         pauseRequested=false;
@@ -28,6 +32,7 @@ public final class DesktopWorker {
         args.add(".");args.add(directory.resolve("leases").toString());args.add("1");
         var builder=new ProcessBuilder(args).redirectErrorStream(true);
         builder.environment().put("PATH",DesktopToolPaths.searchPath());
+        applyDockerEnvironment(builder.environment(),dockerEnvironment);
         for(String variable:List.of("ANTHROPIC_API_KEY","OPENAI_API_KEY","GEMINI_API_KEY"))builder.environment().remove(variable);
         builder.environment().put(config.keyVariable(),key);
         builder.environment().put("FORGELOOP_RUNNER_PAUSE_FILE",directory.resolve("pause").toString());
@@ -35,6 +40,14 @@ public final class DesktopWorker {
         String credential=new RunnerIdentityStore().load(directory.resolve("identity")).credential();
         process=builder.start();Process child=process;
         Thread.ofVirtual().start(()->{try(var reader=child.inputReader()){String line;while((line=reader.readLine())!=null)log.accept(redact(line,key,credential));log.accept("Worker stopped. Exit code: "+child.waitFor());}catch(Exception ignored){log.accept("Worker log connection closed.");}});
+    }
+    /** Limit caller overrides to the connection selection, retaining existing TLS/context configuration. */
+    static void applyDockerEnvironment(Map<String,String> environment,Map<String,String> dockerEnvironment){
+        for(String variable:List.of("DOCKER_CONTEXT","DOCKER_HOST")){
+            if(!dockerEnvironment.containsKey(variable))continue;
+            String value=dockerEnvironment.get(variable);
+            if(value.isEmpty())environment.remove(variable);else environment.put(variable,value);
+        }
     }
     static String redact(String line,String key,String credential){return line.replace(key,"[REDACTED]").replace(credential,"[REDACTED]");}
     public synchronized void pause()throws Exception{if(running()){Files.writeString(directory.resolve("pause"),"pause after current batch");pauseRequested=true;}}

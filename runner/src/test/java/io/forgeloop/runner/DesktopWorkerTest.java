@@ -12,6 +12,18 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DesktopWorkerTest {
     @TempDir Path directory;
+    @Test void verifiedDockerConnectionOverridesOnlyTheAllowlistedSelection(){
+        var environment=new java.util.HashMap<>(java.util.Map.of("DOCKER_CONTEXT","old-context","DOCKER_HOST","ssh://old",
+                "DOCKER_CERT_PATH","private-certificates","UNRELATED","unchanged"));
+        DesktopWorker.applyDockerEnvironment(environment,java.util.Map.of("DOCKER_CONTEXT","selected","DOCKER_HOST","","UNRELATED","not-allowed"));
+        assertEquals("selected",environment.get("DOCKER_CONTEXT"));
+        assertFalse(environment.containsKey("DOCKER_HOST"));
+        assertEquals("private-certificates",environment.get("DOCKER_CERT_PATH"));
+        assertEquals("unchanged",environment.get("UNRELATED"));
+        DesktopWorker.applyDockerEnvironment(environment,java.util.Map.of("DOCKER_CONTEXT","","DOCKER_HOST","unix:///run/docker.sock"));
+        assertFalse(environment.containsKey("DOCKER_CONTEXT"));
+        assertEquals("unix:///run/docker.sock",environment.get("DOCKER_HOST"));
+    }
     @Test void launchesRealChildAndPausesWithoutProviderCalls()throws Exception{
         HttpServer server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);AtomicInteger requests=new AtomicInteger();
         server.createContext("/graphql",exchange->{String request=new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8);requests.incrementAndGet();String response=request.contains("availableRunnerTasks")?"{\"data\":{\"availableRunnerTasks\":[]}}":"{\"data\":{\"runnerHeartbeat\":{\"id\":\"test\"}}}";byte[] bytes=response.getBytes(StandardCharsets.UTF_8);exchange.sendResponseHeaders(200,bytes.length);try(var body=exchange.getResponseBody()){body.write(bytes);}});
