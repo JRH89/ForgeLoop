@@ -22,13 +22,13 @@ public final class DesktopRunner {
     private final JTabbedPane steps=new JTabbedPane();
     private final JComboBox<String> provider=new JComboBox<>(new String[]{"anthropic","openai","gemini"});
     private final JPasswordField key=new JPasswordField();
-    private final JCheckBox login=new JCheckBox("Start work at sign-in (can incur API charges)");
+    private final JCheckBox login=new JCheckBox("Start work at sign-in");
     private final JTextArea logs=new JTextArea(9,65);
-    private final JLabel status=new JLabel("Not started. Setup does not spend API credits.");
-    private final JLabel fingerprint=new JLabel(" ");
-    private final JLabel connectionStatus=new JLabel("Not connected yet"),keyStatus=new JLabel("No saved provider settings");
-    private final JLabel gitPrerequisite=new JLabel("Not checked"),dockerPrerequisite=new JLabel("Not checked");
-    private final JLabel priceStatus=new JLabel("Open Provider to check public model pricing.");
+    private final JTextArea status=DesktopLayout.text("Not started. Setup does not spend API credits.");
+    private final JTextArea fingerprint=DesktopLayout.text(" ");
+    private final JTextArea connectionStatus=DesktopLayout.text("Not connected yet"),keyStatus=DesktopLayout.text("No saved provider settings");
+    private final JTextArea gitPrerequisite=DesktopLayout.text("Not checked"),dockerPrerequisite=DesktopLayout.text("Not checked");
+    private final JTextArea priceStatus=DesktopLayout.text("Open Provider to check public model pricing.");
     private final ModelPriceCatalog priceCatalog=new ModelPriceCatalog();
     private volatile ModelPriceCatalog.Quote selectedQuote;
     private volatile boolean manualPrices;
@@ -39,6 +39,11 @@ public final class DesktopRunner {
     private final java.util.concurrent.atomic.AtomicBoolean pairingCancelled=new java.util.concurrent.atomic.AtomicBoolean();
     private final JButton connect=new JButton("Connect in browser"),save=new JButton("Save provider settings"),start=new JButton("Start runner"),pause=new JButton("Pause after current work"),check=new JButton("Check Git and Docker");
     private final java.util.concurrent.atomic.AtomicBoolean busy=new java.util.concurrent.atomic.AtomicBoolean();
+    private final JButton cancelDockerStartup=new JButton("Cancel Docker startup");
+    private final java.util.concurrent.atomic.AtomicBoolean dockerStartupCancelled=new java.util.concurrent.atomic.AtomicBoolean();
+    private final Object startupLock=new Object();
+    private volatile boolean preparingDocker;
+    private volatile String setupStatus="Setup in progress - no paid work started";
     private volatile DesktopConfiguration configuration;
     private final Timer statusTimer;
     DesktopRunner(Path directory,boolean autoStart)throws Exception{
@@ -53,48 +58,76 @@ public final class DesktopRunner {
         name.setEditable(!Files.exists(directory.resolve("identity")));
         refreshSavedStatus();
         login.setSelected(configuration!=null&&configuration.startAtLogin());
-        JPanel connectionFields=new JPanel(new GridLayout(0,2,12,12));
-        field(connectionFields,"ForgeLoop address",endpoint);field(connectionFields,"Runner name",name);connectionFields.add(connect);connectionFields.add(fingerprint);
-        connectionFields.add(connectionStatus);connectionFields.add(new JLabel("No enrollment token to copy."));
-        connectionFields.add(reopen);connectionFields.add(cancelPairing);reopen.setEnabled(false);cancelPairing.setEnabled(false);
-        JButton checkConnection=new JButton("Check saved connection");connectionFields.add(checkConnection);connectionFields.add(new JLabel("Heartbeat only - does not claim work"));
+        JPanel connectionFields=DesktopLayout.stack(16);
+        connectionFields.add(DesktopLayout.field("ForgeLoop address",endpoint,null));
+        connectionFields.add(DesktopLayout.field("Runner name",name,null));
+        connectionFields.add(connectionStatus);
+        connectionFields.add(DesktopLayout.actions(connect));
+        connectionFields.add(fingerprint);
+        connectionFields.add(DesktopLayout.text("Approve this computer in your browser. No enrollment token to copy."));
+        connectionFields.add(DesktopLayout.actions(reopen,cancelPairing));reopen.setEnabled(false);cancelPairing.setEnabled(false);
+        JButton checkConnection=new JButton("Check saved connection");connectionFields.add(DesktopLayout.actions(checkConnection));
+        connectionFields.add(DesktopLayout.text("Heartbeat only - does not claim work or spend API credits."));
         checkConnection.addActionListener(e->background(()->{if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");client(URI.create(endpoint.getText().trim())).heartbeat(new RunnerIdentityStore().load(directory.resolve("identity")));log("Connection verified. No task was claimed and no provider call was made.");SwingUtilities.invokeLater(()->connectionStatus.setText("Connected - heartbeat verified"));}));
-        JPanel prerequisitePanel=new JPanel(new GridLayout(0,2,8,8));
-        prerequisitePanel.setBorder(BorderFactory.createTitledBorder("Before connecting: Git and Docker with Linux containers are required"));
-        prerequisitePanel.add(new JLabel("Git"));prerequisitePanel.add(prerequisiteRow(gitPrerequisite,guideButton("Install Git",DesktopPrerequisites.gitGuide())));
-        prerequisitePanel.add(new JLabel("Docker Engine"));prerequisitePanel.add(prerequisiteRow(dockerPrerequisite,guideButton("Install Docker",DesktopPrerequisites.dockerGuide())));
+        JPanel prerequisitePanel=DesktopLayout.stack(16);
+        prerequisitePanel.add(DesktopLayout.field("Git",gitPrerequisite,null));
+        prerequisitePanel.add(DesktopLayout.field("Docker Engine",dockerPrerequisite,null));
         JButton checkPrerequisites=new JButton("Check requirements");
-        prerequisitePanel.add(checkPrerequisites);prerequisitePanel.add(new JLabel("Checks this computer only; no API calls"));
+        prerequisitePanel.add(DesktopLayout.actions(checkPrerequisites,guideButton("Install Git",DesktopPrerequisites.gitGuide()),guideButton("Install Docker",DesktopPrerequisites.dockerGuide())));
+        prerequisitePanel.add(DesktopLayout.text("Checks this computer only; no API calls."));
         checkPrerequisites.addActionListener(e->background(()->updatePrerequisites(DesktopPrerequisites.check())));
-        JPanel connection=new JPanel(new BorderLayout(12,16));connection.add(prerequisitePanel,BorderLayout.NORTH);connection.add(connectionFields,BorderLayout.CENTER);
+        JPanel connection=DesktopLayout.stack(18);
+        connection.add(DesktopLayout.section("Before you connect","Git and Docker with Linux containers are required. Java is bundled.",prerequisitePanel));
+        connection.add(DesktopLayout.section("Connect to ForgeLoop","Link this computer to your account. Setup never starts paid work.",connectionFields));
         reopen.addActionListener(e->{if(approvalPage!=null)try{Desktop.getDesktop().browse(approvalPage);}catch(Exception failure){log("Could not open your browser. Check your default browser settings.");}});
         cancelPairing.addActionListener(e->{pairingCancelled.set(true);cancelPairing.setEnabled(false);log("Cancelling connection. Please wait for the current request to finish.");});
-        JPanel providerForm=new JPanel(new GridLayout(0,2,12,12));
-        field(providerForm,"Provider",provider);field(providerForm,"Model (choose or enter an ID)",model);field(providerForm,"API key (only stored on this computer)",key);
-        providerForm.add(new JLabel("Credential status"));providerForm.add(keyStatus);
+        JPanel providerForm=DesktopLayout.stack(16);
+        providerForm.add(DesktopLayout.field("Provider",provider,null));
+        providerForm.add(DesktopLayout.field("Model (choose or enter an ID)",model,null));
+        providerForm.add(DesktopLayout.field("API key",key,"Stored only on this computer. Leave blank to keep your saved key; enter a key to replace it."));
+        providerForm.add(keyStatus);
         key.setToolTipText("Leave blank to keep the saved key for this provider. Enter a key only to replace it.");
-        JButton checkKey=new JButton("Check saved key locally");providerForm.add(checkKey);providerForm.add(new JLabel("Checks storage, not API credit or key validity"));
+        JButton checkKey=new JButton("Check saved key locally");providerForm.add(DesktopLayout.actions(checkKey));providerForm.add(DesktopLayout.text("Checks protected storage, not API credit or key validity."));
         checkKey.addActionListener(e->{String selected=(String)provider.getSelectedItem();background(()->{new DesktopSecretStore(directory,selected).load();log("Saved key is readable from protected storage. No API request was made.");SwingUtilities.invokeLater(()->{if(selected.equals(provider.getSelectedItem()))keyStatus.setText("Saved key readable - no API request made");});});});
-        JPanel prices=new JPanel(new GridLayout(0,2,12,12));field(prices,"Input USD / million tokens",input);field(prices,"Output USD / million tokens",output);prices.setVisible(manualPrices);
+        JPanel prices=DesktopLayout.stack(16);prices.add(DesktopLayout.field("Input USD / million tokens",input,null));prices.add(DesktopLayout.field("Output USD / million tokens",output,null));prices.setVisible(manualPrices);
         JButton advanced=new JButton(manualPrices?"Use automatic prices":"Use manual prices");advanced.setToolTipText("Override public rates for custom models or account-specific pricing.");advanced.addActionListener(e->{manualPrices=!manualPrices;selectedQuote=null;priceLookupVersion.incrementAndGet();lookingUpPrice=false;prices.setVisible(manualPrices);advanced.setText(manualPrices?"Use automatic prices":"Use manual prices");if(!manualPrices)refreshPricing();else priceStatus.setText("Manual override: enter both prices, or leave both blank for N/A.");});
-        providerForm.add(new JLabel("Price estimate"));providerForm.add(priceStatus);providerForm.add(new JLabel("Account-specific rates?"));providerForm.add(advanced);providerForm.add(login);providerForm.add(save);
-        JPanel providerStep=new JPanel(new BorderLayout(12,12));providerStep.add(providerForm,BorderLayout.NORTH);providerStep.add(prices,BorderLayout.CENTER);
-        JPanel controls=new JPanel(new GridLayout(0,2,12,12));controls.add(check);controls.add(new JLabel("Git and Docker are required; Java is bundled."));controls.add(start);controls.add(pause);
-        JButton updates=new JButton("Check for updates");updates.addActionListener(e->background(this::checkUpdates));controls.add(updates);controls.add(new JLabel("View version and checksum; installer never launches here."));
-        JButton diagnostics=new JButton("Export safe diagnostics");controls.add(diagnostics);controls.add(new JLabel("No API keys, credentials, or task logs included"));
+        JPanel pricing=DesktopLayout.stack(16);pricing.add(priceStatus);pricing.add(DesktopLayout.actions(advanced));pricing.add(prices);
+        JPanel consent=DesktopLayout.stack(12);consent.add(DesktopLayout.actions(login));consent.add(DesktopLayout.text("Optional: automatically process eligible work when you sign in. Model API calls can incur charges."));consent.add(DesktopLayout.actions(save));
+        JPanel providerStep=DesktopLayout.stack(18);
+        providerStep.add(DesktopLayout.section("Provider & credentials","Bring your own provider account. Your API key never goes to the control plane.",providerForm));
+        providerStep.add(DesktopLayout.section("Cost estimates","Public model pricing is automatic. Use a manual override only for custom or account-specific rates.",pricing));
+        providerStep.add(DesktopLayout.section("Save & startup",null,consent));
+        JPanel controls=DesktopLayout.stack(12);controls.add(DesktopLayout.actions(start,pause));
+        controls.add(DesktopLayout.text("Start explicitly to process eligible issues. If local Docker is stopped, ForgeLoop will try to start it first."));
+        controls.add(DesktopLayout.actions(cancelDockerStartup));controls.add(DesktopLayout.text("Cancel stops preparation before paid work; Docker may remain running."));
+        cancelDockerStartup.setEnabled(false);
+        cancelDockerStartup.addActionListener(e->{
+            // Serialize cancellation with the final worker transition: never report cancellation after work starts.
+            synchronized(startupLock){
+                if(!preparingDocker)return;
+                dockerStartupCancelled.set(true);cancelDockerStartup.setEnabled(false);
+                setupStatus="Cancelling Docker startup - no paid work started";
+                log("Cancelling Docker startup. The runner will remain stopped; Docker may remain running.");
+            }
+        });
+        JPanel utilities=DesktopLayout.stack(12);utilities.add(DesktopLayout.actions(check));utilities.add(DesktopLayout.text("Git and Docker are required; Java is bundled."));
+        JButton updates=new JButton("Check for updates");updates.addActionListener(e->background(this::checkUpdates));utilities.add(DesktopLayout.actions(updates));utilities.add(DesktopLayout.text("View version and checksum. The installer never launches here."));
+        JButton diagnostics=new JButton("Export safe diagnostics");utilities.add(DesktopLayout.actions(diagnostics));utilities.add(DesktopLayout.text("No API keys, credentials, or task logs included."));
         diagnostics.addActionListener(e->{JFileChooser chooser=new JFileChooser();chooser.setSelectedFile(new java.io.File("forgeloop-diagnostics.txt"));if(chooser.showSaveDialog(frame)==JFileChooser.APPROVE_OPTION){Path target=chooser.getSelectedFile().toPath();if(Files.exists(target)&&JOptionPane.showConfirmDialog(frame,"Replace the existing diagnostics file?","Confirm replacement",JOptionPane.OK_CANCEL_OPTION)!=JOptionPane.OK_OPTION)return;String report=DesktopDiagnostics.summary(directory,configuration,worker.running());background(()->{DesktopFiles.writeAtomic(target.toAbsolutePath(),report.getBytes(java.nio.charset.StandardCharsets.UTF_8));log("Safe diagnostics exported. No secret material or raw logs were included.");});}});
         logs.setEditable(false);logs.setLineWrap(true);logs.setWrapStyleWord(true);
         logs.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12));logs.setMargin(new Insets(16,16,16,16));
-        JPanel runStep=new JPanel(new BorderLayout(12,12));runStep.add(controls,BorderLayout.NORTH);runStep.add(new JScrollPane(logs),BorderLayout.CENTER);
-        steps.addTab("1. Connect",step(connection));steps.addTab("2. Provider",step(providerStep));steps.addTab("3. Run",stretchStep(runStep));
+        JScrollPane logScroll=new JScrollPane(logs,JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        logScroll.setPreferredSize(new Dimension(1,220));
+        JPanel runStep=DesktopLayout.stack(18);runStep.add(DesktopLayout.section("Runner controls","You control when work starts and stops.",controls));runStep.add(DesktopLayout.section("Activity",null,logScroll));runStep.add(DesktopLayout.section("Tools & updates",null,utilities));
+        steps.addTab("1. Connect",DesktopLayout.scroll(connection));steps.addTab("2. Provider",DesktopLayout.scroll(providerStep));steps.addTab("3. Run",DesktopLayout.scroll(runStep));
         if(Files.exists(directory.resolve("identity")))steps.setSelectedIndex(configuration==null?1:2);
-        JPanel header=new JPanel(new BorderLayout(0,8));header.add(DesktopTheme.heading("ForgeLoop Runner"),BorderLayout.NORTH);header.add(new JLabel("Your machine. Your API keys. You control when work starts."),BorderLayout.SOUTH);
-        JPanel root=new JPanel(new BorderLayout(20,24));root.setBorder(BorderFactory.createEmptyBorder(28,28,20,28));root.add(header,BorderLayout.NORTH);root.add(steps,BorderLayout.CENTER);root.add(status,BorderLayout.SOUTH);frame.setContentPane(root);
+        JPanel header=DesktopLayout.stack(8);header.add(DesktopTheme.heading("ForgeLoop Runner"));header.add(DesktopLayout.text("Your machine. Your API keys. You control when work starts."));
+        JPanel root=new JPanel(new BorderLayout(0,18));root.setBorder(BorderFactory.createEmptyBorder(24,24,18,24));root.add(header,BorderLayout.NORTH);root.add(steps,BorderLayout.CENTER);root.add(status,BorderLayout.SOUTH);frame.setContentPane(root);
         DesktopTheme.primary(connect);DesktopTheme.primary(save);DesktopTheme.primary(start);
         if(configuration!=null)log("Saved settings restored. Your API key stays hidden; leave its field blank to keep it.");
         if(Files.exists(directory.resolve("identity")))log("Existing connection restored. You do not need to connect again.");
         connect.addActionListener(e->pair());save.addActionListener(e->save());check.addActionListener(e->background(()->updatePrerequisites(DesktopPrerequisites.check())));
-        start.addActionListener(e->{if(JOptionPane.showConfirmDialog(frame,"Start processing eligible issues? Model API calls can incur charges.","Start paid work",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION)background(()->{if(configuration==null)throw new IllegalStateException("Save provider settings first");if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");startWorker();log("Runner started.");});});
+        start.addActionListener(e->{if(JOptionPane.showConfirmDialog(frame,"Start processing eligible issues? ForgeLoop will try to start local Docker if needed. Model API calls can incur charges once the runner starts.","Start paid work",JOptionPane.OK_CANCEL_OPTION)==JOptionPane.OK_OPTION)background(()->{startWorker();log("Runner started.");});});
         pause.addActionListener(e->background(()->{worker.pause();log("Pause requested. Current work will finish before the worker stops.");}));
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter(){@Override public void windowClosing(WindowEvent e){if(worker.running()||busy.get()){JOptionPane.showMessageDialog(frame,"Pause the runner and wait for current work/setup to finish before closing.");return;}System.exit(0);}});
@@ -104,8 +137,9 @@ public final class DesktopRunner {
             connect.setEnabled(enabled&&!Files.exists(directory.resolve("identity")));save.setEnabled(enabled&&!lookingUpPrice);check.setEnabled(!busy.get());
             start.setEnabled(enabled&&configuration!=null&&Files.exists(directory.resolve("identity")));
             pause.setEnabled(!busy.get()&&worker.running()&&!worker.pausing());
+            cancelDockerStartup.setEnabled(busy.get()&&preparingDocker&&!dockerStartupCancelled.get());
             var snapshot=worker.status();
-            status.setText(worker.pausing()?"Pausing - waiting for current work or request to finish":busy.get()&&!worker.running()?"Setup in progress - no paid work started":snapshot.label());
+            status.setText(worker.pausing()?"Pausing - waiting for current work or request to finish":busy.get()&&!worker.running()?setupStatus:snapshot.label());
             status.setToolTipText(snapshot.lastContactMillis()==0?"No successful worker poll in this session":"Last successful control-plane poll: "+java.time.Instant.ofEpochMilli(snapshot.lastContactMillis()));
         });statusTimer.start();
         JTextField modelEditor=(JTextField)model.getEditor().getEditorComponent();
@@ -113,27 +147,24 @@ public final class DesktopRunner {
         modelEditor.getDocument().addDocumentListener(new javax.swing.event.DocumentListener(){public void insertUpdate(javax.swing.event.DocumentEvent e){changed();}public void removeUpdate(javax.swing.event.DocumentEvent e){changed();}public void changedUpdate(javax.swing.event.DocumentEvent e){changed();}private void changed(){if(steps.getSelectedIndex()!=1)return;if(manualPrices){input.setText("");output.setText("");priceStatus.setText("Model changed — enter both account-specific rates, or leave blank for N/A.");}else queuePriceLookup(priceDebounce);}});
         provider.addActionListener(e->{model.setModel(new DefaultComboBoxModel<>("anthropic".equals(provider.getSelectedItem())?new String[]{"claude-sonnet-5"}:new String[]{""}));refreshSavedStatus();if(steps.getSelectedIndex()==1){if(manualPrices){input.setText("");output.setText("");priceStatus.setText("Provider changed — enter both account-specific rates, or leave blank for N/A.");}else queuePriceLookup(priceDebounce);}});
         steps.addChangeListener(e->{if(steps.getSelectedIndex()==1&&!manualPrices)refreshPricing();});
-        frame.setMinimumSize(new Dimension(900,640));frame.pack();frame.setLocationByPlatform(true);frame.setVisible(true);
+        // Logical screen dimensions shrink on HiDPI displays; keep the first window above the taskbar.
+        GraphicsConfiguration display=frame.getGraphicsConfiguration();Rectangle screen=display.getBounds();Insets systemInsets=Toolkit.getDefaultToolkit().getScreenInsets(display);
+        int usableWidth=screen.width-systemInsets.left-systemInsets.right,usableHeight=screen.height-systemInsets.top-systemInsets.bottom;
+        frame.setMinimumSize(new Dimension(Math.min(640,usableWidth),Math.min(560,usableHeight)));
+        frame.setSize(Math.min(940,usableWidth),Math.min(800,usableHeight));frame.setLocationByPlatform(true);frame.setVisible(true);
         if(autoStart&&configuration!=null&&configuration.startAtLogin())background(()->{startWorker();log("Started using your saved sign-in consent.");});
     }
-    private static void field(JPanel panel,String label,JComponent component){JLabel text=new JLabel(label);text.setLabelFor(component);panel.add(text);panel.add(component);}
-    /** Keep expanded pricing and controls reachable on small or scaled displays. */
-    private static JPanel stretchStep(JPanel content){JPanel panel=new JPanel(new BorderLayout());panel.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));panel.add(content,BorderLayout.CENTER);return panel;}
     private JButton guideButton(String label,URI guide){
         JButton button=new JButton(label);
         button.addActionListener(event->{try{Desktop.getDesktop().browse(guide);}catch(Exception failure){JOptionPane.showMessageDialog(frame,"Open this official guide in your browser:\n"+guide,"Installation guide",JOptionPane.INFORMATION_MESSAGE);}});
         return button;
     }
-    private static JPanel prerequisiteRow(JLabel detail,JButton guide){
-        JPanel row=new JPanel(new BorderLayout(8,0));row.add(detail,BorderLayout.CENTER);row.add(guide,BorderLayout.EAST);return row;
-    }
     private void updatePrerequisites(DesktopPrerequisites.Report report){
         SwingUtilities.invokeLater(()->{
-            gitPrerequisite.setText(wrapped(report.git().detail()));dockerPrerequisite.setText(wrapped(report.docker().detail()));
+            gitPrerequisite.setText(report.git().detail());dockerPrerequisite.setText(report.docker().detail());
             log(report.summary());
         });
     }
-    private static String wrapped(String text){return "<html><div style='width:390px'>"+text.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")+"</div></html>";}
     private void checkUpdates()throws Exception{
         URI origin=URI.create(endpoint.getText().trim());
         DesktopReleaseCatalog.Release release=DesktopReleaseFeedClient.fetch(origin,DesktopReleaseCatalog.Target.current());
@@ -168,13 +199,6 @@ public final class DesktopRunner {
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new java.awt.datatransfer.StringSelection(release.sha256()),null);
             JOptionPane.showMessageDialog(frame,"SHA-256 copied. Compare all 64 characters.","Checksum copied",JOptionPane.INFORMATION_MESSAGE);
         }
-    }
-    private static JPanel step(JPanel content){
-        JPanel body=new JPanel(new BorderLayout());body.setBorder(BorderFactory.createEmptyBorder(20,12,12,12));body.add(content,BorderLayout.NORTH);
-        JScrollPane scroll=new JScrollPane(body,JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setBorder(BorderFactory.createEmptyBorder());scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.setPreferredSize(new Dimension(820,430));
-        JPanel panel=new JPanel(new BorderLayout());panel.add(scroll,BorderLayout.CENTER);return panel;
     }
     /** UI verification may dispose an idle window without terminating its test JVM. */
     void disposeIdle(){if(worker.running()||busy.get())throw new IllegalStateException("Cannot dispose active runner");statusTimer.stop();frame.dispose();}
@@ -250,8 +274,27 @@ public final class DesktopRunner {
         save.setEnabled(false);
         debounce.restart();
     }
-    private void startWorker()throws Exception{if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");DesktopPrerequisites.requireReady();DesktopFiles.writeAtomic(directory.resolve("provider-policy.json"),JSON.writeValueAsBytes(configuration.policy()));worker.start(configuration,new DesktopSecretStore(directory,configuration.provider()).load(),this::log);}
-    private void background(Work work){if(!busy.compareAndSet(false,true))return;Thread.ofVirtual().start(()->{try{work.run();}catch(Exception error){SwingUtilities.invokeLater(()->steps.setSelectedIndex(2));log("Action failed: "+(error instanceof IllegalArgumentException||error instanceof IllegalStateException?error.getMessage():error.getClass().getSimpleName()+"; check prerequisites and connectivity"));}finally{busy.set(false);}});}
+    /** Manual start and previously consented sign-in startup share the same readiness/cancellation boundary. */
+    private void startWorker()throws Exception{
+        if(configuration==null)throw new IllegalStateException("Save provider settings first");
+        if(!Files.exists(directory.resolve("identity")))throw new IllegalStateException("Connect this runner first");
+        synchronized(startupLock){dockerStartupCancelled.set(false);preparingDocker=true;}
+        try{
+            var prepared=DesktopDockerStartup.prepareForWorker(message->{setupStatus=message;log(message);},dockerStartupCancelled::get);
+            var report=prepared.prerequisites();
+            updatePrerequisites(report);
+            if(!report.ready())throw new IllegalStateException(report.summary());
+            // Load local secrets before the transition, leaving Cancel responsive if the OS vault is slow.
+            var secret=new DesktopSecretStore(directory,configuration.provider()).load();
+            synchronized(startupLock){
+                if(dockerStartupCancelled.get())throw new IllegalStateException("Docker startup cancelled. The runner was not started.");
+                DesktopFiles.writeAtomic(directory.resolve("provider-policy.json"),JSON.writeValueAsBytes(configuration.policy()));
+                worker.start(configuration,secret,this::log,prepared.dockerEnvironment());
+                preparingDocker=false;
+            }
+        }finally{preparingDocker=false;}
+    }
+    private void background(Work work){if(!busy.compareAndSet(false,true))return;setupStatus="Setup in progress - no paid work started";Thread.ofVirtual().start(()->{try{work.run();}catch(Exception error){SwingUtilities.invokeLater(()->steps.setSelectedIndex(2));log("Action failed: "+(error instanceof IllegalArgumentException||error instanceof IllegalStateException?error.getMessage():error.getClass().getSimpleName()+"; check prerequisites and connectivity"));}finally{busy.set(false);}});}
     private void log(String message){SwingUtilities.invokeLater(()->{if(logs.getDocument().getLength()>24000)logs.setText("");logs.append(message+"\n");logs.setCaretPosition(logs.getDocument().getLength());});}
     @FunctionalInterface private interface Work{void run()throws Exception;}
     public static void main(String[] args)throws Exception{

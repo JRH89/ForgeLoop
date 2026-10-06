@@ -2,13 +2,19 @@ package io.forgeloop.runner;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 /** Checks local tools before runner enrollment or paid task execution. */
 public final class DesktopPrerequisites {
     private static final String DOCKER_LINUX = "linux";
 
-    public enum State { READY, MISSING, NOT_RUNNING, WRONG_CONTAINER_MODE, CHECK_FAILED }
+    public enum State { READY, MISSING, NOT_RUNNING, ACCESS_DENIED, WRONG_CONTAINER_MODE, CHECK_FAILED }
 
     public record Check(String tool, State state, String detail, URI installGuide) {
         public boolean ready() { return state == State.READY; }
@@ -56,16 +62,20 @@ public final class DesktopPrerequisites {
     }
 
     public static Report check() {
+        return check(Duration.ofSeconds(30), () -> false);
+    }
+
+    /** Both probes share a deadline; startup cancellation can terminate an in-flight native check. */
+    static Report check(Duration timeout, BooleanSupplier cancelled) {
+        long deadline = System.nanoTime() + timeout.toNanos();
         return check((tool, arguments) -> {
-            String executable = DesktopToolPaths.executable(tool);
-            Process process = new ProcessBuilder(concat(executable, arguments))
-                    .redirectErrorStream(true).start();
-            if (!process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                throw new IOException("Timed out");
-            }
-            return new CommandResult(process.exitValue(),
-                    new String(process.getInputStream().readNBytes(8192)));
+            List<String> command = new ArrayList<>();
+            command.add(tool);
+            command.addAll(Arrays.asList(arguments));
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) throw new IOException("Prerequisite check timed out");
+            return DesktopCommandExecutor.run(command, Duration.ofNanos(Math.min(remaining,
+                    Duration.ofSeconds(15).toNanos())), cancelled);
         });
     }
 
@@ -82,6 +92,8 @@ public final class DesktopPrerequisites {
             }
             return new Check("Git", State.CHECK_FAILED,
                     "Git is installed but did not return a valid version. Reinstall Git, then check again.", gitGuide());
+        } catch (CancellationException cancelled) {
+            throw cancelled;
         } catch (IllegalStateException missing) {
             return new Check("Git", State.MISSING,
                     "Git was not found. Install Git for your operating system, then restart ForgeLoop Runner.", gitGuide());
@@ -104,8 +116,14 @@ public final class DesktopPrerequisites {
                 return new Check("Docker", State.WRONG_CONTAINER_MODE,
                         "Docker is running in Windows-container mode. Switch Docker Desktop to Linux containers, then check again.", dockerGuide());
             }
+            if (dockerAccessDenied(result.output())) {
+                return new Check("Docker", State.ACCESS_DENIED,
+                        "Your account cannot access the Docker engine. Fix Docker socket or Desktop permissions, then check again.", dockerGuide());
+            }
             return new Check("Docker", State.NOT_RUNNING,
-                    "Docker is installed but not ready. Start Docker Desktop or the Docker service, then check again.", dockerGuide());
+                    "Docker is installed but not ready. Start runner can try to start your local Docker engine; or start Docker manually and check again.", dockerGuide());
+        } catch (CancellationException cancelled) {
+            throw cancelled;
         } catch (IllegalStateException missing) {
             return new Check("Docker", State.MISSING,
                     "Docker was not found. Install Docker for your operating system, then restart ForgeLoop Runner.", dockerGuide());
@@ -118,17 +136,17 @@ public final class DesktopPrerequisites {
         }
     }
 
-    private static String[] concat(String executable, String[] arguments) {
-        String[] command = new String[arguments.length + 1];
-        command[0] = executable;
-        System.arraycopy(arguments, 0, command, 1, arguments.length);
-        return command;
+    /** Permission failures are not a stopped daemon and must not trigger privileged startup. */
+    static boolean dockerAccessDenied(String output) {
+        String detail = output.toLowerCase(Locale.ROOT);
+        return detail.contains("permission denied") || detail.contains("access is denied")
+                || detail.contains("operation not permitted");
     }
 
     private static Platform platform() {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        if (os.contains("win")) return Platform.WINDOWS;
         if (os.contains("mac") || os.contains("darwin")) return Platform.MACOS;
+        if (os.contains("win")) return Platform.WINDOWS;
         return Platform.LINUX;
     }
 

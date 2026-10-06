@@ -37,6 +37,17 @@ class DesktopPrerequisitesTest {
         assertTrue(report.docker().detail().contains("Linux containers"));
     }
 
+    @Test void permissionFailureIsNotTreatedAsAStoppedEngine() {
+        for (String detail : java.util.List.of("permission denied", "Access is denied", "operation not permitted")) {
+            var report = DesktopPrerequisites.check((tool, args) -> tool.equals("git")
+                    ? new DesktopPrerequisites.CommandResult(0, "git version 2.46.0")
+                    : new DesktopPrerequisites.CommandResult(1, detail));
+            assertEquals(DesktopPrerequisites.State.ACCESS_DENIED, report.docker().state());
+            assertFalse(report.ready());
+            assertTrue(report.summary().contains("permissions"));
+        }
+    }
+
     @Test void checksBothDependenciesAndReturnsOfficialInstallationGuides() {
         AtomicInteger checks = new AtomicInteger();
         var report = DesktopPrerequisites.check((tool, args) -> {

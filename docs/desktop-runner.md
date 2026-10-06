@@ -13,7 +13,7 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
    switch Docker Desktop out of Windows-container mode if prompted. Linux desktop
    key storage additionally needs `secret-tool` (libsecret tools) and an unlocked
    Secret Service keyring. Headless users retain the CLI.
-3. Install missing tools, start Docker, and check requirements again. Git must
+3. Install missing tools, start Docker for first-time pairing, and check requirements again. Git must
    answer its version check; Docker must connect to a ready Linux-container engine.
    Neither check contacts ForgeLoop or a model provider.
 4. Enter your ForgeLoop address and a recognizable name. Select
@@ -29,8 +29,9 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
    account-specific terms; an unknown or offline model can be saved with N/A
    cost estimates. Save to advance to the Run step.
 7. On the Run step, check requirements once more if anything changed. Click
-   **Start runner** and confirm potential API charges. Start repeats the checks
-   immediately before any work is claimed.
+   **Start runner** and confirm potential API charges. If the installed local
+   Docker engine is stopped, the app starts it and waits for Linux containers
+   before any work is claimed. Starting Docker itself makes no model request.
 
 No enrollment token needs copying. The local pairing secret never enters a URL.
 Connecting, saving settings, and checking prerequisites do not call a model.
@@ -47,12 +48,75 @@ original tab while GitHub sign-in opens separately. Approval still requires an
 authenticated administrator. Verify this production proxy boundary with
 `scripts/Test-AnonymousPairing.ps1 -BaseUrl https://your-forgeloop-host`.
 
+## Starting Docker automatically
+
+**Start runner** checks Git and Docker, then starts an installed local engine
+when it is stopped. It waits up to two minutes for Docker to report Linux
+containers. Progress appears in the log while the window remains responsive.
+Use **Cancel Docker startup** to stop waiting and leave the runner stopped;
+Docker may remain running if it has already launched. No model fees are incurred
+until the runner starts processing eligible work.
+
+- **Windows:** uses `docker desktop start --detach` when available, with a
+  fallback to the installed Docker Desktop application. Both all-user and
+  per-user installations are supported. Complete any Docker Desktop first-run
+  or operating-system prompts before retrying.
+- **macOS:** uses the Docker Desktop command when available, with a fallback
+  to opening the installed Docker application. Docker Desktop still needs its
+  normal first-run setup and permissions.
+- **Linux:** starts the service for the selected local engine: Docker Desktop
+  through its user service, rootless Docker through the user's `docker.service`,
+  or Docker Engine through the system `docker.service`. A system service may
+  show the desktop's native administrator authentication prompt. If no
+  authentication agent is available or permission is denied, start the service
+  manually and retry. Rootless startup needs a working user service session.
+
+**Check requirements** and browser pairing only inspect readiness; they never
+start Docker. Missing Git or Docker, Windows-container mode, stopped remote or
+custom Docker endpoints, and socket-access failures show guidance instead of starting
+an unrelated engine. The app does not install Docker, enable startup on boot,
+change container mode, or change your selected Docker context. Docker Desktop
+may change the CLI's default context when it launches; ForgeLoop explicitly pins
+the original connection for its readiness checks and runner process, including
+when the engine was already running. It tries to
+restore Docker Desktop's change to the CLI's default context, but this is
+best-effort: after cancellation, a still-launching Docker Desktop may change that
+default later. Check your CLI context before unrelated Docker work.
+
+These paths follow the official [Docker Desktop start command](https://docs.docker.com/reference/cli/docker/desktop/start/),
+[Linux Desktop startup](https://docs.docker.com/desktop/setup/install/linux/ubuntu/#launch-docker-desktop),
+[rootless service lifecycle](https://docs.docker.com/engine/security/rootless/tips/),
+and [Docker Engine startup](https://docs.docker.com/engine/daemon/start/).
+Automated tests exercise platform selection, readiness, timeout, cancellation,
+and failure handling without starting a real daemon. No native Docker application
+or service was started during local verification. Actual Docker Desktop and Linux
+service startup still require acceptance on each target operating system; mocked
+tests do not establish live daemon compatibility.
+
+## Smaller windows and display scaling
+
+Connect, Provider, and Run each scroll vertically, so settings and controls remain
+reachable in a smaller window or with operating-system display scaling. Fields
+have labels above their inputs; long status messages wrap, and action buttons
+move onto another row when needed. The initial window targets 940 × 800 logical
+pixels and can be reduced to 640 × 560; both sizes are capped to the available
+screen area on small or scaled displays. Scroll within the selected tab to reach
+lower sections; the activity log also has its own scroll area.
+
+Local layout checks use a separate test window and saved test settings. They do
+not start paid work, replace your installed runner, or publish a release. Automated
+checks cover all three tabs at narrow and wide widths, 14/21/28-point UI fonts,
+long status updates, action wrapping, and vertical reachability. Rendered Windows
+test windows are inspected locally; native macOS/Linux scaling still needs
+acceptance on those target desktops.
+
 ## Controls and local data
 
 **Pause after current work** allows the active batch to complete before stopping
 new work. It is not an emergency cancellation and active calls can still cost
 money. Optional **Start work at sign-in** is explicit consent to automatic paid
-work on future sign-ins; Docker must also start, and your keyring must be unlocked.
+work on future sign-ins; it follows the same Docker startup and readiness checks,
+and your keyring must be unlocked.
 Uncheck it and save to remove the app-managed login hook. Setup does not start work
 immediately. The app refuses to close while work or setup is active. Start resumes the
 same identity. The log pane is bounded and does not persist raw logs to disk.
