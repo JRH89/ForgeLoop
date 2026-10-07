@@ -1,9 +1,12 @@
 # Linux server deployment with Cloudflare Tunnel
 
 This guide deploys the current single-host Docker Compose stack at
-`https://forgeloop.hookerhillstudios.com`. Cloudflare Tunnel is the only public
-ingress. PostgreSQL, the control-plane API, and the web UI publish diagnostic
-ports on loopback only; they are not directly reachable from the LAN or Internet.
+`https://forgeloop.hookerhillstudios.com`, with
+`https://forgeloop.codefrontlabs.com` as an additional hostname on the same
+Cloudflare Tunnel. The Hooker Hill Studios hostname remains the configured
+canonical URL. Cloudflare Tunnel is the only public ingress. PostgreSQL, the
+control-plane API, and the web UI publish diagnostic ports on loopback only; they
+are not directly reachable from the LAN or Internet.
 
 The Compose deployment uses GitHub OAuth, a local PostgreSQL volume, and a local
 artifact volume. It is a single-server deployment, not the separately managed
@@ -19,8 +22,10 @@ off-host storage.
   ports are required; restrict SSH to trusted addresses.
 - The named Cloudflare Tunnel `forgeloop` with UUID
   `e0c976c6-b8ab-4f1a-8799-96e365adba3d`, and its tunnel-specific JSON
-  credentials. The existing Cloudflare route must send
-  `forgeloop.hookerhillstudios.com` to this tunnel.
+  credentials. Cloudflare DNS must route both
+  `forgeloop.hookerhillstudios.com` and `forgeloop.codefrontlabs.com` to this
+  tunnel. The additional DNS route can be created with
+  `cloudflared tunnel route dns forgeloop forgeloop.codefrontlabs.com`.
 - A configured ForgeLoop GitHub App and OAuth client. See
   [deployment prerequisites](deployment-prerequisites.md) and
   [GitHub authentication](github-user-authentication.md).
@@ -123,6 +128,8 @@ tunnel's internal service addresses do not change.
    URL is `https://forgeloop.hookerhillstudios.com/api/github/webhooks`. These
    URLs do not change during the server move. Never commit `.env` or print its
    resolved contents with `docker compose config` when sharing diagnostics.
+   The Codefront Labs hostname is an alternate ingress. Add its OAuth callback
+   URL to the GitHub App configuration before signing in through that hostname.
 
 4. Install the tunnel credential with restrictive host permissions. Transfer it
    over SSH/SCP or retrieve it from your secret manager; do not put it in the Git
