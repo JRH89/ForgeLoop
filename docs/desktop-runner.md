@@ -6,6 +6,19 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
 
 ## First connection
 
+The desktop uses four sidebar pages: **Runner** for start/pause and setup status,
+**Connection** for pairing and local prerequisites, **Provider** for your model,
+key and pricing, and **Activity** for session logs, updates and diagnostics.
+At narrow window sizes the sidebar becomes an icon rail; tooltips and accessible
+names retain each destination. Opening the application does not start work.
+
+If your server was replaced or its database was reset, open **Connection** and
+select **Check saved connection**. A saved identity is not proof that the server
+still recognizes it. Use **Reconnect to ForgeLoop** while the worker is stopped
+to pair again. This backs up the old identity in the private runner directory;
+it preserves provider keys, settings and workspaces. Save provider settings after
+pairing with a different server address before starting work.
+
 1. Install the native package built for your OS and architecture. Java is bundled.
 2. Open ForgeLoop Runner and select **Check requirements**. The app checks Git
    and the Docker engine separately, then shows the official install guide for
@@ -23,12 +36,12 @@ Your existing Docker or CLI runner does not need to be replaced to use ForgeLoop
    administrator. The sign-in link opens a separate tab so the pairing request
    remains available. Return to the original tab to approve. Approval expires
    after five minutes; the desktop waits up to ten minutes for approval.
-6. On the Provider step select the provider, model, and API key. The app looks
+6. On the Provider page select the provider, model, and API key. The app looks
    up public base text-token rates automatically, without using your API key.
    Review the displayed source and lookup date. Use **manual prices** for
    account-specific terms; an unknown or offline model can be saved with N/A
-   cost estimates. Save to advance to the Run step.
-7. On the Run step, check requirements once more if anything changed. Click
+   cost estimates. Save to advance to the Runner page.
+7. On Connection, check requirements once more if anything changed. Open Runner and click
    **Start runner** and confirm potential API charges. If the installed local
    Docker engine is stopped, the app starts it and waits for Linux containers
    before any work is claimed. Starting Docker itself makes no model request.
@@ -105,14 +118,14 @@ lower sections; the activity log also has its own scroll area.
 
 Local layout checks use a separate test window and saved test settings. They do
 not start paid work, replace your installed runner, or publish a release. Automated
-checks cover all three tabs at narrow and wide widths, 14/21/28-point UI fonts,
+checks cover all four pages at narrow and wide widths, 14/21/28-point UI fonts,
 long status updates, action wrapping, and vertical reachability. Rendered Windows
 test windows are inspected locally; native macOS/Linux scaling still needs
 acceptance on those target desktops.
 
 ## Controls and local data
 
-**Pause after current work** allows the active batch to complete before stopping
+**Pause runner** allows the active batch to complete before stopping
 new work. It is not an emergency cancellation and active calls can still cost
 money. Optional **Start work at sign-in** is explicit consent to automatic paid
 work on future sign-ins; it follows the same Docker startup and readiness checks,

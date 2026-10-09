@@ -25,9 +25,12 @@ class DesktopWindowTest {
                 assertTrue(find(frame,"Check requirements").isShowing());assertTrue(hasText(frame,"Git"));assertTrue(hasText(frame,"Docker Engine"));
                 BufferedImage screenshot=new BufferedImage(frame.getWidth(),frame.getHeight(),BufferedImage.TYPE_INT_RGB);Graphics2D graphics=screenshot.createGraphics();frame.paintAll(graphics);graphics.dispose();
                 Path output=Path.of("target","desktop-setup.png");Files.createDirectories(output.getParent());ImageIO.write(screenshot,"png",output.toFile());
-                JTabbedPane tabs=findTabs(frame);
-                for(int index=1;index<3;index++){tabs.setSelectedIndex(index);frame.validate();BufferedImage step=new BufferedImage(frame.getWidth(),frame.getHeight(),BufferedImage.TYPE_INT_RGB);Graphics2D painter=step.createGraphics();frame.paintAll(painter);painter.dispose();ImageIO.write(step,"png",Path.of("target","desktop-step-"+index+".png").toFile());}
-                assertTrue(find(frame,"Cancel Docker startup").isShowing());
+                DesktopPages tabs=findTabs(frame);
+                assertEquals(4,tabs.getPageCount());
+                assertFalse(find(frame,"Reconnect to ForgeLoop").isEnabled());
+                for(int index=1;index<tabs.getPageCount();index++){tabs.setSelectedIndex(index);frame.validate();BufferedImage step=new BufferedImage(frame.getWidth(),frame.getHeight(),BufferedImage.TYPE_INT_RGB);Graphics2D painter=step.createGraphics();frame.paintAll(painter);painter.dispose();ImageIO.write(step,"png",Path.of("target","desktop-step-"+index+".png").toFile());}
+                tabs.setSelectedIndex(2);frame.validate();
+                assertFalse(find(frame,"Cancel Docker startup").isShowing());
                 assertFalse(Files.exists(directory.resolve("identity")));assertFalse(Files.exists(directory.resolve("provider-key.dpapi")));
             }catch(Exception error){throw new AssertionError(error);}finally{if(app!=null)app.disposeIdle();}
         });
@@ -40,10 +43,10 @@ class DesktopWindowTest {
                 DesktopTheme.install();UIManager.put("defaultFont",new javax.swing.plaf.FontUIResource(Font.SANS_SERIF,Font.PLAIN,fontSize));
                 DesktopRunner app=null;
                 try{
-                    app=new DesktopRunner(directory,false);JFrame frame=app.window();JTabbedPane tabs=findTabs(frame);
+                    app=new DesktopRunner(directory,false);JFrame frame=app.window();DesktopPages tabs=findTabs(frame);
                     for(int width:new int[]{640,940}){
                         frame.setSize(width,760);
-                        for(int index=0;index<3;index++){
+                        for(int index=0;index<tabs.getPageCount();index++){
                             tabs.setSelectedIndex(index);frame.validate();
                             JScrollPane scroll=(JScrollPane)tabs.getSelectedComponent();
                             // Reflow twice, matching Swing's validate/repaint cycle after the scrollbar appears.
@@ -75,10 +78,12 @@ class DesktopWindowTest {
                 app=new DesktopRunner(directory,false);var frame=app.window();
                 assertEquals(2,findTabs(frame).getSelectedIndex());
                 assertTrue(hasText(frame,"Windows desktop test"));
-                assertTrue(hasText(frame,"Connected - saved on this computer"));
+                assertTrue(hasText(frame,"Saved connection — not yet verified this session"));
                 assertTrue(hasText(frame,"Saved key configured - leave blank to keep"));
                 assertFalse(find(frame,"Reopen approval page").isEnabled());
                 assertFalse(find(frame,"Cancel connection").isEnabled());
+                assertTrue(find(frame,"Reconnect to ForgeLoop").isEnabled());
+                assertFalse(find(frame,"Connect in browser").isEnabled());
                 assertTrue(hasText(frame,"custom-model"));
                 findTabs(frame).setSelectedIndex(1);frame.validate();
                 // A pre-catalog saved rate is treated as an intentional manual override.
@@ -105,5 +110,5 @@ class DesktopWindowTest {
     }
     private static boolean hasText(Container parent,String text){for(Component child:parent.getComponents()){if(child instanceof JLabel label&&text.equals(label.getText()))return true;if(child instanceof javax.swing.text.JTextComponent field&&text.equals(field.getText()))return true;if(child instanceof Container container&&hasText(container,text))return true;}return false;}
     private static JButton find(Container parent,String text){for(Component child:parent.getComponents()){if(child instanceof JButton button&&button.getText().equals(text))return button;if(child instanceof Container container){JButton found=find(container,text);if(found!=null)return found;}}return null;}
-    private static JTabbedPane findTabs(Container parent){for(Component child:parent.getComponents()){if(child instanceof JTabbedPane tabs)return tabs;if(child instanceof Container container){JTabbedPane found=findTabs(container);if(found!=null)return found;}}return null;}
+    private static DesktopPages findTabs(Container parent){for(Component child:parent.getComponents()){if(child instanceof DesktopPages tabs)return tabs;if(child instanceof Container container){DesktopPages found=findTabs(container);if(found!=null)return found;}}return null;}
 }
