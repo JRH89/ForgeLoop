@@ -48,9 +48,16 @@ public final class GitWorktreeManager {
 
     /** Commits an already policy-validated worktree without invoking a shell. */
     public String commit(Path worktree, String message) throws IOException, InterruptedException {
+        return commit(worktree, message, false);
+    }
+
+    /** Records a no-op repair as a distinct commit without claiming verification has passed. */
+    public String commit(Path worktree, String message, boolean allowEmptyRepair) throws IOException, InterruptedException {
         if (!Files.exists(worktree.resolve(".git")) || message == null || message.isBlank() || message.length() > 200) throw new IllegalArgumentException("Git commit request is invalid");
         run(worktree, List.of("git", "add", "--all"));
-        run(worktree, gitWithIdentity("commit", "--no-verify", "-m", message));
+        run(worktree, allowEmptyRepair
+                ? gitWithIdentity("commit", "--allow-empty", "--no-verify", "-m", message)
+                : gitWithIdentity("commit", "--no-verify", "-m", message));
         return output(worktree, List.of("git", "rev-parse", "HEAD"));
     }
 
@@ -95,7 +102,8 @@ public final class GitWorktreeManager {
             throw new IllegalArgumentException("Git integration request is invalid");
         }
         try {
-            for (String sha : commitShas) run(worktree, gitWithIdentity("cherry-pick", sha));
+            // Preserve originally empty repair markers, but still reject conflicting or redundant changes.
+            for (String sha : commitShas) run(worktree, gitWithIdentity("cherry-pick", "--allow-empty", sha));
         } catch (RuntimeException | IOException | InterruptedException failure) {
             try { run(worktree, List.of("git", "cherry-pick", "--abort")); } catch (Exception ignored) { /* Preserve the original conflict. */ }
             throw failure;

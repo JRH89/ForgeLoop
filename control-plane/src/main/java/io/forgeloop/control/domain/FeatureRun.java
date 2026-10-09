@@ -169,7 +169,23 @@ public class FeatureRun {
   /** Records the human release decision separately from automated verification. */
   public void approve(String actor){if(state!=RunState.READY_FOR_REVIEW)throw new IllegalStateException("Only a verified run can be approved");if(approvedAt!=null)return;if(actor==null||actor.isBlank())throw new IllegalArgumentException("Approver is required");approvedAt=Instant.now();approvedBy=actor;}
   /** Completes delivery only after GitHub confirms the expected commit was merged. */
-  public void completeDelivery(){if(state!=RunState.READY_FOR_REVIEW&&state!=RunState.PR_OPEN)throw new IllegalStateException("Run is not awaiting delivery");if(!isApproved())throw new IllegalStateException("Run is not approved");state=RunState.COMPLETE;}
+  /** Missing or malformed legacy snapshots fail closed: they still require explicit approval. */
+  public boolean requiresHumanApproval(){return !snapshotFlag("requireHumanApproval", false);}
+  public boolean getRequiresHumanApproval(){return requiresHumanApproval();}
+  public boolean allowsAutomaticMerge(){return snapshotFlag("autoMergeEnabled", true);}
+  public boolean isDeliveryAuthorized(){return isApproved() || !requiresHumanApproval();}
+  private boolean snapshotFlag(String name, boolean expected){
+    if(policySnapshot==null||policySnapshotSha256==null)return false;
+    try{
+      String digest=hash(policySnapshot);
+      if(!digest.equals(policySnapshotSha256))return false;
+      var root=new com.fasterxml.jackson.databind.ObjectMapper().readTree(policySnapshot);
+      if(!"forgeloop.policy-snapshot/1".equals(root.path("schema").asText()))return false;
+      var flag=root.path("organization").path(name);
+      return flag.isBoolean()&&flag.asBoolean()==expected;
+    }catch(Exception invalid){return false;}
+  }
+  public void completeDelivery(){if(state!=RunState.READY_FOR_REVIEW&&state!=RunState.PR_OPEN)throw new IllegalStateException("Run is not awaiting delivery");if(!isDeliveryAuthorized())throw new IllegalStateException("Run is not approved");state=RunState.COMPLETE;}
   public void resumeAfterRetry(DeliveryTask task){if(state!=RunState.BLOCKED&&state!=RunState.FAILED)throw new IllegalStateException("Run is not blocked");if(task.getRun()!=this)throw new IllegalArgumentException("Retry task does not belong to run");state="PLANNER".equals(task.getRole())?RunState.PLANNING:RunState.EXECUTING;approvedAt=null;approvedBy=null;}
   public long getSpentCostMicros(){return tasks.stream().mapToLong(DeliveryTask::getSpentCostMicros).sum();}
   public boolean hasBudgetRemaining(){return !archived && getSpentCostMicros()<Math.round(budgetUsd*1_000_000d);}

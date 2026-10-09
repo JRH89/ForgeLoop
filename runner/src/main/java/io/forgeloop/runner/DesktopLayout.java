@@ -32,25 +32,52 @@ final class DesktopLayout {
     static JPanel field(String label, JComponent control, String help) {
         JPanel field = stack(7);
         JLabel caption = new JLabel(label);
+        caption.setForeground(DesktopTheme.MUTED);
         caption.setLabelFor(control);
         control.getAccessibleContext().setAccessibleName(label);
         field.add(caption);
         field.add(control);
-        if (help != null && !help.isBlank()) field.add(text(help));
+        if (help != null && !help.isBlank()) field.add(muted(help));
         return field;
     }
 
     static JPanel section(String title, String subtitle, JComponent body) {
         JPanel card = stack(14);
+        card.setBackground(DesktopTheme.SURFACE);
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0x345269)),
-                BorderFactory.createEmptyBorder(18, 18, 18, 18)));
+                BorderFactory.createLineBorder(DesktopTheme.BORDER),
+                BorderFactory.createEmptyBorder(20, 20, 20, 20)));
         JTextArea heading = text(title);
         heading.setFont(heading.getFont().deriveFont(Font.BOLD, heading.getFont().getSize2D() + 2));
         card.add(heading);
-        if (subtitle != null && !subtitle.isBlank()) card.add(text(subtitle));
+        if (subtitle != null && !subtitle.isBlank()) card.add(muted(subtitle));
         card.add(body);
+        transparentChildren(body);
         return card;
+    }
+
+    static JTextArea muted(String value) {
+        JTextArea area = text(value);
+        area.setForeground(DesktopTheme.MUTED);
+        return area;
+    }
+
+    /** Nested form groups inherit their card surface instead of painting dark rectangles. */
+    private static void transparentChildren(Component component) {
+        if (component instanceof JPanel panel) panel.setOpaque(false);
+        if (component instanceof Container container)
+            for (Component child : container.getComponents()) transparentChildren(child);
+    }
+
+    static JPanel page(String title, String description, JComponent... sections) {
+        JPanel page = stack(20);
+        JPanel heading = stack(7);
+        heading.add(DesktopTheme.heading(title));
+        heading.add(muted(description));
+        heading.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
+        page.add(heading);
+        for (JComponent section : sections) page.add(section);
+        return page;
     }
 
     /** Natural-width buttons wrap as a group rather than stretching into equal-width columns. */
@@ -62,7 +89,7 @@ final class DesktopLayout {
 
     static JScrollPane scroll(JComponent content) {
         JPanel page = new ScrollablePage();
-        page.setBorder(BorderFactory.createEmptyBorder(18, 12, 18, 12));
+        page.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
         page.add(content);
         JScrollPane scroll = new JScrollPane(page, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);

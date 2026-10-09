@@ -814,21 +814,29 @@ public final class RunnerMain {
         try {
             GitWorktreeManager git = new GitWorktreeManager();
             journal = RunJournalSession.start(task, lease, leaseFile, worktree, policy, policyFile);
-            String diff = git.boundedDiff(worktree, task.baseBranch());
-            String diffBase = git.resolveCommitSha(worktree, task.baseBranch());
+            // Cached local branches can lag behind fetches; execution already uses the remote-tracking ref.
+            String reviewBase = checkoutRef(task, task.baseBranch());
+            String diff = git.boundedDiff(worktree, reviewBase);
+            String diffBase = git.resolveCommitSha(worktree, reviewBase);
             if (journal != null) journal.context("REVIEW_DIFF", diff, diffBase, false);
             RunnerTask contextualTask = withAdditionalContext(task,
                     collectMcpOrFail(task, worktree, journal));
+            // Review tasks usually own no writable paths; prioritize the actual integrated changes instead.
+            List<String> reviewPaths = git.changedFilesInCommit(worktree, diffBase, git.headSha(worktree))
+                    .stream().map(GitWorktreeManager.ChangedFile::path).toList();
+            String reviewSource = new RepositoryContextBuilder().build(worktree, reviewPaths);
+            if (journal != null) journal.context("REVIEW_SOURCE", reviewSource, diffBase, false);
             ReviewResult result = new ReviewWorker().execute(policy, providerClient(policy, events, journal), contextualTask,
-                    diff, lease.leaseId());
+                    diff, lease.leaseId(), reviewSource);
             client.recordReviewEvidence(identity, lease, result);
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
             finishJournal(task, identity, lease, client, events, journal, "COMPLETED", null);
             events.info(result.approved() ? "TASK_COMPLETED" : "TASK_FAILED",
                     result.approved() ? "Independent review passed" : "Independent review rejected the change");
             client.completeLease(identity, lease.leaseId(), lease.nonce(), result.approved());
-            if (!result.approved()) throw new IllegalStateException("Independent review rejected the integrated change: " + result.summary());
-            System.out.println("Independent review passed.");
+            // A rejected review is already a completed lease, not a harness exception to report again.
+            System.out.println(result.approved() ? "Independent review passed."
+                    : "Independent review rejected the integrated change: " + result.summary());
         } catch (ProviderExecutionFailure failure) {
             ProviderFailureEvidence outcome = ProviderFailureEvidence.from(policy, failure, lease.leaseId());
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.failed(outcome));

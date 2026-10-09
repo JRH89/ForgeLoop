@@ -59,6 +59,40 @@ class GitWorktreeManagerTest {
     }
 
     @Test
+    void preservesNoOpRepairMarkersWithoutAcceptingEmptyImplementation() throws Exception {
+        run("git", "init", temporaryDirectory.toString());
+        Files.writeString(temporaryDirectory.resolve("README.md"), "base");
+        GitWorktreeManager git = new GitWorktreeManager();
+        String base = git.commit(temporaryDirectory, "base");
+        assertThrows(IllegalStateException.class, () -> git.commit(temporaryDirectory, "empty implementation"));
+        String repair = git.commit(temporaryDirectory, "repair: unchanged validated files", true);
+        assertFalse(base.equals(repair));
+        assertTrue(git.changedFilesInCommit(temporaryDirectory, base, repair).isEmpty());
+        Path integration = git.create(temporaryDirectory, base, "empty-repair", temporaryDirectory.resolve("worktrees"));
+        String integrated = git.integrate(integration, List.of(repair));
+        assertFalse(base.equals(integrated));
+        assertEquals("base", Files.readString(integration.resolve("README.md")));
+    }
+
+    @Test
+    void remoteTrackingReviewBaseExcludesPreviouslyMergedChanges() throws Exception {
+        run("git", "init", temporaryDirectory.toString());
+        GitWorktreeManager git = new GitWorktreeManager();
+        Files.writeString(temporaryDirectory.resolve("README.md"), "old");
+        String old = git.commit(temporaryDirectory, "old base");
+        run("git", "-C", temporaryDirectory.toString(), "update-ref", "refs/heads/main", old);
+        Files.writeString(temporaryDirectory.resolve("previous.txt"), "already merged");
+        String fetched = git.commit(temporaryDirectory, "previous delivery");
+        run("git", "-C", temporaryDirectory.toString(), "update-ref", "refs/remotes/origin/main", fetched);
+        Path worktree = git.create(temporaryDirectory, "refs/remotes/origin/main", "review-new", temporaryDirectory.resolve("worktrees"));
+        Files.writeString(worktree.resolve("README.md"), "new comment");
+        git.commit(worktree, "fresh task");
+        assertTrue(git.boundedDiff(worktree, "main").contains("previous.txt"));
+        assertFalse(git.boundedDiff(worktree, "refs/remotes/origin/main").contains("previous.txt"));
+        assertTrue(git.boundedDiff(worktree, "refs/remotes/origin/main").contains("new comment"));
+    }
+
+    @Test
     void buildsAndIntegratesASequencedWriterChainAndReportsItsChangedFiles() throws Exception {
         run("git", "init", temporaryDirectory.toString());
         run("git", "-C", temporaryDirectory.toString(), "config", "user.email", "runner@example.test");

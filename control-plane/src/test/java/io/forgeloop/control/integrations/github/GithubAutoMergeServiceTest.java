@@ -71,7 +71,7 @@ class GithubAutoMergeServiceTest {
         FeatureRun run = mock(FeatureRun.class);
         when(run.getId()).thenReturn("run-1");
         when(run.getState()).thenReturn(io.forgeloop.control.domain.RunState.READY_FOR_REVIEW);
-        when(run.isApproved()).thenReturn(true);
+        when(run.isDeliveryAuthorized()).thenReturn(true);
         when(connections.findByRepository("acme/app")).thenReturn(Optional.of(connection));
         when(connection.isEnabled()).thenReturn(true);
         when(connection.isInstalledAs(7)).thenReturn(true);
