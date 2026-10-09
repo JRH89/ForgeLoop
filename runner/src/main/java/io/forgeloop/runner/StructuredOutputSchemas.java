@@ -61,6 +61,23 @@ public final class StructuredOutputSchemas {
     public static JsonNode plan() { return PLAN.deepCopy(); }
     public static JsonNode patch() { return PATCH.deepCopy(); }
     public static JsonNode review() { return REVIEW.deepCopy(); }
+    /** Bind output to canonical server criteria instead of relying on prose-copying precision. */
+    public static JsonNode review(java.util.List<String> statements) {
+        if (statements == null || statements.isEmpty()
+                || statements.stream().anyMatch(value -> value == null || value.isBlank())
+                || statements.stream().distinct().count() != statements.size()) {
+            throw new IllegalArgumentException("Review criteria must be nonempty and unique");
+        }
+        com.fasterxml.jackson.databind.node.ObjectNode schema = REVIEW.deepCopy();
+        com.fasterxml.jackson.databind.node.ObjectNode criteria =
+                (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("criteria");
+        criteria.put("minItems", statements.size());
+        criteria.put("maxItems", statements.size());
+        com.fasterxml.jackson.databind.node.ObjectNode statement =
+                (com.fasterxml.jackson.databind.node.ObjectNode) criteria.path("items").path("properties").path("statement");
+        statement.set("enum", JSON.valueToTree(statements));
+        return schema;
+    }
     public static JsonNode repositoryScan() { return REPOSITORY_SCAN.deepCopy(); }
     public static JsonNode repositoryIssueProposal() { return REPOSITORY_ISSUE_PROPOSAL.deepCopy(); }
     public static JsonNode issueChat() { return ISSUE_CHAT.deepCopy(); }

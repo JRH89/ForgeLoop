@@ -69,7 +69,7 @@ public final class GuardedPatchWorker {
             throw new GuardedPatchFailure("INVALID_PROVIDER_OUTPUT", usage, unsafeOutput);
         }
         try {
-            String sha = new GitWorktreeManager().commit(worktree, commitMessage(plan.summary()));
+            String sha = new GitWorktreeManager().commit(worktree, commitMessage(plan.summary()), "REPAIR".equals(role));
             return new GuardedPatchResult(sha, usage);
         } catch (Exception localFailure) {
             throw new GuardedPatchFailure("LOCAL_COMMIT_FAILURE", usage, localFailure);

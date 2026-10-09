@@ -36,6 +36,22 @@ class GuardedPatchWorkerTest {
         assertFalse(Files.exists(repository.resolve("src/result.txt")));
     }
 
+    @Test void unchangedRepairProducesAnIntegratableMarkerButImplementationStillFails() throws Exception {
+        initializeRepository();
+        ProviderClient provider = ignored -> new ProviderResult("""
+                {"summary":"Existing contents already satisfy the repair","changes":[{"path":"README.md","content":"base","message":"retain correct contents"}]}
+                """, 3, 2, "no-op-repair");
+        String base = new GitWorktreeManager().headSha(repository);
+        assertThrows(GuardedPatchFailure.class, () -> new GuardedPatchWorker().execute(
+                new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "IMPLEMENTATION", "task", "spec", repository, List.of("README.md")));
+        GuardedPatchResult result = new GuardedPatchWorker().execute(
+                new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "REPAIR", "task", "spec", repository, List.of("README.md"));
+        assertFalse(base.equals(result.commitSha()));
+        assertTrue(new GitWorktreeManager().changedFilesInCommit(repository, base, result.commitSha()).isEmpty());
+    }
+
     @Test void reportsTestBoundaryViolationsSeparatelyAndWritesNothing() throws Exception {
         initializeRepository();
         ProviderClient provider = ignored -> new ProviderResult("""
