@@ -1,0 +1,28 @@
+/* Bound growing histories without hiding content or making short cards tall. */
+.detail-stack .run-scroll-panel {
+  max-height: 28rem;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #38536a #0c1925;
+  scrollbar-gutter: stable;
+}
+.detail-stack .run-scroll-panel::-webkit-scrollbar,
+.detail-stack .evidence pre::-webkit-scrollbar { width: 6px; height: 6px; }
+.detail-stack .run-scroll-panel::-webkit-scrollbar-thumb,
+.detail-stack .evidence pre::-webkit-scrollbar-thumb { background: #38536a; border-radius: 8px; }
+.detail-stack .run-scroll-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Keep section titles visible while reading the independent scroll regions. */
+.run-scroll-panel > h2,
+.run-scroll-panel > .section-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel, #0c1925);
+  padding-block: 8px;
+  box-shadow: 0 -24px 0 var(--panel, #0c1925);
+}
+.detail-stack > .two-column { align-items: start; }
+.detail-stack .evidence pre { scrollbar-width: thin; scrollbar-color: #38536a #050b11; }
+@media (max-width: 760px) {
+  .detail-stack .run-scroll-panel { max-height: 24rem; }
+}

@@ -60,6 +60,7 @@ import RepositoryBudgetSettings from "./RepositoryBudgetSettings";
 import "./styles.css";
 import "./dashboard-responsive.css";
 import "./repository-settings.css";
+import "./run-detail.css";
 
 const terminal = new Set(["COMPLETE", "CANCELLED", "FAILED", "REJECTED"]);
 const retryable = new Set(["FAILED", "HELD", "RETRYABLE_FAILURE"]);
@@ -340,6 +341,44 @@ function RunDetail({
           <span>of ${run.budgetUsd.toFixed(2)}</span>
         </article>
       </section>
+      <section className="panel github-delivery">
+        <div className="section-heading github-delivery-heading">
+          <div><p className="eyebrow">Publication</p><h2>GitHub delivery</h2></div>
+          {operations.publication && (() => {
+            const state = operations.publication.mergedAt ? "MERGED" : operations.publication.pullRequestState;
+            const stateLabels: Record<string, string> = { OPEN: "PULL REQUEST OPEN", DRAFT: "DRAFT PR", CLOSED: "CLOSED", MERGED: "MERGED", UNKNOWN: "STATUS UNKNOWN", NOT_CREATED: "BRANCH READY" };
+            const stateClasses: Record<string, string> = { OPEN: "ready_for_review", DRAFT: "running", CLOSED: "closed", MERGED: "complete", UNKNOWN: "held", NOT_CREATED: "running" };
+            return <span className={`status ${stateClasses[state] ?? "held"}`}>{stateLabels[state] ?? state}</span>;
+          })()}
+        </div>
+        {operations.publication ? (
+          <>
+            <dl className="github-delivery-meta">
+              <div><dt>Repository</dt><dd>{operations.publication.repository}</dd></div>
+              <div><dt>Branch</dt><dd><code title={operations.publication.branch}>{operations.publication.branch}</code></dd></div>
+              <div><dt>Commit</dt><dd><code title={operations.publication.headSha}>{operations.publication.headSha?.slice(0, 12) ?? "Pending"}</code></dd></div>
+              <div><dt>Delivery</dt><dd>{operations.publication.mergedAt ? `Merged ${stamp(operations.publication.mergedAt)}` : operations.publication.pullRequestState === "MERGED" ? "Merged on GitHub" : operations.publication.pullRequestState === "CLOSED" ? "Closed on GitHub" : operations.publication.deliveredAt ? `Published ${stamp(operations.publication.deliveredAt)}` : "Awaiting publication"}</dd></div>
+              <div><dt>Auto-merge</dt><dd>{operations.publication.mergedAt || operations.publication.pullRequestState === "MERGED" ? "Merged" : operations.publication.autoMergeRequested ? "Requested" : "Not requested"}</dd></div>
+              {operations.publication.mergeSha && <div><dt>Merge commit</dt><dd><code title={operations.publication.mergeSha}>{operations.publication.mergeSha.slice(0, 12)}</code></dd></div>}
+            </dl>
+            {operations.publication.pullRequestNumber && (
+              <a
+                className="primary inline"
+                href={`https://github.com/${operations.publication.repository}/pull/${operations.publication.pullRequestNumber}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View pull request #{operations.publication.pullRequestNumber}
+              </a>
+            )}
+          </>
+        ) : (
+          <p className="empty">
+            A pull request is published after verification and any required
+            approval.
+          </p>
+        )}
+      </section>
       <section className="panel">
         <div className="section-heading">
           <div>
@@ -409,7 +448,7 @@ function RunDetail({
         </small>
         {error && <p role="alert">{error}</p>}
       </section>
-      <section className="panel">
+      <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Task graph & attempts">
         <div className="section-heading">
           <div>
             <h2>Task graph & attempts</h2>
@@ -468,7 +507,7 @@ function RunDetail({
         ))}
       </section>
       <div className="two-column">
-        <section className="panel">
+        <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Verification gates">
           <h2>Verification gates</h2>
           {run.gates.map((gate) => (
             <div className="item" key={gate.id}>
@@ -485,7 +524,7 @@ function RunDetail({
             </div>
           ))}
         </section>
-        <section className="panel">
+        <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Acceptance criteria">
           <h2>Acceptance criteria</h2>
           {run.criteria.map((criterion) => (
             <div className="item" key={criterion.id}>
@@ -501,15 +540,15 @@ function RunDetail({
           ))}
         </section>
       </div>
-      <section className="panel">
+      <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Runner event stream">
         <div className="section-heading"><div><h2>Runner event stream</h2><p>Redacted lease progress refreshes while this run is active.</p></div></div>
         {operations.events.length ? operations.events.map(event=><div className="timeline" key={event.id}><i/><div><b>{event.eventType.replaceAll("_"," ")}</b><small>{event.message} · {stamp(event.occurredAt)}</small></div></div>):<p className="empty">No runner events have been received.</p>}
       </section>
-      <section className="panel">
+      <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Human escalation queue">
         <div className="section-heading"><div><h2>Human escalation queue</h2><p>Automation stops safely when a configured boundary is reached.</p></div></div>
         {operations.escalations.length ? operations.escalations.map(item=><div className="item" key={item.id}><div><b>{item.reason.replaceAll("_"," ")}</b><small>{item.summary} · {item.severity} · {stamp(item.createdAt)}</small></div><div className="actions"><span className={`status ${item.status.toLowerCase()}`}>{item.status}</span>{canOperate&&item.status==="OPEN"&&<button className="secondary" disabled={!!busy} onClick={()=>void action(`ack-${item.id}`,()=>acknowledgeEscalation(item.id))}>Acknowledge</button>}{canOperate&&item.status!=="RESOLVED"&&<button className="secondary" disabled={!!busy} onClick={()=>void action(`resolve-${item.id}`,()=>resolveEscalation(item.id))}>Resolve</button>}</div></div>):<p className="empty">No human intervention is required.</p>}
       </section>
-      <section className="panel">
+      <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Independent review">
         <h2>Independent review</h2>
         {operations.reviews.length ? (
           operations.reviews.map((review) => (
@@ -550,7 +589,7 @@ function RunDetail({
           <p className="empty">No independent review has been recorded yet.</p>
         )}
       </section>
-      <section className="panel">
+      <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Evidence browser & redacted logs">
         <h2>Evidence browser & redacted logs</h2>
         {operations.artifacts.length > 0 && <div className="artifact-grid">{operations.artifacts.map(artifact=><a className={`artifact-card ${artifact.artifactType === "SCREENSHOT" ? "screenshot" : ""}`} href={`/api/artifacts/${artifact.id}`} target="_blank" rel="noreferrer" key={artifact.id}>{artifact.artifactType === "SCREENSHOT" && <img src={`/api/artifacts/${artifact.id}`} alt={artifact.displayName}/>}<span><b>{artifact.displayName}</b><small>{artifact.artifactType.replaceAll("_"," ")} · {(artifact.sizeBytes/1024).toFixed(1)} KiB</small><small>SHA-256 {artifact.sha256.slice(0,12)}…</small></span></a>)}</div>}
         {operations.evidence.length ? (
@@ -595,8 +634,7 @@ function RunDetail({
           <p className="empty">No runner evidence has been recorded yet.</p>
         )}
       </section>
-      <div className="two-column">
-        <section className="panel">
+      <section className="panel run-scroll-panel" tabIndex={0} role="region" aria-label="Audit timeline">
           <h2>Audit timeline</h2>
           {operations.audit.length ? (
             operations.audit.map((event) => (
@@ -613,46 +651,7 @@ function RunDetail({
           ) : (
             <p className="empty">No audit events recorded.</p>
           )}
-        </section>
-        <section className="panel github-delivery">
-          <div className="section-heading github-delivery-heading">
-            <div><p className="eyebrow">Publication</p><h2>GitHub delivery</h2></div>
-            {operations.publication && (() => {
-              const state = operations.publication.mergedAt ? "MERGED" : operations.publication.pullRequestState;
-              const stateLabels: Record<string, string> = { OPEN: "PULL REQUEST OPEN", DRAFT: "DRAFT PR", CLOSED: "CLOSED", MERGED: "MERGED", UNKNOWN: "STATUS UNKNOWN", NOT_CREATED: "BRANCH READY" };
-              const stateClasses: Record<string, string> = { OPEN: "ready_for_review", DRAFT: "running", CLOSED: "closed", MERGED: "complete", UNKNOWN: "held", NOT_CREATED: "running" };
-              return <span className={`status ${stateClasses[state] ?? "held"}`}>{stateLabels[state] ?? state}</span>;
-            })()}
-          </div>
-          {operations.publication ? (
-            <>
-              <dl className="github-delivery-meta">
-                <div><dt>Repository</dt><dd>{operations.publication.repository}</dd></div>
-                <div><dt>Branch</dt><dd><code title={operations.publication.branch}>{operations.publication.branch}</code></dd></div>
-                <div><dt>Commit</dt><dd><code title={operations.publication.headSha}>{operations.publication.headSha?.slice(0, 12) ?? "Pending"}</code></dd></div>
-                <div><dt>Delivery</dt><dd>{operations.publication.mergedAt ? `Merged ${stamp(operations.publication.mergedAt)}` : operations.publication.pullRequestState === "MERGED" ? "Merged on GitHub" : operations.publication.pullRequestState === "CLOSED" ? "Closed on GitHub" : operations.publication.deliveredAt ? `Published ${stamp(operations.publication.deliveredAt)}` : "Awaiting publication"}</dd></div>
-                <div><dt>Auto-merge</dt><dd>{operations.publication.mergedAt || operations.publication.pullRequestState === "MERGED" ? "Merged" : operations.publication.autoMergeRequested ? "Requested" : "Not requested"}</dd></div>
-                {operations.publication.mergeSha && <div><dt>Merge commit</dt><dd><code title={operations.publication.mergeSha}>{operations.publication.mergeSha.slice(0, 12)}</code></dd></div>}
-              </dl>
-              {operations.publication.pullRequestNumber && (
-                <a
-                  className="primary inline"
-                  href={`https://github.com/${operations.publication.repository}/pull/${operations.publication.pullRequestNumber}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View pull request #{operations.publication.pullRequestNumber}
-                </a>
-              )}
-            </>
-          ) : (
-            <p className="empty">
-              A draft pull request is created only after verification and
-              explicit approval.
-            </p>
-          )}
-        </section>
-      </div>
+      </section>
     </div>
   );
 }
