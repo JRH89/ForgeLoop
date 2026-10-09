@@ -20,12 +20,17 @@ for (const width of [320, 390, 430, 768, 1440]) {
     const run = { id: 'r', repository, sourceRef: 'issue-7', title, specification: `Acceptance criteria: preserve data.\n\n\`\`\`text\n${long}\n\`\`\``, archived: false, state: 'COMPLETE', createdAt: new Date().toISOString(), budgetUsd: 25, spentCostMicros: 0, approved: false, policyRevision: 1, harnessProfile: 'GENERIC', baseBranch: 'main',
       tasks: [{ id: 't', planKey: long, role: 'BACKEND', executionRole: 'BACKEND', title: 'Implement and verify retry handling', state: 'VERIFIED', attemptBudget: 2, attempts: 1, ownedPaths: [long], dependencyKeys: [], repairPackages: [], providerAttempts: [{ id: 'a', provider: 'anthropic', model: long, inputTokens: 1234, outputTokens: 567, estimatedCostMicros: 0, costKnown: false, outcome: 'SUCCEEDED', recordedAt: new Date().toISOString() }] }],
       gates: [{ id: 'g', name: 'acceptance tests', state: 'PASSED', required: true, kind: 'TEST', networkPolicy: 'NONE', timeoutSeconds: 120, command: ['npm', 'test'] }], criteria: [{ id: 'c', statement: long, coverageState: 'COVERED' }] };
+    // Large histories exercise real overflow rather than only empty cards.
+    run.criteria = Array.from({ length: 40 }, (_, index) => ({ id: `criterion-${index}`, statement: `${index}: ${long}`, coverageState: 'COVERED' }));
     await page.route('**/graphql', route => {
       expect(route.request().postDataJSON().query).not.toContain('mutation');
       return route.fulfill({ json: { data: {
         currentOperator: { subject: 'admin', organizationId: 'org', role: 'ADMIN' },
         repositoryConnections: [{ id: 'repo', repository, installationId: 1, enabled: true, defaultBranch: 'main', issueLabel: 'forgeloop', harnessProfile: 'GENERIC', requiredGates: ['unit'], maxBudgetUsd: 25, policyRevision: 1 }],
         featureRuns: [run], featureRun: run, runAnalytics: { totalRuns: 1, activeRuns: 0, deliveredRuns: 1, providerRequests: 1 },
+        featureRunPublication: { repository, branch: 'forgeloop/issue-7', headSha: 'abc123', pullRequestState: 'MERGED', pullRequestNumber: 7, autoMergeRequested: true },
+        featureRunEvents: Array.from({ length: 60 }, (_, index) => ({ id: `event-${index}`, eventType: 'EXECUTION_PROGRESS', message: `Progress ${index}`, occurredAt: new Date().toISOString() })),
+        featureRunAuditEvents: Array.from({ length: 60 }, (_, index) => ({ id: `audit-${index}`, action: 'TASK_COMPLETED', actor: 'runner', occurredAt: new Date().toISOString() })),
         organizationPolicy: { organizationId: 'org', maxRunBudgetUsd: 25, maxParallelTasks: 2, allowedProviders: ['anthropic'], requireHumanApproval: true, autoMergeEnabled: false, revision: 1 }, harnessDefinitions: [], localMcpConfigurations: [], runners: [],
       } } });
     });
@@ -49,6 +54,19 @@ for (const width of [320, 390, 430, 768, 1440]) {
     await row.click();
     await expect(page.getByRole('heading', { name: 'Task graph & attempts' })).toBeVisible();
     await fits(page);
+    for (const name of ['Acceptance criteria', 'Runner event stream', 'Audit timeline']) {
+      const region = page.getByRole('region', { name, exact: true });
+      const geometry = await region.evaluate(element => ({ height: element.clientHeight, full: element.scrollHeight, scrollbar: getComputedStyle(element).scrollbarWidth }));
+      expect(geometry.full).toBeGreaterThan(geometry.height);
+      expect(geometry.scrollbar).toBe('thin');
+      await region.focus();
+      await page.keyboard.press('End');
+      await expect.poll(() => region.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    }
+    const publication = await page.locator('.github-delivery').boundingBox();
+    const taskGraph = await page.getByRole('region', { name: 'Task graph & attempts', exact: true }).boundingBox();
+    expect(publication!.y).toBeLessThan(taskGraph!.y);
+    await expect(page.locator('.github-delivery')).toContainText('forgeloop/issue-7');
     await page.screenshot({ path: `../evidence/forgeloop-ui/run-details-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: '+ New Run' }).click();
     await expect(page.getByLabel('Specification', { exact: true })).toBeVisible();
