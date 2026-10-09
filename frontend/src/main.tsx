@@ -364,6 +364,7 @@ function RunDetail({
             )}
             {run.state === "READY_FOR_REVIEW" &&
               !run.approved &&
+              run.requiresHumanApproval !== false &&
               operator.role === "ADMIN" && (
                 <button
                   className="primary compact"
@@ -377,6 +378,9 @@ function RunDetail({
                   Approve release
                 </button>
               )}
+            {run.state === "READY_FOR_REVIEW" && run.requiresHumanApproval === false && (
+              <p role="status">Verification passed. Publishing automatically; no human approval is required.</p>
+            )}
             {!terminal.has(run.state) && !run.approved && canOperate && (
               <button
                 className="danger"

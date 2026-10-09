@@ -9,6 +9,8 @@ import jakarta.persistence.LockModeType;
 public interface GithubPublicationRepository extends JpaRepository<GithubPublication, String> {
     Optional<GithubPublication> findByFeatureRunId(String featureRunId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<GithubPublication> findByPullRequestNumberIsNullAndHeadShaIsNotNull();
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<GithubPublication> findByRepositoryAndHeadSha(String repository, String headSha);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<GithubPublication> findByRepositoryAndPullRequestNumber(String repository, Long pullRequestNumber);

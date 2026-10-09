@@ -26,10 +26,10 @@ public class GithubDeliveryService {
     public GithubPublication deliverPushed(FeatureRun run, long installationId, String summary) {
         GithubPublication publication = publications.findByFeatureRunId(run.getId()).orElseThrow(() -> new IllegalStateException("Runner has not pushed an integrated branch"));
         if (publication.isDelivered()) return publication;
-        if (run.getState() != RunState.READY_FOR_REVIEW || !run.isApproved()) throw new IllegalStateException("Only an approved, fully verified run can be delivered to GitHub");
+        if (run.getState() != RunState.READY_FOR_REVIEW || !run.isDeliveryAuthorized()) throw new IllegalStateException("Only an authorized, fully verified run can be delivered to GitHub");
         if (publication.getHeadSha() == null || !publication.getHeadSha().equals(github.getBranchHead(installationId, run.getRepository(), publication.getBranch()))) throw new IllegalStateException("Runner-pushed branch head does not match the integrated commit");
         if (publication.getCheckRunId() == null) { publication.recordCheckRun(github.createCompletedCheck(installationId, run.getRepository(), publication.getHeadSha(), "ForgeLoop verification", summary)); audit.record("GITHUB_CHECK_RUN_CREATED", "FEATURE_RUN", run.getId(), publication.getHeadSha()); }
-        boolean autoMerge = policies != null && policies.findById(run.getOrganizationId()).map(policy -> policy.isAutoMergeEnabled()).orElse(false);
+        boolean autoMerge = run.allowsAutomaticMerge();
         GithubSourceIssue.fromSourceRef(run.getSourceRef()).ifPresent(issue -> publication.linkSourceIssue(issue.number()));
         if (publication.getPullRequestNumber() == null) { publication.recordPullRequest(github.createPullRequest(installationId, run.getRepository(), publication.getBranch(), run.getBaseBranch(), run.getTitle(), pullRequestBody(run, summary), !autoMerge), autoMerge); audit.record(autoMerge ? "GITHUB_AUTO_MERGE_PR_CREATED" : "GITHUB_DRAFT_PR_CREATED", "FEATURE_RUN", run.getId(), String.valueOf(publication.getPullRequestNumber())); }
         return publications.save(publication);

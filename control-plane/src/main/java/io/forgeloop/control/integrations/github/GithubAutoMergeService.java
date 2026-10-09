@@ -44,7 +44,7 @@ public class GithubAutoMergeService {
         publication.recordMerge(mergeSha);
         FeatureRun run = runs.findById(publication.getFeatureRunId()).orElseThrow(() -> new IllegalStateException("Feature run was not found"));
         linkSourceIssue(publication, run);
-        if (run.getState() != io.forgeloop.control.domain.RunState.COMPLETE && run.isApproved()) run.completeDelivery();
+        if (run.getState() != io.forgeloop.control.domain.RunState.COMPLETE && run.isDeliveryAuthorized()) run.completeDelivery();
         audit.record("GITHUB_PR_MERGED", "FEATURE_RUN", run.getId(), mergeSha);
         closeSourceIssue(publication, installationId);
     }
