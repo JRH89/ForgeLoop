@@ -1,5 +1,8 @@
 # Run detail layout
 
+The console viewport, sidebar and nested scrolling areas use thin dark themed
+scrollbars. The styling is scoped to the console and preserves native scrolling.
+
 GitHub delivery metadata (branch, commit, PR and merge state) sits below the run
 summary metrics, before budget controls and task history.
 

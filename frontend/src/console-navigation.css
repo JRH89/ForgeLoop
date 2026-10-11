@@ -22,3 +22,18 @@
   .console-app .mobile-signout { display: flex; margin-top: .6rem; }
 }
 @media (prefers-reduced-motion: reduce) { .console-app .shell > .console-sidebar { transition: none; } }
+.console-app,
+.console-app *,
+html:has(.console-app) {
+  scrollbar-width: thin;
+  scrollbar-color: #38536a #0a141f;
+}
+/* Style the viewport as well as nested panels; keep native scrolling behavior. */
+.console-app *::-webkit-scrollbar,
+html:has(.console-app)::-webkit-scrollbar { width: 6px; height: 6px; }
+.console-app *::-webkit-scrollbar-track,
+html:has(.console-app)::-webkit-scrollbar-track { background: #0a141f; }
+.console-app *::-webkit-scrollbar-thumb,
+html:has(.console-app)::-webkit-scrollbar-thumb { background: #38536a; border-radius: 8px; }
+.console-app *::-webkit-scrollbar-thumb:hover,
+html:has(.console-app)::-webkit-scrollbar-thumb:hover { background: #52718b; }
