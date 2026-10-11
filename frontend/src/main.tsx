@@ -812,7 +812,7 @@ function RunsPage({
                   const progressPercent = runProgress(item);
                   return (
                     <tr key={item.id} className={selected === item.id ? "selected" : ""} tabIndex={0} aria-label={`Open run ${item.title}`} onClick={() => setSelected(item.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(item.id); } }}>
-                      <td><b>{item.sourceRef}</b><small>{item.title}</small></td>
+                      <td><b>{item.sourceRef}</b><small title={item.title}>{item.title}</small></td>
                       <td data-label="Repository">{item.repository}</td>
                       <td data-label="Status"><span className={`status ${displayedRunState(item).toLowerCase()}`}>{displayedRunState(item).replaceAll("_", " ")}</span></td>
                       <td data-label="Progress"><div className="run-progress"><span><i style={{ width: `${progressPercent}%` }} /></span><small>{progressPercent}%</small></div></td>
