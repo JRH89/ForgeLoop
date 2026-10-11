@@ -42,6 +42,7 @@ for (const width of [320, 390, 430, 768, 1440]) {
     const row = page.getByRole('row', { name: `Open run ${title}` });
     await expect(row).toBeVisible();
     await fits(page);
+    expect(await page.locator('.runs-table-wrap').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     if (width <= 760) {
       for (const label of ['Repository', 'Status', 'Progress', 'Cost', 'Started', 'Queue']) {
         const cell = row.locator(`[data-label="${label}"]`);

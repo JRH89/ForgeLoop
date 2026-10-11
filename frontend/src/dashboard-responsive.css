@@ -23,20 +23,7 @@
   .console-app .run-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 0; }
   .console-app .run-filters button { justify-content: center; gap: 4px; min-width: 0; min-height: 44px; }
   /* Keep the same row/actions/data, but present each run as a labeled card on phones. */
-  .console-app .runs-table-wrap { overflow: visible; }
-  .console-app .runs-table { display: block; min-width: 0; width: 100%; }
-  .console-app .runs-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .console-app .runs-table tbody { display: grid; gap: 14px; padding-top: 14px; }
-  .console-app .runs-table tbody tr { display: block; min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-  .console-app .runs-table td { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 0; white-space: normal; border: 0; min-width: 0; font-size: .875rem; }
-  .console-app .runs-table td:first-child b { font-size: .95rem; }
-  .console-app .runs-table td:first-child small { font-size: .82rem; }
-  .console-app .runs-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: .72rem; }
-  .console-app .runs-table td:first-child { display: block; min-width: 0; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
-  .console-app .runs-table td:first-child small { max-width: none; overflow: visible; white-space: normal; line-height: 1.6; }
-  .console-app .runs-table .status { justify-self: start; max-width: 100%; white-space: normal; }
-  .console-app .run-progress { min-width: 0; width: 100%; }
-  .console-app .runs-table td button { justify-self: start; min-height: 44px; padding: 8px 14px; border: 1px solid #36526a; border-radius: 6px; background: #142737; color: var(--text); }
+
   .console-app .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .console-app .metrics b { overflow-wrap: anywhere; font-size: clamp(1rem, 5vw, 1.8rem); }
   .console-app .task-title, .console-app .item, .console-app .definition > div, .console-app .evidence summary { flex-wrap: wrap; gap: 8px; }
@@ -51,4 +38,45 @@
   .console-app .brand { gap: 6px; }
   .console-app .brand strong { font-size: 1rem; }
   .console-app .session { gap: 6px; font-size: .7rem; }
+}
+/* Fixed column allocation prevents long descriptions/costs widening the queue. */
+@media (min-width: 1101px) {
+  .console-app .runs-table { table-layout: fixed; min-width: 0; }
+  .console-app .runs-table th,
+  .console-app .runs-table td { padding-inline: 10px; white-space: normal; overflow-wrap: anywhere; }
+  .console-app .runs-table th:nth-child(1) { width: 25%; }
+  .console-app .runs-table th:nth-child(2) { width: 16%; }
+  .console-app .runs-table th:nth-child(3) { width: 12%; }
+  .console-app .runs-table th:nth-child(4) { width: 14%; }
+  .console-app .runs-table th:nth-child(5) { width: 15%; }
+  .console-app .runs-table th:nth-child(6) { width: 8%; }
+  .console-app .runs-table th:nth-child(7) { width: 10%; }
+  .console-app .runs-table td:first-child { min-width: 0; }
+  .console-app .runs-table td:first-child b,
+  .console-app .runs-table td:first-child small,
+  .console-app .runs-table td[data-label="Repository"] {
+    max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .console-app .runs-table .status { min-width: 0; max-width: 100%; white-space: normal; }
+  .console-app .run-progress { min-width: 0; }
+  .console-app .runs-table td button { max-width: 100%; padding-inline: 8px; }
+  .console-app .queue-actions { flex-wrap: wrap; }
+}
+
+/* Reuse accessible stacked queue cards on both mobile and tablet widths. */
+@media (max-width: 1100px) {
+  .console-app .runs-table-wrap { overflow: visible; }
+  .console-app .runs-table { display: block; min-width: 0; width: 100%; }
+  .console-app .runs-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .console-app .runs-table tbody { display: grid; gap: 14px; padding-top: 14px; }
+  .console-app .runs-table tbody tr { display: block; min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .console-app .runs-table td { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 0; white-space: normal; border: 0; min-width: 0; font-size: .875rem; }
+  .console-app .runs-table td:first-child b { font-size: .95rem; }
+  .console-app .runs-table td:first-child small { font-size: .82rem; }
+  .console-app .runs-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: .72rem; }
+  .console-app .runs-table td:first-child { display: block; min-width: 0; padding-bottom: 12px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+  .console-app .runs-table td:first-child small { max-width: none; overflow: visible; white-space: normal; line-height: 1.6; }
+  .console-app .runs-table .status { justify-self: start; max-width: 100%; white-space: normal; }
+  .console-app .run-progress { min-width: 0; width: 100%; }
+  .console-app .runs-table td button { justify-self: start; min-height: 44px; padding: 8px 14px; border: 1px solid #36526a; border-radius: 6px; background: #142737; color: var(--text); }
 }

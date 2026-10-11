@@ -1,5 +1,9 @@
 # Run detail layout
 
+Desktop queue columns use fixed proportions with single-line truncated run titles
+and repository names. Full titles remain in tooltips and run details; costs wrap.
+Mobile retains stacked cards. The queue must fit without horizontal scrolling.
+
 The console viewport, sidebar and nested scrolling areas use thin dark themed
 scrollbars. The styling is scoped to the console and preserves native scrolling.
 
