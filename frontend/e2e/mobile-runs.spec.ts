@@ -35,6 +35,10 @@ for (const width of [320, 390, 430, 768, 1440]) {
       } } });
     });
     await page.goto('/app');
+    await expect(page.getByRole('row', { name: `Open run ${title}` })).toBeVisible();
+    for (const selector of ['html', '.console-sidebar']) {
+      expect(await page.locator(selector).evaluate(element => getComputedStyle(element).scrollbarWidth)).toBe('thin');
+    }
     const row = page.getByRole('row', { name: `Open run ${title}` });
     await expect(row).toBeVisible();
     await fits(page);
