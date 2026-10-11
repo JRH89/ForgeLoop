@@ -13,6 +13,11 @@ it('saves a repository ceiling and reports the persisted policy', async () => {
   const fetch = vi.fn(async (url: string, init: RequestInit) => {
     expect(url).toBe('/graphql');
     expect(init.method).toBe('POST');
+    // The callback replaces the repository card: partial selections crash its render.
+    const { query } = JSON.parse(String(init.body));
+    for (const field of ['requiredGates', 'defaultBranch', 'issueLabel', 'harnessProfile', 'runRecord', 'requireAssignee', 'requiredAssignee', 'installationId', 'enabled']) {
+      expect(query).toContain(field);
+    }
     return { ok: true, json: async () => ({ data: { configureRepositoryBudget: saved } }) };
   });
   const onSaved = vi.fn();
