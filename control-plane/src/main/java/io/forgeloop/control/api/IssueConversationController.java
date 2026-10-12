@@ -21,6 +21,10 @@ public class IssueConversationController {
 
     @QueryMapping public IssueConversationView issueConversation(@Argument String id) { return conversations.get(id); }
 
+    @MutationMapping public boolean deleteIssueConversation(@Argument String conversationId) {
+        return conversations.delete(conversationId);
+    }
+
     @MutationMapping public IssueConversationView startIssueConversation(@Argument String repository, @Argument String message) {
         return conversations.start(repository, message);
     }

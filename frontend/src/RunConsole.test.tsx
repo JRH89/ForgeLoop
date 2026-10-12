@@ -5,6 +5,22 @@ import App from './main';
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('centralizes repository settings and inherits the configured budget for new runs', async () => {
+  vi.stubGlobal('fetch', controlPlane({ repositoryConnections: [{ id: 'repo', repository: 'org/repo', enabled: true, defaultBranch: 'main', issueLabel: 'forgeloop', requiredGates: ['unit'], maxBudgetUsd: 5, policyRevision: 1 }] }));
+  render(<App/>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Repositories' }));
+  expect(screen.queryByRole('button', { name: 'Save budget' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Manage repository settings' }));
+  expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Save budget' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Organization per-run ceiling (USD)')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Runs' }));
+  fireEvent.click(screen.getByRole('button', { name: '+ New Run' }));
+  fireEvent.change(screen.getByLabelText('Authorized repository'), { target: { value: 'org/repo' } });
+  expect(await screen.findByText(/Run limit: \$5. Inherited from Settings/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('Maximum spend')).not.toBeInTheDocument();
+});
+
 it('places Account in the sidebar with a decorative icon matching the navigation', async () => {
   vi.stubGlobal('fetch', controlPlane({}));
   render(<App />);
@@ -143,7 +159,7 @@ it('shows persisted harness and runner-local MCP configuration', async () => {
   vi.stubGlobal('fetch', controlPlane({ repositoryConnections: [] }));
   render(<App />);
   await screen.findByText('Intake queue');
-  fireEvent.click(screen.getByRole('button', { name: /Harness & policy/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Settings/ }));
   expect(await screen.findByText('Execution policy')).toBeInTheDocument();
   expect(screen.getByText('FULL_STACK')).toBeInTheDocument();
   expect(screen.getByText('No local MCP context routes configured.')).toBeInTheDocument();

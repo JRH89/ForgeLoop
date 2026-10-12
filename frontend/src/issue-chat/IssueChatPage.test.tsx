@@ -13,6 +13,32 @@ const publication = { repository: 'acme/app', pullRequestNumber: 27, pullRequest
 
 afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 
+it('confirms deletion, removes history and returns to a new chat', async () => {
+  window.history.replaceState(null, '', '/app#chat=chat-1');
+  let deleted = false;
+  const confirm = vi.fn(() => false);
+  const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+    const request = JSON.parse(String(init.body));
+    if (request.query.includes('deleteIssueConversation')) {
+      expect(request.variables).toEqual({ conversationId: 'chat-1' });
+      deleted = true;
+      return { ok: true, json: async () => ({ data: { deleteIssueConversation: true } }) };
+    }
+    return { ok: true, json: async () => ({ data: { issueConversations: deleted ? [] : [ready], issueConversation: ready } }) };
+  });
+  vi.stubGlobal('fetch', fetch);
+  vi.stubGlobal('confirm', confirm);
+  render(<IssueChatPage repositories={[repository]} operator={operator} onRepositories={() => {}}/>);
+  const remove = await screen.findByRole('button', { name: 'Delete conversation' });
+  fireEvent.click(remove);
+  expect(deleted).toBe(false);
+  confirm.mockReturnValue(true);
+  fireEvent.click(remove);
+  expect(await screen.findByRole('heading', { name: 'What should change?' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Delete conversation' })).not.toBeInTheDocument();
+  expect(window.location.hash).toBe('#chat');
+});
+
 it('lets an administrator refine a runner draft before explicitly creating an unassigned issue', async () => {
   vi.stubGlobal('confirm', vi.fn(() => true));
   const fetch = vi.fn(async (_url: string, init: RequestInit) => {

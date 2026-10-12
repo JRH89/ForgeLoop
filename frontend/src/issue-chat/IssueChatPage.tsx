@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Trash2 } from 'lucide-react';
 import {
+  deleteIssueConversation,
   createIssueFromConversation,
   loadIssueConversation,
   loadIssueConversations,
@@ -147,6 +149,19 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
     });
   }
 
+  async function removeConversation(item: IssueConversation) {
+    if (!window.confirm('Permanently delete this conversation and its messages? Any GitHub issue, run, and usage records will remain.')) return;
+    await perform('delete', async () => {
+      if (!await deleteIssueConversation(item.id)) throw new Error('Conversation could not be deleted.');
+      if (activeId === item.id) {
+        select('');
+        setConversation(undefined);
+        setMessage('');
+      }
+      await refreshConversations();
+    });
+  }
+
   async function perform(label: string, action: () => Promise<void>) {
     setBusy(label);
     setError('');
@@ -179,6 +194,7 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
             <strong>{item.draftTitle || item.messages.find(entry => entry.role === 'USER')?.content || 'New issue chat'}</strong>
             <span>{item.status.replaceAll('_', ' ')} · {new Date(item.updatedAt).toLocaleDateString()}</span>
           </button>
+          {operator.role !== 'VIEWER' && <button className="chat-delete" aria-label="Delete conversation" title={item.status === 'RUNNING' ? 'Wait for the current reply to finish' : 'Delete conversation history'} disabled={!!busy || item.status === 'RUNNING'} onClick={() => void removeConversation(item)}><Trash2 size={16} aria-hidden="true"/></button>}
         </li>)}</ul> : <p className="empty">Your issue chats will appear here.</p>}
       </aside>
       <section className="panel issue-chat-workspace">

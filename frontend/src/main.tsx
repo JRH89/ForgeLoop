@@ -57,6 +57,7 @@ import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
 import RunRecordSettings from "./RunRecordSettings";
 import RepositoryBudgetSettings from "./RepositoryBudgetSettings";
+import SetupBanner from "./SetupBanner";
 import "./styles.css";
 import "./dashboard-responsive.css";
 import "./repository-settings.css";
@@ -78,14 +79,7 @@ const stamp = (value: string) =>
     timeStyle: "short",
   }).format(new Date(value));
 
-function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnection[]; operator:OperatorSession; onSaved:(item:RepositoryConnection)=>void }) {
-  const [organizationLimit, setOrganizationLimit] = useState<number>();
-  const [configurationError, setConfigurationError] = useState('');
-  useEffect(() => {
-    void loadPlatformConfiguration()
-      .then(configuration => setOrganizationLimit(configuration.policy.maxRunBudgetUsd))
-      .catch(reason => setConfigurationError(reason instanceof Error ? reason.message : 'Unable to load the organization budget'));
-  }, []);
+function RepositoryPage({ items, operator, onSettings }: { items: RepositoryConnection[]; operator:OperatorSession; onSettings:()=>void }) {
   return (
     <>
       <section className="hero">
@@ -123,15 +117,8 @@ function RepositoryPage({ items, operator, onSaved }: { items: RepositoryConnect
                 </div>
                 <span className="status complete">Policy v{item.policyRevision}</span>
               </div>
-              <div className="repository-settings-grid">
-                <IntakeSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
-                {organizationLimit !== undefined
-                  ? <RepositoryBudgetSettings item={item} organizationLimit={organizationLimit} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
-                  : configurationError
-                    ? <p role="alert">Unable to show the repository budget control: {configurationError}</p>
-                    : <p role="status">Loading the organization budget limit…</p>}
-                <RunRecordSettings item={item} editable={operator.role==='ADMIN'} onSaved={onSaved}/>
-              </div>
+              <p>Run limit: ${item.maxBudgetUsd} USD · Intake: {item.requireAssignee ? 'assignment required' : 'label only'} · Detailed records: {item.runRecord ? 'enabled' : 'disabled'}</p>
+              <button className="secondary" onClick={onSettings}>Manage repository settings</button>
               <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
             </article>
           ))
@@ -155,8 +142,11 @@ function NewRun({
     sourceRef: "",
     title: "",
     specification: "",
-    budgetUsd: 25,
   });
+  const [organizationLimit, setOrganizationLimit] = useState<number>();
+  useEffect(() => { void loadPlatformConfiguration().then(value => setOrganizationLimit(value.policy.maxRunBudgetUsd)).catch(() => setError('Unable to load budget policy. Try again.')); }, []);
+  const selectedRepository = repositories.find(item => item.repository === form.repository);
+  const budgetUsd = organizationLimit !== undefined && selectedRepository ? Math.min(organizationLimit, selectedRepository.maxBudgetUsd) : undefined;
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
@@ -164,7 +154,8 @@ function NewRun({
     setBusy(true);
     setError("");
     try {
-      onAdded(await submitFeature(form));
+      if (budgetUsd === undefined) throw new Error("Select a repository with a configured budget.");
+      onAdded(await submitFeature({ ...form, budgetUsd }));
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Unable to create run",
@@ -227,22 +218,10 @@ function NewRun({
           }
         />
       </label>
-      <label>
-        Maximum spend (USD)
-        <input
-          aria-label="Maximum spend"
-          type="number"
-          min="1"
-          step="1"
-          value={form.budgetUsd}
-          onChange={(event) =>
-            setForm({ ...form, budgetUsd: Number(event.target.value) })
-          }
-        />
-      </label>
+      <p role="status">{budgetUsd !== undefined ? `Run limit: $${budgetUsd}. Inherited from Settings; no separate run budget is needed.` : 'Select a repository to see its run limit.'}</p>
       <button
         className="primary"
-        disabled={busy || !repositories.some((item) => item.enabled)}
+        disabled={busy || budgetUsd === undefined || !selectedRepository?.enabled}
       >
         {busy ? "Submitting…" : "Create delivery run"}
       </button>
@@ -839,7 +818,7 @@ function RunsPage({
   );
 }
 
-function ConfigurationPage({operator}:{operator:OperatorSession}) {
+function ConfigurationPage({operator, repositories, onSaved}:{operator:OperatorSession; repositories:RepositoryConnection[]; onSaved:(item:RepositoryConnection)=>void}) {
   const [configuration,setConfiguration]=useState<PlatformConfiguration>();
   const [error,setError]=useState("");
   const [busy,setBusy]=useState("");
@@ -851,11 +830,14 @@ function ConfigurationPage({operator}:{operator:OperatorSession}) {
   async function perform(label:string,work:()=>Promise<unknown>){setBusy(label);setError("");try{await work();setConfiguration(await loadPlatformConfiguration());}catch(reason){setError(reason instanceof Error?reason.message:"Configuration update failed");}finally{setBusy("");}}
   if(!configuration)return <p className="loading">Loading execution policy…</p>;
   return <>
-    <section className="page-title"><div><p className="eyebrow">Execution governance</p><h1>Harness & policy</h1><p>Reusable delivery rules and runner-local context routes for this organization.</p></div><span className="revision">Policy revision {configuration.policy.revision}</span></section>
+    <section className="page-title"><div><p className="eyebrow">Execution governance</p><h1>Settings</h1><p>Manage spending limits, delivery, repository intake and runner configuration in one place.</p></div><span className="revision">Policy revision {configuration.policy.revision}</span></section>
     {error&&<p role="alert">{error}</p>}
-    <section className="panel policy-card"><div><p className="eyebrow">Organization boundary</p><h2>Execution policy</h2><p>Hard limits applied before work enters the runner queue.</p></div><form onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);void perform("policy",()=>configureOrganizationPolicy({maxRunBudgetUsd:Number(form.get("budget")),maxParallelTasks:Number(form.get("parallel")),allowedProviders:csv(String(form.get("providers"))),requireHumanApproval:form.get("approval")==="on",autoMergeEnabled:form.get("autoMerge")==="on"}));}}><label>Maximum run budget<input name="budget" type="number" min="1" step="1" defaultValue={configuration.policy.maxRunBudgetUsd} disabled={!admin}/></label><label>Parallel task ceiling<input name="parallel" type="number" min="1" max="16" defaultValue={configuration.policy.maxParallelTasks} disabled={!admin}/></label><label>Allowed providers<input name="providers" defaultValue={configuration.policy.allowedProviders.join(", ")} disabled={!admin}/></label><label className="check"><input name="approval" type="checkbox" defaultChecked={configuration.policy.requireHumanApproval} disabled={!admin}/> Require human approval before delivery</label><label className="check"><input name="autoMerge" type="checkbox" defaultChecked={configuration.policy.autoMergeEnabled} disabled={!admin}/> Auto-merge the verified commit after all GitHub checks pass</label>{admin&&<button className="primary compact" disabled={!!busy}>Save policy</button>}</form></section>
+    <section className="panel policy-card"><div><p className="eyebrow">Organization boundary</p><h2>Execution policy</h2><p>Hard limits applied before work enters the runner queue.</p></div><form onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);void perform("policy",()=>configureOrganizationPolicy({maxRunBudgetUsd:Number(form.get("budget")),maxParallelTasks:Number(form.get("parallel")),allowedProviders:csv(String(form.get("providers"))),requireHumanApproval:form.get("approval")==="on",autoMergeEnabled:form.get("autoMerge")==="on"}));}}><label>Organization per-run ceiling (USD)<input name="budget" type="number" min="1" step="1" defaultValue={configuration.policy.maxRunBudgetUsd} disabled={!admin}/></label><label>Parallel task ceiling<input name="parallel" type="number" min="1" max="16" defaultValue={configuration.policy.maxParallelTasks} disabled={!admin}/></label><label>Allowed providers<input name="providers" defaultValue={configuration.policy.allowedProviders.join(", ")} disabled={!admin}/></label><label className="check"><input name="approval" type="checkbox" defaultChecked={configuration.policy.requireHumanApproval} disabled={!admin}/> Require human approval before delivery</label><label className="check"><input name="autoMerge" type="checkbox" defaultChecked={configuration.policy.autoMergeEnabled} disabled={!admin}/> Auto-merge the verified commit after all GitHub checks pass</label>{admin&&<button className="primary compact" disabled={!!busy}>Save policy</button>}</form></section>
+    <section className="panel"><h2>Repository settings</h2><p>Each repository has one run limit, bounded by the organization ceiling above. New manual and issue-triggered runs use that limit; existing runs keep their captured budget.</p>{repositories.length ? repositories.map(item => <article className="repository-card" key={item.id}><h3>{item.repository}</h3><div className="repository-settings-grid"><RepositoryBudgetSettings item={item} organizationLimit={configuration.policy.maxRunBudgetUsd} editable={admin} onSaved={onSaved}/><IntakeSettings item={item} editable={admin} onSaved={onSaved}/><RunRecordSettings item={item} editable={admin} onSaved={onSaved}/></div></article>) : <p>No connected repositories yet.</p>}</section>
+    <details className="panel"><summary>Runner setup &amp; advanced configuration</summary><RunnerSetup operator={operator}/>
     <div className="config-columns"><section className="panel"><div className="section-heading"><div><p className="eyebrow">Reusable orchestration</p><h2>Harness definitions</h2></div><span className="count">{configuration.harnesses.length}</span></div>{configuration.harnesses.map(item=><article className="definition" key={item.id}><div><b>{item.name}</b><span className={`status ${item.enabled?"complete":"failed"}`}>{item.enabled?"ACTIVE":"DISABLED"}</span></div><p>{item.description}</p><small>{item.allowedRoles.join(" · ")} · {item.defaultAttemptBudget} attempts · v{item.revision}</small></article>)}{admin&&<form className="subform" onSubmit={event=>{event.preventDefault();void perform("harness",()=>createHarnessDefinition({...harness,allowedRoles:csv(harness.allowedRoles)}));}}><h3>Add harness</h3><input aria-label="Harness name" placeholder="BUG_FIX" value={harness.name} onChange={event=>setHarness({...harness,name:event.target.value.toUpperCase()})} required/><textarea aria-label="Harness description" placeholder="Describe the bounded workflow" value={harness.description} onChange={event=>setHarness({...harness,description:event.target.value})} required/><input aria-label="Harness roles" value={harness.allowedRoles} onChange={event=>setHarness({...harness,allowedRoles:event.target.value})} required/><input aria-label="Default attempt budget" type="number" min="1" max="10" value={harness.defaultAttemptBudget} onChange={event=>setHarness({...harness,defaultAttemptBudget:Number(event.target.value)})}/><button className="secondary" disabled={!!busy}>Create harness</button></form>}</section>
     <section className="panel"><div className="section-heading"><div><p className="eyebrow">Runner-local context</p><h2>MCP routes</h2></div><span className="count">{configuration.mcp.length}</span></div>{configuration.mcp.length?configuration.mcp.map(item=><article className="definition" key={item.id}><div><b>{item.name}</b><span className={`status ${item.enabled?"complete":"failed"}`}>{item.enabled?"ROUTED":"DISABLED"}</span></div><p><code>{item.command} {item.arguments.join(" ")}</code></p><small>{item.contextTool} · {item.allowedRoles.join(" · ")} · v{item.revision}</small></article>):<p className="empty">No local MCP context routes configured.</p>}{admin&&<form className="subform" onSubmit={event=>{event.preventDefault();try{JSON.parse(mcp.toolArguments);}catch{setError("MCP tool arguments must be valid JSON");return;}void perform("mcp",()=>createLocalMcpConfiguration({...mcp,arguments:csv(mcp.arguments),allowedRoles:csv(mcp.allowedRoles)}));}}><h3>Add local route</h3><input aria-label="MCP route name" placeholder="repository-context" value={mcp.name} onChange={event=>setMcp({...mcp,name:event.target.value})} required/><input aria-label="MCP command" placeholder="node" value={mcp.command} onChange={event=>setMcp({...mcp,command:event.target.value})} required/><input aria-label="MCP command arguments" placeholder="server.js, --stdio" value={mcp.arguments} onChange={event=>setMcp({...mcp,arguments:event.target.value})}/><input aria-label="MCP allowed roles" value={mcp.allowedRoles} onChange={event=>setMcp({...mcp,allowedRoles:event.target.value})} required/><input aria-label="MCP context tool" placeholder="repository.get_context" value={mcp.contextTool} onChange={event=>setMcp({...mcp,contextTool:event.target.value})} required/><textarea aria-label="MCP tool arguments" value={mcp.toolArguments} onChange={event=>setMcp({...mcp,toolArguments:event.target.value})} required/><button className="secondary" disabled={!!busy}>Create route</button></form>}</section></div>
+    </details>
   </>;
 }
 
@@ -970,7 +952,7 @@ function App() {
             >
               <span className="nav-icon" aria-hidden="true"><GitBranch size={17} strokeWidth={1.9} /></span> Repositories
             </button>
-            <button className={page === "Configuration" ? "active" : ""} onClick={() => navigate("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Harness &amp; policy</button>
+            <button className={page === "Configuration" ? "active" : ""} onClick={() => navigate("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Settings</button>
             <GuideNavigation active={page === 'Guide'} onSelect={id => { setGuideTarget({ id }); navigate('Guide'); }}/>
             <button className={page === "GettingStarted" ? "active" : ""} onClick={() => navigate("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
             {operator?.role === 'ADMIN' && <button className={page === 'Team' ? 'active' : ''} onClick={() => navigate('Team')}><span className="nav-icon" aria-hidden="true"><Users size={17} strokeWidth={1.9}/></span> Team</button>}
@@ -988,7 +970,7 @@ function App() {
           ) : !operator ? (
             <p className="loading">Loading operator workspace…</p>
           ) : page === "Runs" ? (
-            <><div className="setup-entry"><span>Setting up a repository or diagnosing waiting work?</span><button onClick={() => navigate("GettingStarted")}>Open setup checklist</button></div><RunsPage
+            <><SetupBanner key={`${operator.subject}:${operator.organizationId}`} operator={operator} onOpen={() => navigate("GettingStarted")}/><RunsPage
               repositories={repositories}
               runs={runs}
               operator={operator}
@@ -999,9 +981,9 @@ function App() {
           ) : page === "IssueChat" ? (
             <IssueChatPage repositories={repositories} operator={operator} onRepositories={() => navigate('Repositories')}/>
           ) : page === "Repositories" ? (
-            <RepositoryPage items={repositories} operator={operator} onSaved={updated=>setRepositories(current=>current.map(item=>item.id===updated.id?updated:item))}/>
+            <RepositoryPage items={repositories} operator={operator} onSettings={() => navigate("Configuration")}/>
           ) : page === "Configuration" ? (
-            <><RunnerSetup operator={operator}/><ConfigurationPage operator={operator}/></>
+            <ConfigurationPage operator={operator} repositories={repositories} onSaved={updated=>setRepositories(current=>current.map(item=>item.id===updated.id?updated:item))}/>
           ) : page === "Team" ? (
             operator.role === 'ADMIN' ? <TeamPage operator={operator}/> : <p role="alert">Administrator access is required.</p>
           ) : page === "Account" ? (
