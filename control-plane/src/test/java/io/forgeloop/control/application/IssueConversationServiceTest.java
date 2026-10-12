@@ -26,6 +26,39 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 class IssueConversationServiceTest {
+    @Test void deletesPendingOwnedHistoryButRetainsExternalWorkAndUsage() {
+        IssueConversation conversation = new IssueConversation("org-1", "acme/app", "owner");
+        when(operators.organizationId()).thenReturn("org-1");
+        when(operators.subject()).thenReturn("owner");
+        when(conversations.lockByIdAndOrganizationId(conversation.getId(), "org-1")).thenReturn(Optional.of(conversation));
+        assertEquals(true, service.delete(conversation.getId()));
+        verify(messages).deleteByConversation_Id(conversation.getId());
+        verify(conversations).delete(conversation);
+        verify(operators, never()).requireAdministrator();
+        org.mockito.Mockito.verifyNoInteractions(github, activities);
+    }
+
+    @Test void refusesRunningAndCrossOrganizationDeletion() {
+        IssueConversation conversation = new IssueConversation("org-1", "acme/app", "owner");
+        conversation.claim("runner");
+        when(operators.organizationId()).thenReturn("org-1");
+        when(operators.subject()).thenReturn("owner");
+        when(conversations.lockByIdAndOrganizationId(conversation.getId(), "org-1")).thenReturn(Optional.of(conversation));
+        assertThrows(IllegalStateException.class, () -> service.delete(conversation.getId()));
+        when(operators.organizationId()).thenReturn("other");
+        assertThrows(IllegalArgumentException.class, () -> service.delete(conversation.getId()));
+        verify(conversations, never()).delete(any());
+    }
+
+    @Test void requiresAdministratorToDeleteAnotherUsersConversation() {
+        IssueConversation conversation = new IssueConversation("org-1", "acme/app", "owner");
+        when(operators.organizationId()).thenReturn("org-1");
+        when(operators.subject()).thenReturn("other-user");
+        when(conversations.lockByIdAndOrganizationId(conversation.getId(), "org-1")).thenReturn(Optional.of(conversation));
+        doThrow(new AccessDeniedException("administrator required")).when(operators).requireAdministrator();
+        assertThrows(AccessDeniedException.class, () -> service.delete(conversation.getId()));
+        verify(conversations, never()).delete(any());
+    }
     private final IssueConversationRepository conversations = mock(IssueConversationRepository.class);
     private final IssueConversationMessageRepository messages = mock(IssueConversationMessageRepository.class);
     private final RepositoryConnectionService connections = mock(RepositoryConnectionService.class);

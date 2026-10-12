@@ -133,6 +133,20 @@ public class IssueConversationService {
         return view(conversation);
     }
 
+    /** Lock against claims/completions; retain accounting and external GitHub work. */
+    @Transactional
+    public boolean delete(String conversationId) {
+        operators.requireOperator();
+        IssueConversation conversation = requireConversation(conversationId);
+        if (!conversation.getCreatedBy().equals(operators.subject())) operators.requireAdministrator();
+        if ("RUNNING".equals(conversation.getStatus()))
+            throw new IllegalStateException("Wait for the current reply to finish before deleting this conversation.");
+        messages.deleteByConversation_Id(conversationId);
+        conversations.delete(conversation);
+        audit.record("ISSUE_CHAT_DELETED", "ISSUE_CONVERSATION", conversationId, "history-deleted;usage-retained");
+        return true;
+    }
+
     private IssueConversation requireConversation(String id) {
         return conversations.lockByIdAndOrganizationId(id, operators.organizationId())
                 .orElseThrow(() -> new IllegalArgumentException("Issue conversation not found"));
