@@ -19,3 +19,4 @@
 .setup-runs li { margin-bottom: 1rem; overflow-wrap: anywhere; }
 .setup-entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem; border: 1px solid #253b4f; border-radius: .75rem; margin-bottom: 1.5rem; }
 @media (max-width: 600px) { .setup-steps > li { padding: 1rem; } .onboarding button, .onboarding select { width: 100%; } }
+.setup-entry-actions { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; margin-left: auto; flex-wrap: wrap; }

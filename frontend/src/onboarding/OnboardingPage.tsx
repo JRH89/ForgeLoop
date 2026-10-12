@@ -68,7 +68,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
             <p>Repository budget: ${repository.maxBudgetUsd} · Organization limit: ${snapshot.config.policy.maxRunBudgetUsd} · Human approval: {snapshot.config.policy.requireHumanApproval ? 'required' : 'not required'} · Auto-merge: {snapshot.config.policy.autoMergeEnabled ? 'enabled' : 'disabled'}</p>
             {warnings.length ? <ul>{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul> : <p>Saved harness and intake configuration checks pass. This does not verify provider funding or the repository build environment.</p>}
             <p>Verification gates: {repository.requiredGates.join(', ') || 'None configured; review your verification policy before using real work.'}</p></> : <p>Select a connected repository first.</p>}
-          <button onClick={() => navigate('Repositories')}>Review intake settings</button> <button onClick={() => navigate('Configuration')}>Review harness &amp; policy</button>
+          <button onClick={() => navigate('Configuration')}>Review intake settings</button> <button onClick={() => navigate('Configuration')}>Review workspace settings</button>
         </li>
         <li><h2>Create and follow your first issue</h2>
           <p>Start with one small change and explicit acceptance criteria. The GitHub draft includes a safe title and checklist, but does not apply the intake label or assignee.</p>
