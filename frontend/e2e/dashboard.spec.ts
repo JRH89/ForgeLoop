@@ -17,7 +17,7 @@ test('renders the persisted delivery-run console', async ({ page }) => {
   }
 
   await page.getByRole('button', { name: /Settings/ }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Execution policy' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Harness definitions' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'MCP routes' })).toBeVisible();
