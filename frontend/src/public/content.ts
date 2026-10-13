@@ -1,4 +1,5 @@
 import {aboutGuide, featuresGuide, setupGuide, workflowGuide} from './guides';
+import { changelogSections } from './changelog';
 
 export const SITE = 'https://forgeloop.hookerhillstudios.com';
 export const REPOSITORY = 'https://github.com/JRH89/ForgeLoop';
@@ -6,6 +7,7 @@ export const PUBLISHED = '2026-09-26';
 export type Section = { heading: string; body: string; points?: string[]; links?: {label:string;href:string}[] };
 export type PublicPage = { path: string; title: string; description: string; eyebrow: string; heading: string; intro: string; sections: Section[] };
 export const pages: PublicPage[] = [
+  { path: '/changelog', title: 'ForgeLoop changelog | Product updates and runner releases', description: 'Follow ForgeLoop product milestones, desktop runner releases, issue-intake improvements and verified software delivery updates.', eyebrow: 'Product updates', heading: 'What changed in ForgeLoop.', intro: 'Selected shipped milestones. For installer assets and checksums, follow the linked runner releases.', sections: changelogSections },
   {path:'/',title:'ForgeLoop | Evidence-backed AI software delivery',description:'Turn GitHub issues into evidence-backed pull requests. Coordinate coding agents, verify changes, and run delivery on infrastructure you control.',eyebrow:'Autonomous software delivery',heading:'Turn GitHub issues into evidence-backed pull requests.',intro:'',sections:[]},
   {path:'/features',title:'AI coding agent orchestration features | ForgeLoop',description:'Explore GitHub intake, self-hosted runners, verification gates, repair loops, cost telemetry, and guarded pull request delivery in ForgeLoop.',eyebrow:'Built around the work',heading:'More than an agent with a terminal.',intro:'A delivery system needs to know what work is allowed, what passed, what failed, and which exact commit is ready for review.',sections:featuresGuide},
   {path:'/about',title:'About ForgeLoop | The system around coding agents',description:'Learn why ForgeLoop separates coding agents from delivery policy, verification, and evidence, with repository-agnostic runners you control.',eyebrow:'Why ForgeLoop exists',heading:'The hard part is not generating a diff.',intro:'It is making a change you can explain, verify, review, and safely integrate. ForgeLoop is built around that responsibility.',sections:aboutGuide},
