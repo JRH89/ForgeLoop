@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { LockKeyhole, ShieldCheck } from 'lucide-react';
-import favicon from './assets/favicon.png';
+import { brandIcon as favicon } from './brand';
 import './runner-pairing.css';
 import { approveRunnerPairing, loadOperator } from './api';
 

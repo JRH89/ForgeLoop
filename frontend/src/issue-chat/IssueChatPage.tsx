@@ -1,3 +1,4 @@
+import ConsolePageHeader from '../ConsolePageHeader';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import {
@@ -170,7 +171,7 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
     finally { setBusy(''); }
   }
 
-  if (!enabledRepositories.length) return <section className="page-title"><div><p className="eyebrow">Runner-assisted intake</p><h1>Issue chat</h1><p>Connect a repository before drafting an issue.</p><button className="primary" onClick={onRepositories}>Open repositories</button></div></section>;
+  if (!enabledRepositories.length) return <ConsolePageHeader eyebrow="Runner-assisted intake" title="Issue chat" description="Connect a repository before drafting an issue." actions={<button className="primary" onClick={onRepositories}>Open repositories</button>}/>;
 
   const canCreate = operator.role === 'ADMIN' && conversation?.status === 'READY' && draft.title.trim() && draft.body.trim()
     && draft.criteria.split(/\r?\n/).some(item => item.trim());
@@ -178,12 +179,9 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
   const publication = operations?.publication;
 
   return <>
-    <section className="page-title issue-chat-title">
-      <div><p className="eyebrow">Runner-assisted intake</p><h1>Issue chat</h1><p>Describe the change, refine a reviewable specification, then choose whether to create the issue.</p></div>
-      <label className="issue-chat-repository">Repository<select aria-label="Repository" value={repository} onChange={event => { setRepository(event.target.value); select(''); }}>
+    <ConsolePageHeader eyebrow="Runner-assisted intake" title="Issue chat" description="Describe a change and refine a reviewable issue specification." actions={<label className="issue-chat-repository">Repository<select aria-label="Repository" value={repository} onChange={event => { setRepository(event.target.value); select(''); }}>
         {enabledRepositories.map(item => <option key={item.id} value={item.repository}>{item.repository}</option>)}
-      </select></label>
-    </section>
+      </select></label>}/>
     <p className="issue-chat-cost-note">Messages and drafts are saved in this organization workspace; do not include secrets. Each reply may incur provider charges, shown under Usage &amp; costs.</p>
     {error && <p role="alert">{error}</p>}
     <div className="issue-chat-layout">

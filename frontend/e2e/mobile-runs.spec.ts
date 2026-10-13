@@ -83,7 +83,9 @@ for (const width of [320, 390, 430, 768, 1440]) {
       await expect(menuToggle).toHaveAttribute('aria-expanded', 'false');
       await expect(page.locator('.console-sidebar')).toHaveCSS('visibility', 'hidden');
     }
-    await expect(page.getByRole('heading', { name: 'Connected repositories', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Repositories', exact: true })).toBeVisible();
+    await expect(page.locator('.console-page-header .eyebrow')).toHaveText('Repository access');
+    expect(await page.locator('.connected-repositories').evaluate(element => getComputedStyle(element).backgroundImage)).toBe('none');
     const repositoryCard = page.locator('.repository-card');
     await expect(repositoryCard).toHaveCount(1);
     await expect(repositoryCard.getByRole('heading', { name: 'Repository issue scan', exact: true })).toBeVisible();

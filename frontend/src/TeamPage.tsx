@@ -1,3 +1,4 @@
+import ConsolePageHeader from './ConsolePageHeader';
 import { useEffect, useState, type FormEvent } from 'react';
 import { inviteGithubUser, loadOrganizationMembers, revokeOrganizationMember, type OperatorSession, type OrganizationMember } from './api';
 import './team.css';
@@ -29,7 +30,7 @@ export default function TeamPage({operator}: {operator: OperatorSession}) {
     finally { setBusy(false); }
   }
   return <section className="team-page">
-    <div className="page-heading"><div><span className="eyebrow">ORGANIZATION ACCESS</span><h1>Team</h1><p>Invite GitHub users to {operator.organizationId}. Only administrators can manage access.</p></div></div>
+    <ConsolePageHeader eyebrow="Organization access" title="Team" description="Invite GitHub users and manage workspace access."/>
     <div className="team-card"><h2>Invite a person</h2><p>Enter their GitHub username. ForgeLoop resolves it to GitHub's permanent account ID before granting access. No email is sent; share your ForgeLoop URL with them.</p>
       <form onSubmit={event => void invite(event)} className="team-invite-form"><label>GitHub username<input value={login} onChange={event => setLogin(event.target.value)} required autoComplete="off" placeholder="octocat" /></label><label>Role<select value={role} onChange={event => setRole(event.target.value as OperatorSession['role'])}><option value="VIEWER">Viewer — read only</option><option value="OPERATOR">Operator — manage runs</option><option value="ADMIN">Administrator — manage organization</option></select></label><button disabled={busy || !login.trim()} type="submit">Invite GitHub user</button></form>
     </div>

@@ -1,3 +1,4 @@
+import ConsolePageHeader from '../ConsolePageHeader';
 import { useEffect, useState } from 'react';
 import { loadProviderActivities, loadRunAnalytics, loadRuns, type FeatureRun, type ProviderActivity, type RunAnalytics } from '../api';
 import { usageSummary, usd, type UsageBucket } from './usage';
@@ -28,7 +29,7 @@ export default function UsagePage({ initialAnalytics, onSettings }: { initialAna
   const usage = runs && usageSummary(runs, days, repository, updated, activities);
   const count = usage ? usage.total.priced + usage.total.unpriced : 0;
   return <section className="usage-page">
-    <div className="page-title"><div><p className="eyebrow">Organization usage</p><h1>Usage &amp; costs</h1><p>Review estimated provider spend across runs and AI-assisted workspace activity.</p></div><button className="secondary" onClick={onSettings}>Budget &amp; execution settings</button></div>
+    <ConsolePageHeader eyebrow="Organization usage" title="Usage & costs" description="Review estimated provider spend across runs and AI activity." actions={<button className="secondary" onClick={onSettings}>Budget &amp; execution settings</button>}/>
     <p>Costs are estimates from recorded provider usage, not provider invoices. The report includes delivery runs, repository scans, and any metered issue-spec or chat activity. Unpriced requests are shown as N/A, never counted as free. Archived runs remain included.</p>
     <div className="usage-filters"><div><label htmlFor="usage-period">Period (UTC)</label><select id="usage-period" value={days} onChange={event => setDays(Number(event.target.value))}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select></div>
       <div><label htmlFor="usage-repository">Repository</label><select id="usage-repository" value={repository} onChange={event => setRepository(event.target.value)}><option value="">All repositories</option>{[...new Set(runs?.map(run => run.repository))].sort().map(name => <option key={name}>{name}</option>)}</select></div>

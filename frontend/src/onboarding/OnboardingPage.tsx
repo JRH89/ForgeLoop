@@ -1,3 +1,4 @@
+import ConsolePageHeader from '../ConsolePageHeader';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { checkIssueIntake, loadPlatformConfiguration, loadRepositoryConnections, loadRunners, loadRuns,
   type FeatureRun, type IssueIntakeCheck, type OperatorSession, type PlatformConfiguration, type RepositoryConnection, type Runner } from '../api';
@@ -40,8 +41,7 @@ export default function OnboardingPage({ operator, navigate }: Props) {
   const issueUrl = repository && newIssueUrl(repository.repository, repository.issueLabel, repository.requiredAssignee, repository.requireAssignee);
   const admin = operator.role === 'ADMIN';
   return <section className="onboarding">
-    <h1>Getting started</h1>
-    <p>Connect a repository to your own runner, then follow one issue through verified delivery.</p>
+    <ConsolePageHeader eyebrow="Workspace setup" title="Getting started" description="Connect your runner and follow your first issue through delivery."/>
     <p className="setup-notice">These checks do not call a model or start work. Provider keys stay on your runner. Starting a runner with eligible queued work can spend API credits.</p>
     {error && <p role="alert">{error}</p>}
     <button onClick={() => setRefresh(value => value + 1)}>Refresh readiness</button>

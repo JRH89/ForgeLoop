@@ -29,6 +29,7 @@ it('places Account in the sidebar with a decorative icon matching the navigation
   expect(account).toHaveClass('account-console-link');
   expect(account.querySelector('.nav-icon')).toHaveAttribute('aria-hidden', 'true');
   expect(account.querySelector('svg')).toHaveAttribute('width', '17');
+  expect(screen.getByRole('link', { name: 'ForgeLoop' }).querySelector('img')).toHaveAttribute('src', '/icons/icon-192.png?v=20261012');
   expect(screen.queryByRole('link', { name: 'Support' })).not.toBeInTheDocument();
 });
 
@@ -194,7 +195,7 @@ it('provides an in-app operator guide as the fifth navigation item', async () =>
   fireEvent.click(guide);
   expect(guide).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByRole('button', { name: 'Quick start' })).not.toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Using ForgeLoop' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'User guide' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'What every setting does' })).toBeInTheDocument();
   expect(screen.getByText('Auto-merge', { selector: 'dt' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'When something does not move' })).toBeInTheDocument();

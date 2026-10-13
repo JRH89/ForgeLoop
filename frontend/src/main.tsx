@@ -1,3 +1,4 @@
+import ConsolePageHeader from './ConsolePageHeader';
 import {
   FormEvent,
   useEffect,
@@ -44,7 +45,7 @@ import {
   type RunAnalytics,
   type PlatformConfiguration,
 } from "./api";
-import favicon from "./assets/favicon.png";
+import { brandIcon as favicon } from './brand';
 import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
 import RunnerSetup from "./RunnerSetup";
@@ -84,18 +85,7 @@ function RepositoryPage({ items, operator, onSettings }: { items: RepositoryConn
   return (
     <>
       <section className="panel connected-repositories">
-        <div className="section-heading">
-          <div>
-            <h2>Connected repositories</h2>
-            <p>
-              Issue intake and verification are bound to the persisted policy
-              revision.
-            </p>
-          </div>
-          <a className="primary" href="/api/github/app/install">
-            Install GitHub App
-          </a>
-        </div>
+        <ConsolePageHeader eyebrow="Repository access" title="Repositories" description="Manage connected repositories and discover work to propose." actions={<a className="primary" href="/api/github/app/install">Install GitHub App</a>}/>
         {items.length ? (
           items.map((item) => (
             <RepositoryDisclosure key={`${operator.subject}:${operator.organizationId}:${item.id}`} storageKey={`forgeloop:repository-expanded:${encodeURIComponent(operator.subject)}:${encodeURIComponent(operator.organizationId)}:${encodeURIComponent(item.repository)}`} heading={<>
@@ -751,17 +741,7 @@ function RunsPage({
     );
   return (
     <>
-      <section className="page-title runs-title">
-        <div>
-          <h1>Runs</h1>
-          <p>Turn specifications into working software.</p>
-        </div>
-        {operator.role !== "VIEWER" && (
-          <button className="primary" onClick={() => setCreating(true)}>
-            + New Run
-          </button>
-        )}
-      </section>
+      <ConsolePageHeader eyebrow="Software delivery" title="Runs" description="Track issues through verified delivery." actions={operator.role !== "VIEWER" && <button className="primary" onClick={() => setCreating(true)}>+ New Run</button>}/>
       <section className="panel runs-dashboard">
         <p role="status">{refreshError?`Updates interrupted: ${refreshError}. Retrying automatically.`:`Live updates every 2 seconds${lastUpdated?` · Updated ${lastUpdated}`:''}`}</p>
         <label className="check"><input type="checkbox" checked={archived} onChange={event=>{setArchived(event.target.checked);setSelected(undefined);}}/> Show archived runs</label>
@@ -821,7 +801,7 @@ function ConfigurationPage({operator, repositories, onSaved}:{operator:OperatorS
   async function perform(label:string,work:()=>Promise<unknown>){setBusy(label);setError("");try{await work();setConfiguration(await loadPlatformConfiguration());}catch(reason){setError(reason instanceof Error?reason.message:"Configuration update failed");}finally{setBusy("");}}
   if(!configuration)return <p className="loading">Loading execution policy…</p>;
   return <>
-    <section className="page-title"><div><p className="eyebrow">Execution governance</p><h1>Settings</h1><p>Manage spending limits, delivery, repository intake and runner configuration in one place.</p></div><span className="revision">Policy revision {configuration.policy.revision}</span></section>
+    <ConsolePageHeader eyebrow="Execution governance" title="Settings" description="Manage spending limits, delivery rules, and repository configuration." actions={<span className="revision">Policy revision {configuration.policy.revision}</span>}/>
     {error&&<p role="alert">{error}</p>}
     <RunnerSetup operator={operator}/>
     <section className="panel policy-card"><div><p className="eyebrow">Organization boundary</p><h2>Execution policy</h2><p>Hard limits applied before work enters the runner queue.</p></div><form onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);void perform("policy",()=>configureOrganizationPolicy({maxRunBudgetUsd:Number(form.get("budget")),maxParallelTasks:Number(form.get("parallel")),allowedProviders:csv(String(form.get("providers"))),requireHumanApproval:form.get("approval")==="on",autoMergeEnabled:form.get("autoMerge")==="on"}));}}><label>Organization per-run ceiling (USD)<input name="budget" type="number" min="1" step="1" defaultValue={configuration.policy.maxRunBudgetUsd} disabled={!admin}/></label><label>Parallel task ceiling<input name="parallel" type="number" min="1" max="16" defaultValue={configuration.policy.maxParallelTasks} disabled={!admin}/></label><label>Allowed providers<input name="providers" defaultValue={configuration.policy.allowedProviders.join(", ")} disabled={!admin}/></label><label className="check"><input name="approval" type="checkbox" defaultChecked={configuration.policy.requireHumanApproval} disabled={!admin}/> Require human approval before delivery</label><label className="check"><input name="autoMerge" type="checkbox" defaultChecked={configuration.policy.autoMergeEnabled} disabled={!admin}/> Auto-merge the verified commit after all GitHub checks pass</label>{admin&&<button className="primary compact" disabled={!!busy}>Save policy</button>}</form></section>

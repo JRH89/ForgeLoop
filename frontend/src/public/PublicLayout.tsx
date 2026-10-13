@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-const favicon='/icons/icon-192.png';
+import { brandIcon as favicon } from '../brand';
 import { REPOSITORY } from './content';
 import { heroStyle } from './heroes';
 import { BookOpen, CircleHelp, Download, FileText, Info, Layers, LifeBuoy, Menu, Shield, X } from 'lucide-react';

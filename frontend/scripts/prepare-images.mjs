@@ -1,5 +1,12 @@
 import sharp from 'sharp';
-import { mkdir, copyFile, readdir } from 'node:fs/promises';
+import { mkdir, copyFile, readdir, access } from 'node:fs/promises';
+// Supplied branding is authoritative; regeneration must be an explicit choice.
+async function generateBranding(path, generate) {
+  if (process.env.FORGELOOP_REGENERATE_BRANDING !== 'true') {
+    try { await access(path); return; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  await generate();
+}
 await mkdir('public/images',{recursive:true});
 await mkdir('public/icons',{recursive:true});
 await mkdir('public/fonts',{recursive:true});
@@ -9,13 +16,13 @@ const hero='src/assets/delivery-hero-generated.png';
 // Encoding/size derivatives of the approved generated asset, not substitute artwork.
 await sharp(hero).resize({width:1774,withoutEnlargement:true}).webp({quality:82}).toFile('public/images/delivery-hero.webp');
 await sharp(hero).resize({width:900,withoutEnlargement:true}).webp({quality:78}).toFile('public/images/delivery-hero-small.webp');
-await sharp(hero).resize(1200,630,{fit:'cover'}).jpeg({quality:86}).toFile('public/images/social-preview.jpg');
+await generateBranding('public/images/social-preview.jpg', () => sharp(hero).resize(1200,630,{fit:'cover'}).jpeg({quality:86}).toFile('public/images/social-preview.jpg'));
 // Versioned URLs avoid stale cached artwork; retain the prior source/derivatives.
 const refinedHero='src/assets/delivery-hero-v2.png';
 await sharp(refinedHero).webp({quality:92,effort:6}).toFile('public/images/delivery-v2-hero.webp');
 await sharp(refinedHero).resize({width:1000,withoutEnlargement:true}).webp({quality:88,effort:6}).toFile('public/images/delivery-v2-hero-small.webp');
 await sharp(refinedHero).resize(1200,630,{fit:'cover'}).jpeg({quality:92}).toFile('public/images/delivery-v2-social-preview.jpg');
-for(const size of [32,180,192])await sharp('src/assets/favicon.png').resize(size,size).png().toFile(`public/icons/icon-${size}.png`);
+for(const size of [32,180,192])await generateBranding(`public/icons/icon-${size}.png`, () => sharp('src/assets/favicon.png').resize(size,size).png().toFile(`public/icons/icon-${size}.png`));
 for(const file of await readdir('src/assets/heroes')){
   if(!file.endsWith('.png'))continue;
   const key=file.slice(0,-4),source=`src/assets/heroes/${file}`;
