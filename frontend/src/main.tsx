@@ -45,7 +45,7 @@ import {
   type RunAnalytics,
   type PlatformConfiguration,
 } from "./api";
-import favicon from "./assets/favicon.png";
+import { brandIcon as favicon } from './brand';
 import MarkdownContent from "./MarkdownContent";
 import UserGuidePage from "./UserGuidePage";
 import RunnerSetup from "./RunnerSetup";

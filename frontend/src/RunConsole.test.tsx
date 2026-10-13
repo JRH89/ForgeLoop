@@ -29,6 +29,7 @@ it('places Account in the sidebar with a decorative icon matching the navigation
   expect(account).toHaveClass('account-console-link');
   expect(account.querySelector('.nav-icon')).toHaveAttribute('aria-hidden', 'true');
   expect(account.querySelector('svg')).toHaveAttribute('width', '17');
+  expect(screen.getByRole('link', { name: 'ForgeLoop' }).querySelector('img')).toHaveAttribute('src', '/icons/icon-192.png?v=20261012');
   expect(screen.queryByRole('link', { name: 'Support' })).not.toBeInTheDocument();
 });
 
