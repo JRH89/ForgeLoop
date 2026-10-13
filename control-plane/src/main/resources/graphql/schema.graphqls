@@ -70,7 +70,7 @@ input ProviderAttemptInput { provider: String!, model: String!, requestIdDigest:
 input TaskPlanInput { acceptanceCriteria: [String!]!, tasks: [PlannedTaskInput!]! }
 input PlannedTaskInput { key: String!, role: String!, title: String!, requiredCapability: String!, dependencies: [String!]!, ownedPaths: [String!]!, attemptBudget: Int!, budgetMicros: Float! }
 input SubmitFeatureInput { repository: String!, sourceRef: String!, title: String!, specification: String!, budgetUsd: Float! }
-input ConnectRepositoryInput { repository: String!, installationId: Float!, defaultBranch: String!, issueLabel: String!, requireLabel: Boolean!, harnessProfile: String!, requiredGates: [String!]!, maxBudgetUsd: Float! }
+input ConnectRepositoryInput { repository: String!, installationId: Float!, defaultBranch: String!, issueLabel: String!, harnessProfile: String!, requiredGates: [String!]!, maxBudgetUsd: Float! }
 input RegisterRunnerInput { token: String!, name: String!, version: String!, capabilities: [String!]! }
 input OrganizationPolicyInput { maxRunBudgetUsd: Float!, maxParallelTasks: Int!, allowedProviders: [String!]!, requireHumanApproval: Boolean!, autoMergeEnabled: Boolean! }
 input HarnessDefinitionInput { name: String!, description: String!, allowedRoles: [String!]!, defaultAttemptBudget: Int! }
@@ -131,3 +131,4 @@ extend type Mutation { recordTestCheckEvidence(leaseId: ID!, runnerId: ID!, nonc
 input TestCheckEvidenceInput { artifactReference: String!, bundleDigest: String! }
 type TestCheckEvidence { id: ID!, taskId: ID!, runnerId: ID!, kind: String!, gate: String!, image: String!, command: [String!]!, targetSha: String!, parentSha: String, verdict: String!, reason: String!, beforeStatus: String, afterStatus: String!, beforeExitCode: Int, afterExitCode: Int!, beforeTimedOut: Boolean!, afterTimedOut: Boolean!, beforeTotal: Int, beforePassed: Int, beforeFailed: Int, beforeErrored: Int, beforeSkipped: Int, afterTotal: Int!, afterPassed: Int!, afterFailed: Int!, afterErrored: Int!, afterSkipped: Int!, redTests: [String!]!, failingTests: [String!]!, classifiedTests: String!, changedFiles: String!, beforeOutcomeDigest: String, afterOutcomeDigest: String!, beforeOutputDigest: String, afterOutputDigest: String!, artifactReference: String!, bundleDigest: String!, digest: String!, recordedAt: String! }
 type IssueIntakeCheck { eligible: Boolean!, reasons: [String!]!, checkedAt: String! }
+extend type RepositoryConnection { requireLabel: Boolean! }
