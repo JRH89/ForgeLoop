@@ -1,3 +1,4 @@
+import ConsolePageHeader from './ConsolePageHeader';
 import MarkdownContent from "./MarkdownContent";
 import runnerSetup from "./docs/runner-setup.md?raw";
 
@@ -21,7 +22,7 @@ const settings = [
 export default function UserGuidePage() {
   return (
     <article className="guide">
-      <section className="hero guide-hero"><p className="eyebrow">Operator handbook</p><h1>Using ForgeLoop</h1><p>From GitHub issue to verified pull request: setup, operating procedures, safety boundaries, and every configurable setting.</p></section>
+      <ConsolePageHeader eyebrow="Operator handbook" title="User guide" description="Learn how to set up, operate, and verify your delivery workflow."/>
       <section className="panel guide-section" id="quick-start">
         <p className="eyebrow">Start here</p><h2>How delivery works</h2>
         <div className="guide-steps">{lifecycle.map(([number,title,body])=><div key={number}><span>{number}</span><div><h3>{title}</h3><p>{body}</p></div></div>)}</div>
