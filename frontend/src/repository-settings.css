@@ -77,8 +77,8 @@
 }
 
 .repository-setting {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   min-width: 0;
   padding: 16px;
@@ -86,6 +86,9 @@
   border-radius: 11px;
   background: #091521;
 }
+
+/* Stretch the cards equally, then reserve remaining space above their actions. */
+.repository-setting > button { margin-top: auto; align-self: flex-start; }
 
 .repository-setting-heading h4 {
   margin: 0;

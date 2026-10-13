@@ -92,6 +92,10 @@ for (const width of [320, 390, 430, 768, 1440]) {
     for (const setting of ['Issue intake', 'Run budget', 'Run records']) {
       await expect(page.getByRole('heading', { name: setting, exact: true })).toBeVisible();
     }
+    if (width === 1440) {
+      const bottoms = await page.locator('.repository-setting > button').evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().bottom));
+      expect(Math.max(...bottoms) - Math.min(...bottoms)).toBeLessThanOrEqual(1);
+    }
     if (width <= 760) {
       expect(await page.locator('.repository-settings-grid').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)).toBe(1);
     }
