@@ -26,7 +26,7 @@ export function runExplanation(run: FeatureRun, runners: Runner[], now = Date.no
   if (run.state === 'CANCELLED') return 'Cancelled. This run will not claim more work.';
   if (run.state === 'REJECTED') return 'Rejected. Open the run to inspect validation evidence before submitting replacement work.';
   if (run.state === 'PR_OPEN') return 'Pull request open. Review its checks and merge status in Runs and GitHub.';
-  if (run.state === 'READY_FOR_REVIEW' && !run.approved) return 'Waiting for human approval. Review the evidence in Runs before approving.';
+  if (run.state === 'READY_FOR_REVIEW' && !run.approved) return run.requiresHumanApproval === false ? 'Verification passed. Waiting for automatic publication; no human approval is required.' : 'Waiting for human approval. Review the evidence in Runs before approving.';
   if (['BLOCKED', 'FAILED', 'HELD'].includes(run.state) || run.tasks.some(task => ['FAILED', 'HELD'].includes(task.state)))
     return 'Needs attention. Open the run to inspect failed tasks, evidence, and escalations.';
   if (run.budgetUsd > 0 && run.spentCostMicros >= run.budgetUsd * 1_000_000)
@@ -41,10 +41,11 @@ export function runExplanation(run: FeatureRun, runners: Runner[], now = Date.no
   return 'Runner contact is recent. Open Runs for live task events, dependencies, leases, and verification results; contact alone does not guarantee work is executing.';
 }
 
-export function newIssueUrl(repository: string, issueLabel: string, requiredAssignee?: string, requireAssignee = Boolean(requiredAssignee)): string | undefined {
+export function newIssueUrl(repository: string, issueLabel: string, requiredAssignee?: string, requireAssignee = Boolean(requiredAssignee), requireLabel=true): string | undefined {
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) return undefined;
   const assignee = requiredAssignee ? `Required assignee: \`${requiredAssignee}\`.` : requireAssignee ? 'An assignee is required; any valid GitHub assignee is accepted.' : 'No assignee is required.';
-  const body = `## Requested change\nDescribe one small, concrete change.\n\n## Acceptance criteria\n- [ ] Describe the observable result.\n- [ ] Describe the tests that should pass.\n\n## Constraints\nDescribe what must not change.\n\n## ForgeLoop intake handoff\nRequired label: \`${issueLabel}\`. ${assignee}\nDo not add the required label or assignment until this issue is ready for ForgeLoop to process. An eligible issue can start provider work and incur API charges when a runner is active.`;
+  const label = requireLabel ? `Required label: \`${issueLabel}\`.` : 'Label requirement is bypassed. Creating an eligible issue may immediately start paid work.';
+  const body = `## Requested change\nDescribe one small, concrete change.\n\n## Acceptance criteria\n- [ ] Describe the observable result.\n- [ ] Describe the tests that should pass.\n\n## Constraints\nDescribe what must not change.\n\n## ForgeLoop intake handoff\n${label} ${assignee}\nDo not create an eligible issue until it is ready for ForgeLoop to process. An eligible issue can start provider work and incur API charges when a runner is active.`;
   // Intentionally prefill title/body only; GitHub labels or assignees could activate paid intake.
   const params = new URLSearchParams({ title: 'Describe the change', body });
   return `https://github.com/${repository}/issues/new?${params}`;

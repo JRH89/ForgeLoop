@@ -32,6 +32,9 @@ public class RepositoryConnection {
   @Column(nullable = false) private int policyRevision;
   private String requiredAssignee;
   @Column(nullable = false) private boolean requireAssignee;
+  @Column(nullable = false) private boolean requireLabel = true;
+  public boolean isRequireLabel() { return requireLabel; }
+  public void configureLabelRequirement(boolean required) { requireLabel = required; policyRevision++; }
   @Column(length = 80) private String testFirstGate;
   @Column(length = 8000) private String testPathGlobs;
   @Embedded

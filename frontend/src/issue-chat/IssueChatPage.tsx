@@ -39,6 +39,8 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [addIntakeLabel, setAddIntakeLabel] = useState(false);
+  const activeRepository = enabledRepositories.find(item => item.repository === (conversation?.repository ?? repository));
 
   const refreshConversations = useCallback(async () => {
     if (!repository) return;
@@ -112,6 +114,7 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
   }, [conversation?.repository, conversation?.issueNumber, run?.id, run?.state]);
 
   function select(id: string) {
+    setAddIntakeLabel(false);
     setError('');
     setActiveId(id);
     window.history.pushState(null, '', id ? `/app#chat=${encodeURIComponent(id)}` : '/app#chat');
@@ -142,9 +145,9 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
   async function createIssue() {
     if (!conversation) return;
     const criteria = draft.criteria.split(/\r?\n/).map(item => item.trim()).filter(Boolean);
-    if (!window.confirm('Create this reviewed GitHub issue? It will be created without an intake label or assignee; repository policy controls when work starts.')) return;
+    if (!window.confirm(`Create this reviewed GitHub issue? ${addIntakeLabel ? 'The configured intake label will be added.' : 'No intake label will be added.'} No assignee is added. ${addIntakeLabel || activeRepository?.requireLabel === false ? 'This issue may immediately start paid work if assignment rules are satisfied.' : 'Repository intake policy controls when work starts.'}`)) return;
     await perform('create', async () => {
-      const updated = await createIssueFromConversation(conversation.id, draft.title.trim(), draft.body.trim(), criteria);
+      const updated = await createIssueFromConversation(conversation.id, draft.title.trim(), draft.body.trim(), criteria, addIntakeLabel);
       setConversation(updated);
       await refreshConversations();
     });
@@ -220,11 +223,11 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
             <label>Issue description<textarea value={draft.body} maxLength={12000} onChange={event => setDraft({ ...draft, body: event.target.value })} disabled={!!conversation.issueNumber} /></label>
             <label>Acceptance criteria <small>One criterion per line</small><textarea value={draft.criteria} maxLength={4000} onChange={event => setDraft({ ...draft, criteria: event.target.value })} disabled={!!conversation.issueNumber} /></label>
             {conversation.issueNumber ? <p>Issue created: <a href={conversation.issueUrl} target="_blank" rel="noreferrer">#{conversation.issueNumber} on GitHub</a></p>
-              : <><p className="issue-chat-intake-note">Creating an issue does not start work. Add the configured intake label and satisfy any required assignee rule in GitHub.</p>
+              : <><label className="check"><input type="checkbox" checked={addIntakeLabel} onChange={event=>setAddIntakeLabel(event.target.checked)} disabled={operator.role !== 'ADMIN' || !!busy}/> Add intake label automatically ({activeRepository?.issueLabel || 'forgeloop'})</label><p className="issue-chat-intake-note">{activeRepository?.requireLabel === false ? 'Label bypass is enabled for this repository.' : addIntakeLabel ? 'The configured intake label will be added when creating the issue.' : 'No intake label is added unless selected.'} Eligible issues can start paid work; any required assignee must still be set in GitHub.</p>
                 <button className="primary" onClick={() => void createIssue()} disabled={!canCreate || !!busy}>{busy === 'create' ? 'Creating issue…' : 'Review and create GitHub issue'}</button>
                 {operator.role !== 'ADMIN' && <small>An organization administrator must approve issue creation.</small>}</>}
           </section>}
-          {waitingForIssue && <section className="issue-chat-delivery"><h3>Waiting for repository intake</h3><p>Assign the issue and add the configured label in GitHub. ForgeLoop will start work only when this repository's intake policy is satisfied.</p><a href={conversation.issueUrl} target="_blank" rel="noreferrer">Open issue #{conversation.issueNumber}</a></section>}
+          {waitingForIssue && <section className="issue-chat-delivery"><h3>Waiting for repository intake</h3><p>ForgeLoop starts only when saved intake rules are satisfied and a runner is available. {activeRepository?.requireLabel !== false && 'Check that the configured label is present. '} {activeRepository?.requireAssignee && 'Set the required assignee in GitHub.'}</p><a href={conversation.issueUrl} target="_blank" rel="noreferrer">Open issue #{conversation.issueNumber}</a></section>}
           {run && <DeliveryTracker run={run} operations={operations} publication={publication} />}
         </>}
       </section>

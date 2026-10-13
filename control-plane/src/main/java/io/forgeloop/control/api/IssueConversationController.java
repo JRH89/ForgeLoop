@@ -34,7 +34,7 @@ public class IssueConversationController {
     }
 
     @MutationMapping public IssueConversationView createIssueFromConversation(@Argument String conversationId,
-            @Argument String title, @Argument String body, @Argument List<String> acceptanceCriteria) {
-        return conversations.createIssue(conversationId, title, body, acceptanceCriteria);
+            @Argument String title, @Argument String body, @Argument List<String> acceptanceCriteria, @Argument boolean addIntakeLabel) {
+        return conversations.createIssue(conversationId, title, body, acceptanceCriteria, addIntakeLabel);
     }
 }

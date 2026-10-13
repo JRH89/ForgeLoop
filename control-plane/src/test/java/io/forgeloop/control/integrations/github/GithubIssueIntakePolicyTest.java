@@ -7,6 +7,17 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class GithubIssueIntakePolicyTest {
+    @Test void bypassesOnlyLabelAndPreservesAssignmentAndBodyChecks() throws Exception {
+        assertTrue(connection.isRequireLabel());
+        connection.configureLabelRequirement(false);
+        assertTrue(GithubIssueIntakePolicy.reasons(connection, json.readTree("""
+            {"state":"open","body":"Do the work","labels":[],"assignees":[]}
+            """)).isEmpty());
+        connection.configureAssignmentPolicy(true, "owner");
+        assertEquals(List.of("Assign the issue to: owner", "Add a description and acceptance criteria to the issue body."), GithubIssueIntakePolicy.reasons(connection, json.readTree("""
+            {"state":"open","body":"","labels":[],"assignees":[]}
+            """)));
+    }
     private final RepositoryConnection connection = new RepositoryConnection("org", "acme/project", 12, "main", "forgeloop", "JVM_REACT", List.of("compile"), 20);
     private final ObjectMapper json = new ObjectMapper();
 

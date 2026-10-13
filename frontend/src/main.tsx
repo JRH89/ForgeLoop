@@ -98,7 +98,7 @@ function RepositoryPage({ items, operator, onSettings }: { items: RepositoryConn
                 </div>
                 <span className="status complete">Policy v{item.policyRevision}</span>
               </>}>
-              <p>Run limit: ${item.maxBudgetUsd} USD · Intake: {item.requireAssignee ? 'assignment required' : 'label only'} · Detailed records: {item.runRecord ? 'enabled' : 'disabled'}</p>
+              <p>Run limit: ${item.maxBudgetUsd} USD · Intake: {item.requireAssignee ? 'assignment required' : item.requireLabel === false ? 'label bypassed' : 'label only'} · Detailed records: {item.runRecord ? 'enabled' : 'disabled'}</p>
               <button className="secondary" onClick={onSettings}>Manage repository settings</button>
               <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
             </RepositoryDisclosure>
