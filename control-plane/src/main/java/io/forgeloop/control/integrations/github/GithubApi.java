@@ -16,6 +16,11 @@ public interface GithubApi {
     long createPullRequest(long installationId, String repository, String head, String base, String title, String body, boolean draft);
     /** Creates one issue without labels or assignees; issue intake remains an explicit policy decision. */
     GithubIssueReceipt createIssue(long installationId, String repository, String title, String body);
+    /** Include labels in the creation request, avoiding a second partial publication. */
+    default GithubIssueReceipt createIssue(long installationId, String repository, String title, String body, java.util.List<String> labels) {
+        if (!labels.isEmpty()) throw new UnsupportedOperationException("Labeled issue creation is not supported by this adapter");
+        return createIssue(installationId, repository, title, body);
+    }
     /** Closes a source issue after its verified pull request has merged. */
     void closeIssue(long installationId, String repository, int issueNumber);
     boolean checksPass(long installationId, String repository, String headSha);

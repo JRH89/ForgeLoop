@@ -61,6 +61,7 @@ it('lets an administrator refine a runner draft before explicitly creating an un
   expect(await screen.findByDisplayValue('Filter runs by status')).toBeVisible();
   fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Reviewed: filter runs by status' } });
   fireEvent.change(screen.getByLabelText(/Acceptance criteria/), { target: { value: 'Selected status hides nonmatching runs.' } });
+  fireEvent.click(screen.getByRole('checkbox', { name: /Add intake label automatically/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Review and create GitHub issue' }));
 
   expect(await screen.findByRole('link', { name: '#18 on GitHub' })).toHaveAttribute('href', created.issueUrl);
@@ -68,7 +69,7 @@ it('lets an administrator refine a runner draft before explicitly creating an un
   expect(screen.getByRole('link', { name: 'Open this run in Runs' })).toHaveAttribute('href', '/app#run=run-1');
   const write = fetch.mock.calls.map(([, init]) => JSON.parse(String(init.body)) as { query: string; variables: Record<string, unknown> })
     .find(request => request.query.includes('createIssueFromConversation'));
-  expect(write?.variables).toMatchObject({ conversationId: 'chat-1', title: 'Reviewed: filter runs by status', acceptanceCriteria: ['Selected status hides nonmatching runs.'] });
+  expect(write?.variables).toMatchObject({ conversationId: 'chat-1', title: 'Reviewed: filter runs by status', acceptanceCriteria: ['Selected status hides nonmatching runs.'], addIntakeLabel: true });
   expect(screen.getByText('Linked delivery')).toBeVisible();
   expect(screen.getByText(/Verification is complete/)).toBeVisible();
 });

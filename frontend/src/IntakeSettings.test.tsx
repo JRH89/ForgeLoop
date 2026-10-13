@@ -4,6 +4,14 @@ import { afterEach, expect, it, vi } from 'vitest';
 import IntakeSettings from './IntakeSettings';
 import type {RepositoryConnection} from './api';
 afterEach(()=>vi.unstubAllGlobals());
+it('requires confirmation before bypassing the label gate', async()=>{
+  const fetch=vi.fn(); vi.stubGlobal('fetch',fetch); vi.stubGlobal('confirm',vi.fn(()=>false));
+  render(<IntakeSettings item={{repository:'org/repo',issueLabel:'ready'} as RepositoryConnection} editable onSaved={()=>{}}/>);
+  const label=screen.getByRole('checkbox',{name:'Require intake label on org/repo'});
+  expect(label).toBeChecked(); fireEvent.click(label);
+  fireEvent.click(screen.getByRole('button',{name:'Save intake settings'}));
+  expect(fetch).not.toHaveBeenCalled();
+});
 it('persists the explicit assignee and surfaces failures',async()=>{
   const fetch=vi.fn(async(url:string,init:RequestInit)=>{expect(url).toBe('/graphql');expect(init.method).toBe('POST');return {ok:false,json:async()=>({errors:[{message:'Access denied'}]})};});vi.stubGlobal('fetch',fetch);
   render(<IntakeSettings item={{repository:'org/repo'} as RepositoryConnection} editable onSaved={()=>{}}/>);
@@ -11,5 +19,5 @@ it('persists the explicit assignee and surfaces failures',async()=>{
   fireEvent.change(screen.getByRole('textbox'),{target:{value:'worker'}});
   fireEvent.click(screen.getByRole('button',{name:'Save intake settings'}));
   expect(await screen.findByRole('alert')).toHaveTextContent('Access denied');
-  expect(JSON.parse(String(fetch.mock.calls[0][1].body)).variables).toEqual({repository:'org/repo',requireAssignee:true,requiredAssignee:'worker'});
+  expect(JSON.parse(String(fetch.mock.calls[0][1].body)).variables).toEqual({repository:'org/repo',requireAssignee:true,requiredAssignee:'worker',requireLabel:true});
 });

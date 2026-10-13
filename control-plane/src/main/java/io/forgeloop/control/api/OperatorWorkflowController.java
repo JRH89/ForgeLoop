@@ -23,8 +23,8 @@ public class OperatorWorkflowController {
     @MutationMapping public boolean deleteFeatureRun(@Argument String runId) {
         return deletions.delete(runId);
     }
-    @MutationMapping public RepositoryConnection configureRepositoryIntake(@Argument String repository, @Argument boolean requireAssignee, @Argument String requiredAssignee) {
-        return connections.configureIntake(repository, requireAssignee, requiredAssignee);
+    @MutationMapping public RepositoryConnection configureRepositoryIntake(@Argument String repository, @Argument boolean requireAssignee, @Argument String requiredAssignee, @Argument Boolean requireLabel) {
+        return connections.configureIntake(repository, requireAssignee, requiredAssignee, requireLabel);
     }
     @MutationMapping public RepositoryConnection configureRepositoryBudget(@Argument String repository, @Argument double maxBudgetUsd) {
         return connections.configureBudget(repository, maxBudgetUsd);

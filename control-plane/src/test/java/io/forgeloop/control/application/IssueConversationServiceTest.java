@@ -26,6 +26,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 class IssueConversationServiceTest {
+    @Test void addsConfiguredLabelOnlyWhenExplicitlyRequested() {
+        IssueConversation conversation = runningConversation();
+        conversation.complete("runner-1", "Draft ready.", "Title", "Body", List.of("Criterion"), "openai", "gpt-test", 20, 10, 500, true);
+        when(operators.organizationId()).thenReturn("org-1");
+        when(conversations.lockByIdAndOrganizationId("chat-1", "org-1")).thenReturn(Optional.of(conversation));
+        RepositoryConnection connection = mock(RepositoryConnection.class);
+        when(connection.getInstallationId()).thenReturn(42L);
+        when(connection.getIssueLabel()).thenReturn("ready-for-work");
+        when(connections.requireEnabled("acme/app")).thenReturn(connection);
+        when(github.createIssue(eq(42L), eq("acme/app"), eq("Title"), any(), eq(List.of("ready-for-work")))).thenReturn(new GithubIssueReceipt(17, "https://github.com/acme/app/issues/17"));
+        when(messages.findByConversation_IdOrderByCreatedAtAscIdAsc("chat-1")).thenReturn(List.of());
+        assertEquals(17, service.createIssue("chat-1", "Title", "Body", List.of("Criterion"), true).issueNumber());
+        verify(github, never()).createIssue(anyLong(), any(), any(), any());
+        verify(operators).requireAdministrator();
+    }
     @Test void deletesPendingOwnedHistoryButRetainsExternalWorkAndUsage() {
         IssueConversation conversation = new IssueConversation("org-1", "acme/app", "owner");
         when(operators.organizationId()).thenReturn("org-1");
@@ -114,7 +129,7 @@ class IssueConversationServiceTest {
         RepositoryConnection connection = mock(RepositoryConnection.class);
         when(connection.getInstallationId()).thenReturn(42L);
         when(connections.requireEnabled("acme/app")).thenReturn(connection);
-        when(github.createIssue(42L, "acme/app", "Human-edited title", "Human-edited body\n\n### Acceptance criteria\n- [ ] Reviewed criterion\n\n---\nCreated from an administrator-reviewed ForgeLoop issue chat. The issue is not labeled or assigned automatically; repository intake policy controls when work starts."))
+        when(github.createIssue(42L, "acme/app", "Human-edited title", "Human-edited body\n\n### Acceptance criteria\n- [ ] Reviewed criterion\n\n---\nCreated from an administrator-reviewed ForgeLoop issue chat. Repository intake policy controls when work starts; no assignee is added automatically."))
                 .thenReturn(new GithubIssueReceipt(17, "https://github.com/acme/app/issues/17"));
         when(messages.findByConversation_IdOrderByCreatedAtAscIdAsc("chat-1")).thenReturn(List.of());
 

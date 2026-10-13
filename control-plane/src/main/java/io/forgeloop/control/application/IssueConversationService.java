@@ -117,6 +117,10 @@ public class IssueConversationService {
 
     @Transactional
     public IssueConversationView createIssue(String conversationId, String title, String body, List<String> criteria) {
+        return createIssue(conversationId, title, body, criteria, false);
+    }
+    @Transactional
+    public IssueConversationView createIssue(String conversationId, String title, String body, List<String> criteria, boolean addIntakeLabel) {
         operators.requireAdministrator();
         IssueConversation conversation = requireConversation(conversationId);
         if (!"READY".equals(conversation.getStatus())) throw new IllegalStateException("Review a completed issue draft before creating the GitHub issue");
@@ -126,10 +130,12 @@ public class IssueConversationService {
         RepositoryConnection connection = connections.requireEnabled(conversation.getRepository());
         String issueBody = approvedBody + "\n\n### Acceptance criteria\n"
                 + acceptedCriteria.stream().map(item -> "- [ ] " + item).reduce((left, right) -> left + "\n" + right).orElse("")
-                + "\n\n---\nCreated from an administrator-reviewed ForgeLoop issue chat. The issue is not labeled or assigned automatically; repository intake policy controls when work starts.";
-        var receipt = github.createIssue(connection.getInstallationId(), conversation.getRepository(), approvedTitle, issueBody);
+                + "\n\n---\nCreated from an administrator-reviewed ForgeLoop issue chat. Repository intake policy controls when work starts; no assignee is added automatically.";
+        var receipt = addIntakeLabel
+                ? github.createIssue(connection.getInstallationId(), conversation.getRepository(), approvedTitle, issueBody, List.of(connection.getIssueLabel()))
+                : github.createIssue(connection.getInstallationId(), conversation.getRepository(), approvedTitle, issueBody);
         conversation.createIssue(receipt.number(), receipt.url(), approvedTitle, approvedBody, acceptedCriteria);
-        audit.record("ISSUE_CHAT_ISSUE_CREATED", "ISSUE_CONVERSATION", conversationId, receipt.number() + "|" + receipt.url());
+        audit.record("ISSUE_CHAT_ISSUE_CREATED", "ISSUE_CONVERSATION", conversationId, receipt.number() + "|" + receipt.url() + "|addIntakeLabel=" + addIntakeLabel);
         return view(conversation);
     }
 

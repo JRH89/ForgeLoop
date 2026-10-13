@@ -83,7 +83,10 @@ public class GithubHttpApi implements GithubApi, GithubIssueReader {
         return response.path("number").asLong();
     }
     @Override public GithubIssueReceipt createIssue(long installationId, String repository, String title, String body) {
-        JsonNode response = request(installationId, "POST", "/repos/" + repository + "/issues", Map.of("title", title, "body", body));
+        return createIssue(installationId, repository, title, body, java.util.List.of());
+    }
+    @Override public GithubIssueReceipt createIssue(long installationId, String repository, String title, String body, java.util.List<String> labels) {
+        JsonNode response = request(installationId, "POST", "/repos/" + repository + "/issues", Map.of("title", title, "body", body, "labels", labels));
         int number = response.path("number").asInt();
         String url = response.path("html_url").asText();
         if (number < 1 || !url.startsWith("https://github.com/")) throw new IllegalStateException("GitHub issue receipt was invalid");

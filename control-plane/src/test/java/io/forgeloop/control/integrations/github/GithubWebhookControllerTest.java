@@ -23,6 +23,16 @@ import org.springframework.http.ResponseEntity;
 import org.mockito.Mockito;
 
 class GithubWebhookControllerTest {
+    @Test void acceptsAnUnlabeledNewIssueOnlyWithExplicitLabelBypass() throws Exception {
+        RepositoryConnection connection = new RepositoryConnection("local-development", "acme/project", 1, "main", "forgeloop", "GENERIC", List.of("unit"), 5);
+        connection.configureLabelRequirement(false);
+        when(connections.findByRepository("acme/project")).thenReturn(java.util.Optional.of(connection));
+        String payload = """
+                {"action":"opened","repository":{"full_name":"acme/project"},"installation":{"id":1},"issue":{"number":1,"title":"Small change","state":"open","body":"Acceptance criteria","labels":[],"assignees":[]}}
+                """;
+        controller.receive("bypass-delivery", "issues", signature(payload), payload);
+        verify(runs).submitIssue(any(), org.mockito.ArgumentMatchers.eq(connection));
+    }
     private final GithubDeliveryRepository deliveries = Mockito.mock(GithubDeliveryRepository.class);
     private final FeatureRunService runs = Mockito.mock(FeatureRunService.class);
     private final RepositoryConnectionRepository connections = Mockito.mock(RepositoryConnectionRepository.class);

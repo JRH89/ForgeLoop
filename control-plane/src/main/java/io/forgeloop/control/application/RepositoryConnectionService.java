@@ -107,10 +107,14 @@ public class RepositoryConnectionService {
   @Transactional(readOnly = true)
   public List<RepositoryConnection> list() { return connections.findByOrganizationId(operators.organizationId()); }
   @Transactional public RepositoryConnection configureIntake(String repository, boolean requireAssignee, String requiredAssignee) {
+    return configureIntake(repository, requireAssignee, requiredAssignee, null);
+  }
+  @Transactional public RepositoryConnection configureIntake(String repository, boolean requireAssignee, String requiredAssignee, Boolean requireLabel) {
     operators.requireAdministrator();
     RepositoryConnection connection = requireEnabled(repository);
     connection.configureAssignmentPolicy(requireAssignee, requiredAssignee);
-    audit.record("REPOSITORY_INTAKE_UPDATED", "REPOSITORY_CONNECTION", connection.getId(), "revision=" + connection.getPolicyRevision());
+    if (requireLabel != null) connection.configureLabelRequirement(requireLabel);
+    audit.record("REPOSITORY_INTAKE_UPDATED", "REPOSITORY_CONNECTION", connection.getId(), "revision=" + connection.getPolicyRevision() + "|requireLabel=" + connection.isRequireLabel() + "|requireAssignee=" + connection.isRequireAssignee());
     return connection;
   }
   @Transactional public RepositoryConnection configureTestFirst(String repository, String testGate, List<String> testPaths) {

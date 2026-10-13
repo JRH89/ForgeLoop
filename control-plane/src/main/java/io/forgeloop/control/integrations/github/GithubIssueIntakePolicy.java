@@ -14,7 +14,7 @@ public final class GithubIssueIntakePolicy {
         if (!connection.isEnabled()) reasons.add("Repository connection is disabled.");
         if (issue.has("pull_request")) reasons.add("Choose an issue, not a pull request.");
         if ("closed".equals(issue.path("state").asText())) reasons.add("The issue is closed.");
-        if (issue.path("labels").findValuesAsText("name").stream().noneMatch(connection::acceptsIssueLabel))
+        if (connection.isRequireLabel() && issue.path("labels").findValuesAsText("name").stream().noneMatch(connection::acceptsIssueLabel))
             reasons.add("Add the required label: " + connection.getIssueLabel());
         if (!connection.acceptsAssignees(issue.path("assignees").findValuesAsText("login")))
             reasons.add(connection.getRequiredAssignee() == null

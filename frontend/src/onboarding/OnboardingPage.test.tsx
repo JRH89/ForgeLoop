@@ -137,6 +137,7 @@ it('builds a helpful issue draft without automatically triggering intake', () =>
   expect(url.searchParams.get('body')).toContain('Acceptance criteria');
   expect(url.searchParams.get('body')).toContain('Required label: `forgeloop`');
   expect(url.searchParams.get('body')).toContain('Required assignee: `owner`');
-  expect(url.searchParams.get('body')).toContain('Do not add the required label or assignment until this issue is ready');
+  expect(url.searchParams.get('body')).toContain('Do not create an eligible issue until it is ready');
+  expect(new URL(newIssueUrl('acme/app', 'forgeloop', undefined, false, false)!).searchParams.get('body')).toContain('Label requirement is bypassed');
   expect(newIssueUrl('../bad?redirect=elsewhere', 'forgeloop')).toBeUndefined();
 });
