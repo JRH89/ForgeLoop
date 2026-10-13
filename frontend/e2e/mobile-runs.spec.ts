@@ -102,7 +102,12 @@ for (const width of [320, 390, 430, 768, 1440]) {
     await fits(page);
     await page.screenshot({ path: `../evidence/forgeloop-ui/repository-settings-${width}.png`, fullPage: true });
     await expect(page.getByRole('heading', { name: 'Execution policy', exact: true })).toBeVisible();
-    await page.getByText('Runner setup & advanced configuration', { exact: true }).click();
+    const runnerHeading = await page.getByRole('heading', { name: 'Install and connect a runner', exact: true }).boundingBox();
+    const policyHeading = await page.getByRole('heading', { name: 'Execution policy', exact: true }).boundingBox();
+    const repositoryHeading = await page.getByRole('heading', { name: 'Repository settings', exact: true }).boundingBox();
+    expect(runnerHeading!.y).toBeLessThan(policyHeading!.y);
+    expect(policyHeading!.y).toBeLessThan(repositoryHeading!.y);
+    await page.getByText('Advanced harness & MCP configuration', { exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Harness definitions', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'MCP routes', exact: true })).toBeVisible();
     await fits(page);

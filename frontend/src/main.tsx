@@ -52,6 +52,7 @@ import RunnerPairingPage from "./RunnerPairingPage";
 import RunnerDownloads from "./RunnerDownloads";
 import TeamPage from "./TeamPage";
 import RepositoryScans from "./repositories/RepositoryScans";
+import RepositoryDisclosure from "./repositories/RepositoryDisclosure";
 import IssueChatPage from "./issue-chat/IssueChatPage";
 import { isRunnerPairingRoute } from "./desktopRoute";
 import IntakeSettings from "./IntakeSettings";
@@ -82,15 +83,6 @@ const stamp = (value: string) =>
 function RepositoryPage({ items, operator, onSettings }: { items: RepositoryConnection[]; operator:OperatorSession; onSettings:()=>void }) {
   return (
     <>
-      <section className="hero">
-        <p className="eyebrow">Repository authorization</p>
-        <h1>Connect policy, not source code.</h1>
-        <p>
-          Install the ForgeLoop GitHub App and choose the repositories it may
-          access. GitHub supplies the installation identity; source execution
-          remains on an authorized runner.
-        </p>
-      </section>
       <section className="panel connected-repositories">
         <div className="section-heading">
           <div>
@@ -106,8 +98,7 @@ function RepositoryPage({ items, operator, onSettings }: { items: RepositoryConn
         </div>
         {items.length ? (
           items.map((item) => (
-            <article className="repository-card" key={item.id}>
-              <div className="repository-card-heading">
+            <RepositoryDisclosure key={`${operator.subject}:${operator.organizationId}:${item.id}`} storageKey={`forgeloop:repository-expanded:${encodeURIComponent(operator.subject)}:${encodeURIComponent(operator.organizationId)}:${encodeURIComponent(item.repository)}`} heading={<>
                 <div className="repository-identity">
                   <span className="repository-identity-icon" aria-hidden="true"><GitBranch size={18}/></span>
                   <div>
@@ -116,11 +107,11 @@ function RepositoryPage({ items, operator, onSettings }: { items: RepositoryConn
                   </div>
                 </div>
                 <span className="status complete">Policy v{item.policyRevision}</span>
-              </div>
+              </>}>
               <p>Run limit: ${item.maxBudgetUsd} USD · Intake: {item.requireAssignee ? 'assignment required' : 'label only'} · Detailed records: {item.runRecord ? 'enabled' : 'disabled'}</p>
               <button className="secondary" onClick={onSettings}>Manage repository settings</button>
               <RepositoryScans repository={item.repository} isAdmin={operator.role==='ADMIN'}/>
-            </article>
+            </RepositoryDisclosure>
           ))
         ) : (
           <p className="empty">No repositories are authorized yet.</p>
@@ -832,9 +823,10 @@ function ConfigurationPage({operator, repositories, onSaved}:{operator:OperatorS
   return <>
     <section className="page-title"><div><p className="eyebrow">Execution governance</p><h1>Settings</h1><p>Manage spending limits, delivery, repository intake and runner configuration in one place.</p></div><span className="revision">Policy revision {configuration.policy.revision}</span></section>
     {error&&<p role="alert">{error}</p>}
+    <RunnerSetup operator={operator}/>
     <section className="panel policy-card"><div><p className="eyebrow">Organization boundary</p><h2>Execution policy</h2><p>Hard limits applied before work enters the runner queue.</p></div><form onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);void perform("policy",()=>configureOrganizationPolicy({maxRunBudgetUsd:Number(form.get("budget")),maxParallelTasks:Number(form.get("parallel")),allowedProviders:csv(String(form.get("providers"))),requireHumanApproval:form.get("approval")==="on",autoMergeEnabled:form.get("autoMerge")==="on"}));}}><label>Organization per-run ceiling (USD)<input name="budget" type="number" min="1" step="1" defaultValue={configuration.policy.maxRunBudgetUsd} disabled={!admin}/></label><label>Parallel task ceiling<input name="parallel" type="number" min="1" max="16" defaultValue={configuration.policy.maxParallelTasks} disabled={!admin}/></label><label>Allowed providers<input name="providers" defaultValue={configuration.policy.allowedProviders.join(", ")} disabled={!admin}/></label><label className="check"><input name="approval" type="checkbox" defaultChecked={configuration.policy.requireHumanApproval} disabled={!admin}/> Require human approval before delivery</label><label className="check"><input name="autoMerge" type="checkbox" defaultChecked={configuration.policy.autoMergeEnabled} disabled={!admin}/> Auto-merge the verified commit after all GitHub checks pass</label>{admin&&<button className="primary compact" disabled={!!busy}>Save policy</button>}</form></section>
     <section className="panel"><h2>Repository settings</h2><p>Each repository has one run limit, bounded by the organization ceiling above. New manual and issue-triggered runs use that limit; existing runs keep their captured budget.</p>{repositories.length ? repositories.map(item => <article className="repository-card" key={item.id}><h3>{item.repository}</h3><div className="repository-settings-grid"><RepositoryBudgetSettings item={item} organizationLimit={configuration.policy.maxRunBudgetUsd} editable={admin} onSaved={onSaved}/><IntakeSettings item={item} editable={admin} onSaved={onSaved}/><RunRecordSettings item={item} editable={admin} onSaved={onSaved}/></div></article>) : <p>No connected repositories yet.</p>}</section>
-    <details className="panel"><summary>Runner setup &amp; advanced configuration</summary><RunnerSetup operator={operator}/>
+    <details className="panel"><summary>Advanced harness &amp; MCP configuration</summary>
     <div className="config-columns"><section className="panel"><div className="section-heading"><div><p className="eyebrow">Reusable orchestration</p><h2>Harness definitions</h2></div><span className="count">{configuration.harnesses.length}</span></div>{configuration.harnesses.map(item=><article className="definition" key={item.id}><div><b>{item.name}</b><span className={`status ${item.enabled?"complete":"failed"}`}>{item.enabled?"ACTIVE":"DISABLED"}</span></div><p>{item.description}</p><small>{item.allowedRoles.join(" · ")} · {item.defaultAttemptBudget} attempts · v{item.revision}</small></article>)}{admin&&<form className="subform" onSubmit={event=>{event.preventDefault();void perform("harness",()=>createHarnessDefinition({...harness,allowedRoles:csv(harness.allowedRoles)}));}}><h3>Add harness</h3><input aria-label="Harness name" placeholder="BUG_FIX" value={harness.name} onChange={event=>setHarness({...harness,name:event.target.value.toUpperCase()})} required/><textarea aria-label="Harness description" placeholder="Describe the bounded workflow" value={harness.description} onChange={event=>setHarness({...harness,description:event.target.value})} required/><input aria-label="Harness roles" value={harness.allowedRoles} onChange={event=>setHarness({...harness,allowedRoles:event.target.value})} required/><input aria-label="Default attempt budget" type="number" min="1" max="10" value={harness.defaultAttemptBudget} onChange={event=>setHarness({...harness,defaultAttemptBudget:Number(event.target.value)})}/><button className="secondary" disabled={!!busy}>Create harness</button></form>}</section>
     <section className="panel"><div className="section-heading"><div><p className="eyebrow">Runner-local context</p><h2>MCP routes</h2></div><span className="count">{configuration.mcp.length}</span></div>{configuration.mcp.length?configuration.mcp.map(item=><article className="definition" key={item.id}><div><b>{item.name}</b><span className={`status ${item.enabled?"complete":"failed"}`}>{item.enabled?"ROUTED":"DISABLED"}</span></div><p><code>{item.command} {item.arguments.join(" ")}</code></p><small>{item.contextTool} · {item.allowedRoles.join(" · ")} · v{item.revision}</small></article>):<p className="empty">No local MCP context routes configured.</p>}{admin&&<form className="subform" onSubmit={event=>{event.preventDefault();try{JSON.parse(mcp.toolArguments);}catch{setError("MCP tool arguments must be valid JSON");return;}void perform("mcp",()=>createLocalMcpConfiguration({...mcp,arguments:csv(mcp.arguments),allowedRoles:csv(mcp.allowedRoles)}));}}><h3>Add local route</h3><input aria-label="MCP route name" placeholder="repository-context" value={mcp.name} onChange={event=>setMcp({...mcp,name:event.target.value})} required/><input aria-label="MCP command" placeholder="node" value={mcp.command} onChange={event=>setMcp({...mcp,command:event.target.value})} required/><input aria-label="MCP command arguments" placeholder="server.js, --stdio" value={mcp.arguments} onChange={event=>setMcp({...mcp,arguments:event.target.value})}/><input aria-label="MCP allowed roles" value={mcp.allowedRoles} onChange={event=>setMcp({...mcp,allowedRoles:event.target.value})} required/><input aria-label="MCP context tool" placeholder="repository.get_context" value={mcp.contextTool} onChange={event=>setMcp({...mcp,contextTool:event.target.value})} required/><textarea aria-label="MCP tool arguments" value={mcp.toolArguments} onChange={event=>setMcp({...mcp,toolArguments:event.target.value})} required/><button className="secondary" disabled={!!busy}>Create route</button></form>}</section></div>
     </details>

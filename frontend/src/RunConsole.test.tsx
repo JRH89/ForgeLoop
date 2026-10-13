@@ -10,6 +10,7 @@ it('centralizes repository settings and inherits the configured budget for new r
   render(<App/>);
   fireEvent.click(await screen.findByRole('button', { name: 'Repositories' }));
   expect(screen.queryByRole('button', { name: 'Save budget' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Connect policy, not source code.')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Manage repository settings' }));
   expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Save budget' })).toBeInTheDocument();
