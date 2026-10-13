@@ -5,6 +5,10 @@ RPM for Fedora/RHEL/openSUSE, portable `.tar.gz` archives, and native Arch
 
 ## What changed in this preview
 
+- **Updated branding:** The runner window, navigation mark and native Windows,
+  macOS and Linux installer/launcher icons now derive from the approved green/cyan
+  ForgeLoop logo mark used by the website. Existing identity and keys are unchanged.
+
 - **Docker startup:** Start runner can start a recognized, installed local Docker
   engine on Windows, macOS, or Linux, then wait for Linux-container readiness.
   Startup is bounded and cancellable; no model work starts before readiness.

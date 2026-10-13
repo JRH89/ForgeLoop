@@ -11,6 +11,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class DesktopIconsTest {
+    @Test void bundlesTheApprovedCurrentBrandMark() throws Exception {
+        // Pin the reviewed web/runner source asset so old branding cannot ship silently.
+        try (var source = DesktopIcons.class.getResourceAsStream("/desktop/favicon.png")) {
+            assertNotNull(source);
+            String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(source.readAllBytes()));
+            assertEquals("e20001b3d232659174f15f68b0c4ccfc96c67ceb2119d53eb1afb43e8f0f008d", digest);
+        }
+    }
     @TempDir Path directory;
     @Test void encodesNativeIconsFromBundledFavicon() throws Exception {
         DesktopIcons.write(directory);
