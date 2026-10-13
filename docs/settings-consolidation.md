@@ -1,9 +1,15 @@
 # Consolidated console settings
 
+The Repositories tab omits the introductory hero banner. Repository cards are
+native keyboard-accessible disclosures, initially open. Their last open/closed
+choice is saved per account, workspace and repository in localStorage; blocked
+storage does not prevent toggling. This changes visibility only, not execution.
+
 Settings is the single editing location for organization spending/delivery policy,
 repository budgets, assignment intake and retained run records. Repository pages
-show summaries and link to Settings; they retain repository scans. Runner setup,
-harnesses and local MCP configuration are in a collapsed advanced section.
+show summaries and link to Settings; they retain repository scans. Runner setup
+and execution policy appear first. Harnesses and local MCP configuration remain
+in a collapsed advanced section below repository settings.
 
 The organization ceiling remains a safety boundary, not a second per-run budget.
 New manual runs inherit the selected repository limit capped by the current
