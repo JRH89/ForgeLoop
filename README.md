@@ -56,7 +56,7 @@ The control plane coordinates work; the runner handles repository checkout and e
 
 The hosted product is live and the repository contains the implementation and automated checks. Current CI covers the control plane, runner, web app, MCP gateway, Windows installer setup, and a disposable Compose end-to-end environment that exercises database restore, runner pairing, package enrollment, and browser tests.
 
-A live issue-to-verified-PR path has been demonstrated against a demo repository. Validation across a second unrelated repository remains open; so do off-host backup/restore, a physical reboot/server validation, staging burn-in, and a production go/no-go review. Desktop installers are unsigned development previews and macOS packages are not notarized. The website and desktop downloads label this limitation.
+A live issue-to-verified-PR path has been demonstrated against a demo repository. A second-repository unattended issue-to-merge run was also validated on October 9, 2026. Remaining checks include off-host backup/restore, a physical reboot/server validation, staging burn-in, and a production go/no-go review. Desktop installers are unsigned development previews and macOS packages are not notarized. The website and desktop downloads label this limitation.
 
 This is an evolving portfolio product, not a claim that every production launch gate is closed. The open items are listed at the bottom so implementation and operational evidence remain distinct.
 
@@ -76,6 +76,7 @@ This is an evolving portfolio product, not a claim that every production launch 
 
 - [x] GitHub sign-in and self-service account provisioning with organization-scoped membership and roles.
 - [x] GitHub App installation, signed webhook validation, idempotent deliveries, repository synchronization, and configurable issue-label intake.
+- [x] Optional per-repository label bypass and Issue Chat label application with explicit paid-work warnings.
 - [x] Optional issue-assignment gate for any assignee or a specified GitHub login; read-only intake diagnostics.
 - [x] Manual repository analysis proposals with bounded/redacted context, runner-local model calls, usage estimates, and administrator-approved issue creation.
 - [x] Persisted runs, task graphs, gates, acceptance criteria, audit history, approval, cancellation, bounded retries, and queue archive/restore.
@@ -102,7 +103,7 @@ This is an evolving portfolio product, not a claim that every production launch 
 
 ### Remaining validation
 
-- [ ] Complete an end-to-end run in a second unrelated repository profile after provider funding is available.
+- [x] Complete a second-repository unattended issue-to-merge run ([October 9 evidence](docs/second-repository-validation-2026-10-09.md)); this does not close the operational production gates below.
 - [ ] Validate a physical workstation/server reboot, tunnel recovery, runner heartbeat, and authenticated access.
 - [ ] Configure encrypted off-host backup retention and complete a restore drill on another host, including evidence objects.
 - [ ] Complete staging burn-in, external alert delivery, and an explicit production go/no-go review.

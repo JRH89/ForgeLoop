@@ -20,3 +20,6 @@ The getting-started banner's dismissal is persisted in localStorage per GitHub
 identity and workspace. It survives reloads in that browser; clearing storage or
 using another browser resets it. Blocked storage still permits session dismissal.
 Getting started remains accessible in the sidebar. No secrets are stored.
+Label and assignment gates are independent. Label gating defaults on; administrators
+can bypass it. Issue Chat can opt into adding the configured label on publication.
+Both paths warn about potential immediate provider spending.

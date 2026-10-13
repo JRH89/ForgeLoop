@@ -79,8 +79,10 @@ organization-scoped repository, runner, policy, and run metadata every 10 second
    saved key locally** and **Check saved connection**. Neither calls a model.
 4. **Review intake and safety settings.** Check the exact issue label, optional
    assignment gate (any assignee or one exact login), budgets, harness, verification gates, human approval, and
-   auto-merge policy. Administrators change intake in Repositories and execution
-   settings in Harness & policy.
+   auto-merge policy. Administrators change intake and execution policy in Settings.
+   The intake label is required by default; bypassing it can activate paid work
+   as soon as an eligible issue is created. Existing issues are not rescanned by
+   changing the setting alone.
 5. **Create and follow your first issue.** Use the safe GitHub draft to start a
    small change with observable acceptance criteria. Its title and body are
    prefilled with the configured intake requirements, but it does not attach the
@@ -120,9 +122,10 @@ additional provider call, and the runner reports its own estimated cost (or
 N/A when pricing is unavailable). The generated title, description, and checks
 remain editable. Only **Approve & create GitHub issue** publishes the reviewed
 draft; **Reject draft** records the decision without creating an issue. Neither
-action applies the intake label or assigns anyone. To admit an approved issue
-to paid work later, add the repository's intake label and satisfy its assignment
-rule deliberately. Only the most recent ten scans per repository are shown.
+action assigns anyone or adds a label. With label gating enabled, add the label
+and satisfy any assignment rule deliberately. With label bypass enabled, creating
+an eligible issue can immediately activate paid work. Only the most recent ten
+scans per repository are shown.
 
 ### Draft an issue with AI chat
 
@@ -137,9 +140,12 @@ criteria. It gets no repository checkout or GitHub installation token and cannot
 modify code or create an issue.
 
 Review the draft, edit it if needed, and explicitly choose **Review and create
-GitHub issue**. An administrator is required. The issue is created without an
-intake label or assignee; normal repository intake rules still decide when a run
-starts. The chat tracks the linked run, verification gates and evidence, and PR
+GitHub issue**. An administrator is required. **Add intake label automatically**
+is off by default; selecting it adds the repository's configured label in the
+issue-creation request. No assignee is added. With label bypass enabled, the label
+is not necessary for intake. Eligible issues can immediately start paid work;
+normal assignment, budget and verification rules still apply. The chat tracks
+the linked run, verification gates and evidence, and PR
 as they appear. Use **Open this run in Runs** to review evidence and approve a
 verified delivery; the configured merge policy applies after GitHub checks pass.
 Provider usage is listed as **AI chat** on Usage & costs.
@@ -261,14 +267,14 @@ the desktop restores setup but does not start work unless you explicitly opted
 into sign-in startup. Real OS reboot and funded in-flight delivery verification
 remain separate release checks.
 
-The **Desktop installers and updates** link in Harness & policy reports release
+The **Desktop installers and updates** link in Settings reports release
 availability. Public preview installers are unsigned; signed production installers
 still require signing/notarization and release verification.
 The existing guided CLI installation below remains an advanced fallback.
 
 ### Guided CLI installation (advanced fallback)
 
-Open **Harness & policy → Install and connect a runner**. Administrators can
+Open **Settings → Install and connect a runner**. Administrators can
 generate a single-use enrollment token there; other roles ask their administrator.
 The panel lists runner heartbeats so you can confirm the connection.
 
@@ -459,10 +465,11 @@ rates reduce budget accuracy. Future work needs a configured price to report cos
 
 ### Assignment-gated intake
 
-In **Repositories**, turn on **Wait until an issue is assigned** to require an
+In **Settings → Repository settings**, turn on **Wait for an assignee** to require an
 assignment before a new issue starts. Leave the specific assignee blank to
 accept any GitHub assignee, or enter a login without `@` to require that person.
-Both the intake label and the assignment rule must be met. Choose a login GitHub
+The label is required unless **Require intake label** is turned off. Assignment
+rules remain independent of label bypass. Choose a login GitHub
 lets you assign in that repository; the setting does not make an arbitrary App bot assignable.
 Assigning a labeled issue or labeling an assigned issue both trigger evaluation.
 It applies to future intake, not cancellation of existing work. Manual submissions

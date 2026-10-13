@@ -12,7 +12,7 @@
   Ownership is checked before GitHub access. The existing App adapter reads the
   issue with an installation token; errors never expose issue bodies or tokens.
 - Shared eligibility rules between webhook intake and setup diagnostics: exact
-  label, configured case-insensitive assignee, nonblank body, not closed or a PR.
+  label when required, configured case-insensitive assignee, nonblank body, not closed or a PR.
 - Waiting-run explanations tied to persisted facts, not a fabricated readiness score.
 
 ## Boundaries
