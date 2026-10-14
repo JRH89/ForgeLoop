@@ -42,11 +42,11 @@ final class DesktopLayout {
     }
 
     static JPanel section(String title, String subtitle, JComponent body) {
-        JPanel card = stack(14);
+        JPanel card = stack(12);
         card.setBackground(DesktopTheme.SURFACE);
         card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(DesktopTheme.BORDER),
-                BorderFactory.createEmptyBorder(20, 20, 20, 20)));
+                new com.formdev.flatlaf.ui.FlatLineBorder(new Insets(0,0,0,0),DesktopTheme.BORDER,1,12),
+                BorderFactory.createEmptyBorder(18, 20, 18, 20)));
         JTextArea heading = text(title);
         heading.setFont(heading.getFont().deriveFont(Font.BOLD, heading.getFont().getSize2D() + 2));
         card.add(heading);
@@ -70,7 +70,7 @@ final class DesktopLayout {
     }
 
     static JPanel page(String title, String description, JComponent... sections) {
-        JPanel page = stack(20);
+        JPanel page = stack(18);
         JPanel heading = stack(7);
         heading.add(DesktopTheme.heading(title));
         heading.add(muted(description));
@@ -89,7 +89,7 @@ final class DesktopLayout {
 
     static JScrollPane scroll(JComponent content) {
         JPanel page = new ScrollablePage();
-        page.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
+        page.setBorder(BorderFactory.createEmptyBorder(28, 32, 28, 32));
         page.add(content);
         JScrollPane scroll = new JScrollPane(page, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
@@ -100,12 +100,34 @@ final class DesktopLayout {
     }
 
     private static final class ScrollablePage extends JPanel implements Scrollable {
-        ScrollablePage() { super(new StackLayout(0)); }
+        ScrollablePage() { super(new ContentLayout()); }
         @Override public Dimension getPreferredScrollableViewportSize() { return new Dimension(820, 510); }
         @Override public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction) { return 20; }
         @Override public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) { return Math.max(20, visible.height - 20); }
         @Override public boolean getScrollableTracksViewportWidth() { return true; }
         @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    }
+
+    /** Keep forms readable on large monitors, while tracking narrow viewports without clipping. */
+    private static final class ContentLayout extends BorderLayout {
+        @Override public Dimension preferredLayoutSize(Container parent) {
+            Insets insets=parent.getInsets();
+            Component content=parent.getComponentCount()==0?null:parent.getComponent(0);
+            if(content==null)return new Dimension(1,1);
+            int width=Math.min(820,Math.max(1,parent.getWidth()-insets.left-insets.right));
+            content.setSize(width,content.getHeight());
+            return new Dimension(width+insets.left+insets.right,content.getPreferredSize().height+insets.top+insets.bottom);
+        }
+        @Override public void layoutContainer(Container parent) {
+            if(parent.getComponentCount()==0)return;
+            Insets insets=parent.getInsets();
+            int available=Math.max(1,parent.getWidth()-insets.left-insets.right);
+            int width=Math.min(820,available);
+            Component content=parent.getComponent(0);
+            content.setSize(width,content.getHeight());
+            content.setBounds(insets.left+(available-width)/2,insets.top,width,content.getPreferredSize().height);
+            if(content instanceof Container container)container.doLayout();
+        }
     }
 
     /** Measure children at the actual viewport width before assigning their natural height. */

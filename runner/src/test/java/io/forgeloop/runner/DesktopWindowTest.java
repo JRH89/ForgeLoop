@@ -11,6 +11,34 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DesktopWindowTest {
     @TempDir Path directory;
+    @Test void designPreviewDisablesOperationalActionsButKeepsNavigation()throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeFalse(GraphicsEnvironment.isHeadless());
+        DesktopFiles.protect(directory);writeManualConfiguration();
+        SwingUtilities.invokeAndWait(()->{
+            DesktopTheme.install();DesktopRunner app=null;
+            try {
+                app=new DesktopRunner(directory,false);
+                var windowControls=new java.util.ArrayList<AbstractButton>();
+                findWindowControls(app.window().getRootPane(),app.window().getContentPane(),windowControls);
+                var enabledControls=windowControls.stream().filter(AbstractButton::isEnabled).toList();
+                app.designPreview();
+                for(var button:enabledControls)assertTrue(button.isEnabled(),"Preview must preserve title-bar controls");
+                assertFalse(find(app.window(),"Connect in browser").isEnabled());
+                assertFalse(find(app.window(),"Save provider settings").isEnabled());
+                assertFalse(find(app.window(),"Start runner").isEnabled());
+                assertTrue(hasText(app.window(),"DESIGN PREVIEW · Isolated sample settings · No connection or paid work"));
+                var pages=findTabs(app.window());pages.setSelectedIndex(1);assertEquals(1,pages.getSelectedIndex());
+                assertFalse(Files.exists(directory.resolve("identity")));
+            }catch(Exception error){throw new AssertionError(error);}finally{if(app!=null)app.disposeIdle();}
+        });
+    }
+    private static void findWindowControls(Container parent,Container content,java.util.List<AbstractButton> buttons) {
+        for(var child:parent.getComponents()) {
+            if(child==content)continue;
+            if(child instanceof AbstractButton button)buttons.add(button);
+            if(child instanceof Container nested)findWindowControls(nested,content,buttons);
+        }
+    }
     @Test void opensSetupWithoutNetworkOrPaidWorkAndCapturesLayout()throws Exception{
         org.junit.jupiter.api.Assumptions.assumeFalse(GraphicsEnvironment.isHeadless());
         DesktopFiles.protect(directory);

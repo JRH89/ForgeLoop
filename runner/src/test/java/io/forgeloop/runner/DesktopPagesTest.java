@@ -27,6 +27,8 @@ class DesktopPagesTest {
                 int expected = Integer.parseInt(link.getName().substring("navigation-".length()));
                 assertEquals(expected,pages.getSelectedIndex());
                 assertTrue(pages.getSelectedComponent().isVisible());
+                assertEquals(DesktopTheme.SELECTED,link.getBackground());
+                assertEquals(DesktopTheme.ACCENT,link.getForeground());
             }
             shell.setSize(1040,760);shell.doLayout();
             for (JButton link : links) assertEquals(link.getAccessibleContext().getAccessibleName(),link.getText());

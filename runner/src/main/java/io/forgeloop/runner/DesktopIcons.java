@@ -1,7 +1,10 @@
 package io.forgeloop.runner;
 
 import java.awt.RenderingHints;
+import java.awt.AlphaComposite;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.BaseMultiResolutionImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -12,6 +15,17 @@ import javax.imageio.ImageIO;
 /** Native launcher formats derived from the same favicon used by the desktop window. */
 public final class DesktopIcons {
     private DesktopIcons() { }
+    /** Swing selects a device-resolution raster instead of enlarging the 1x sidebar icon. */
+    static javax.swing.ImageIcon displayIcon(int logicalSize) {
+        return new javax.swing.ImageIcon(new BaseMultiResolutionImage(windowImage(logicalSize),windowImage(logicalSize*2),windowImage(logicalSize*3),windowImage(logicalSize*4)));
+    }
+    /** The launcher, taskbar, and in-app brand share the same strongly rounded silhouette. */
+    static BufferedImage windowImage(int size) {
+        try(var resource=DesktopIcons.class.getResourceAsStream("/desktop/favicon.png")) {
+            if(resource==null)throw new IllegalStateException("ForgeLoop favicon is missing");
+            return rounded(ImageIO.read(resource),size);
+        }catch(java.io.IOException error){throw new IllegalStateException("Cannot load ForgeLoop icon",error);}
+    }
     public static void main(String[] args) throws Exception {
         if (args.length != 1) throw new IllegalArgumentException("An output directory is required");
         write(Path.of(args[0]));
@@ -53,14 +67,21 @@ public final class DesktopIcons {
         Files.write(directory.resolve("forgeloop.icns"), icns.array());
     }
     private static byte[] png(BufferedImage source, int size) throws Exception {
-        var scaled = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-        var graphics = scaled.createGraphics();
-        try {
-            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            graphics.drawImage(source, 0, 0, size, size, null);
-        } finally { graphics.dispose(); }
+        var scaled=rounded(source,size);
         var bytes = new ByteArrayOutputStream();
         if (!ImageIO.write(scaled, "png", bytes)) throw new IllegalStateException("PNG encoder unavailable");
         return bytes.toByteArray();
+    }
+    private static BufferedImage rounded(BufferedImage source,int size) {
+        var scaled = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+        var graphics = scaled.createGraphics();
+        try {
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+            graphics.fill(new RoundRectangle2D.Double(0,0,size,size,size*.44,size*.44));
+            graphics.setComposite(AlphaComposite.SrcIn);
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            graphics.drawImage(source, 0, 0, size, size, null);
+        } finally { graphics.dispose(); }
+        return scaled;
     }
 }
