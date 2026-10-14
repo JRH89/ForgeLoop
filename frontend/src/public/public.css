@@ -1,7 +1,12 @@
 /* Public-site styling is scoped so operator console layouts remain unchanged. */
 .public-footer .footer-note a{text-decoration:underline;text-underline-offset:3px}
 .runner-downloads .public-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
-.runner-downloads .public-cards article{display:grid;grid-template-rows:subgrid;grid-row:span 4;min-width:0}
+.runner-downloads .public-cards article{display:grid;grid-template-rows:subgrid;grid-row:span 5;min-width:0}
+.runner-downloads .platform-downloads{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.platform-downloads label{display:grid;gap:10px;font-size:.85rem;color:#a6bad0}
+.platform-downloads select{width:100%;min-width:0;padding:12px;background:#07131e;color:#edf4ff;border:1px solid #36526a;border-radius:8px;font:inherit}
+.platform-downloads select:focus-visible{outline:2px solid #8dc4ff;outline-offset:3px}
+@media(max-width:900px){.runner-downloads .platform-downloads{grid-template-columns:1fr}}
 .runner-downloads .public-cards article>h3,.runner-downloads .public-cards article>p{margin:0}
 .runner-downloads .public-cards article>.primary{margin:0;align-items:center;justify-content:center;text-align:center;white-space:normal}
 .runner-downloads .public-cards article>.download-verification{margin:0}

@@ -37,6 +37,7 @@ export default function RunnerDownloads(){
   const [manifest,setManifest]=useState<DesktopRelease|null>(null);
   const [loading,setLoading]=useState(true);
   const [copied,setCopied]=useState('');
+  const [selectedPackages,setSelectedPackages]=useState<Record<string,string>>({});
   useEffect(initializeNavigation,[]);
   useEffect(()=>{
     const controller=new AbortController();
@@ -67,18 +68,27 @@ export default function RunnerDownloads(){
       <h2>Version {manifest.version}{manifest.preview?' — Preview':''}</h2>
       {manifest.preview&&<p className="guide-callout">These preview installers are unsigned. Windows may show an unknown-publisher warning, and macOS may block the app because it is not notarized. Use a preview only if your device policy allows it.</p>}
       {manifest.releaseUrl&&<p><a href={manifest.releaseUrl}>Release notes and all downloads</a></p>}
-      <div className="public-cards">{manifest.packages.filter(item=>item.format!=='appimage').map(item=><article key={`${item.platform}-${item.architecture}-${item.format}`}>
-        <h3>{packageTitle(item)}</h3>
+      <div className="public-cards platform-downloads">{['Linux','Windows','macOS'].map(platform=>{
+        // Keep every published format available, preferring x64 for the initial selection.
+        const packages=manifest.packages.filter(item=>item.platform===platform&&item.format!=='appimage').sort((a,b)=>Number(a.architecture!=='x64')-Number(b.architecture!=='x64'));
+        const packageKey=(item:DesktopRelease['packages'][number])=>`${item.architecture}-${item.format}`;
+        const item=packages.find(item=>packageKey(item)===selectedPackages[platform])??packages[0];
+        if(!item)return null;
+        return <article key={platform}>
+        <h3>{platform}</h3>
+        <label>Choose your package<select aria-label={`${platform} package`} value={packageKey(item)} onChange={event=>setSelectedPackages(previous=>({...previous,[platform]:event.target.value}))}>
+          {packages.map(option=><option key={packageKey(option)} value={packageKey(option)}>{packageTitle(option)}</option>)}
+        </select></label>
         <p>{packageDescription(item)}</p>
         <a className="primary" href={item.url}>{downloadLabel(item)}</a>
-        <details className="download-verification"><summary>Verify download</summary>
+        <details className="download-verification" key={packageKey(item)}><summary>Verify download</summary>
           <p>SHA-256</p><code style={{overflowWrap:'anywhere'}}>{item.sha256}</code>
           <button type="button" onClick={()=>void copyChecksum(item.sha256)}>{copied===item.sha256?'Copied':'Copy SHA-256'}</button>
           <p>After downloading, run:</p>
           <code style={{overflowWrap:'anywhere'}}>{item.platform==='Windows'?'Get-FileHash .\\'+(item.filename??'installer.msi')+' -Algorithm SHA256':(item.platform==='macOS'?'shasum -a 256 ':'sha256sum ')+(item.filename??'installer')}</code>
           <p>Compare the complete value with the checksum above. If they differ, do not install that file. Checksums confirm file integrity; publisher signing is separate.</p>
         </details>
-      </article>)}</div>
+      </article>})}</div>
       {manifest.packages.some(item=>item.platform==='Linux')&&<details className="download-verification linux-install-notes">
         <summary>Linux install notes</summary>
         {manifest.packages.filter(item=>item.platform==='Linux'&&item.format==='pkg.tar.zst').map(item=><p key={item.architecture}>For Arch Linux {item.architecture} (including Omarchy on x64), install with <code>sudo pacman -U ./forgeloop-runner-{manifest.version}-linux-{item.architecture}.{item.format}</code>. This is a native pacman package, not an AppImage.</p>)}
