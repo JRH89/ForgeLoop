@@ -20,9 +20,21 @@ class DesktopIconsTest {
         }
     }
     @TempDir Path directory;
+    @Test void providesSharpDeviceResolutionVariantsForSidebarBrand() {
+        var icon=DesktopIcons.displayIcon(30);
+        assertEquals(30,icon.getIconWidth());
+        var image=(java.awt.image.MultiResolutionImage)icon.getImage();
+        assertEquals(4,image.getResolutionVariants().size());
+        assertEquals(90,image.getResolutionVariant(90,90).getWidth(null));
+        assertEquals(120,image.getResolutionVariant(120,120).getWidth(null));
+    }
     @Test void encodesNativeIconsFromBundledFavicon() throws Exception {
         DesktopIcons.write(directory);
         assertEquals(512, ImageIO.read(directory.resolve("forgeloop.png").toFile()).getWidth());
+        var rounded=ImageIO.read(directory.resolve("forgeloop.png").toFile());
+        assertEquals(0,rounded.getRGB(0,0)>>>24,"Launcher corners must be transparent");
+        assertEquals(0,rounded.getRGB(20,20)>>>24,"Corners must be heavily rounded");
+        assertTrue((rounded.getRGB(256,256)>>>24)>0,"Brand mark remains visible");
         byte[] bytes = Files.readAllBytes(directory.resolve("forgeloop.ico"));
         var ico = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
         assertEquals(0, ico.getShort()); assertEquals(1, ico.getShort()); assertEquals(6, ico.getShort());

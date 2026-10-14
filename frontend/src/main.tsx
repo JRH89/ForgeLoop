@@ -926,7 +926,6 @@ function App() {
             </button>
             <button className={page === "Configuration" ? "active" : ""} onClick={() => navigate("Configuration")}><span className="nav-icon" aria-hidden="true"><SlidersHorizontal size={17} strokeWidth={1.9} /></span> Settings</button>
             <GuideNavigation active={page === 'Guide'} onSelect={id => { setGuideTarget({ id }); navigate('Guide'); }}/>
-            <button className={page === "GettingStarted" ? "active" : ""} onClick={() => navigate("GettingStarted")}><span className="nav-icon" aria-hidden="true"><ListChecks size={17} strokeWidth={1.9} /></span> Getting started</button>
             {operator?.role === 'ADMIN' && <button className={page === 'Team' ? 'active' : ''} onClick={() => navigate('Team')}><span className="nav-icon" aria-hidden="true"><Users size={17} strokeWidth={1.9}/></span> Team</button>}
             <button className={`account-console-link ${page === 'Account' ? 'active' : ''}`} onClick={() => navigate('Account')}><span className="nav-icon" aria-hidden="true"><UserRound size={17} strokeWidth={1.9}/></span> Account</button>
             <a className="logout mobile-signout" href="/logout">Sign out</a>

@@ -14,19 +14,19 @@ final class DesktopShell extends JPanel {
     private final JLabel brand = new JLabel("ForgeLoop");
     private final JLabel version = new JLabel("Runner " + DesktopVersion.current());
     private final String[] titles = {"Connection", "Provider", "Runner", "Activity"};
+    private final JLabel location = new JLabel("Runner overview");
     private Boolean compactMode;
 
     DesktopShell(DesktopPages pages, JComponent status) {
         super(new BorderLayout());
-        sidebar.setBackground(new Color(0x0F1620));
+        sidebar.setBackground(DesktopTheme.SIDEBAR);
         sidebar.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 0, 1, DesktopTheme.BORDER),
-                BorderFactory.createEmptyBorder(24, 12, 18, 12)));
+                BorderFactory.createEmptyBorder(20, 12, 18, 12)));
         JPanel top = DesktopLayout.stack(26);
         top.setOpaque(false);
         brand.setFont(brand.getFont().deriveFont(Font.BOLD, 18f));
-        var logo = DesktopShell.class.getResource("/desktop/favicon.png");
-        if (logo != null) brand.setIcon(new ImageIcon(new ImageIcon(logo).getImage().getScaledInstance(30, 30, Image.SCALE_SMOOTH)));
+        brand.setIcon(DesktopIcons.displayIcon(30));
         brand.setIconTextGap(9);
         top.add(brand);
         JPanel links = DesktopLayout.stack(7);
@@ -52,6 +52,14 @@ final class DesktopShell extends JPanel {
         version.setFont(version.getFont().deriveFont(11f));
         sidebar.add(version, BorderLayout.SOUTH);
         JPanel main = new JPanel(new BorderLayout());
+        JPanel toolbar=new JPanel(new BorderLayout());
+        toolbar.setBackground(DesktopTheme.SIDEBAR);
+        toolbar.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0,0,1,0,DesktopTheme.BORDER),BorderFactory.createEmptyBorder(14,24,14,24)));
+        location.setFont(location.getFont().deriveFont(Font.BOLD));
+        toolbar.add(location,BorderLayout.WEST);
+        JLabel local=new JLabel("LOCAL WORKSPACE");local.setForeground(DesktopTheme.MUTED);local.setFont(local.getFont().deriveFont(10f));
+        toolbar.add(local,BorderLayout.EAST);
+        main.add(toolbar,BorderLayout.NORTH);
         main.add(pages, BorderLayout.CENTER);
         JPanel footer = new JPanel(new BorderLayout());
         footer.setBorder(BorderFactory.createCompoundBorder(
@@ -70,9 +78,10 @@ final class DesktopShell extends JPanel {
     }
 
     private void refreshSelection(int selected) {
+        location.setText(titles[selected]+(selected==2?" overview":" settings"));
         for (JButton link : navigation) {
             boolean active = link.getName().equals("navigation-" + selected);
-            link.setBackground(active ? new Color(0x183A34) : sidebar.getBackground());
+            link.setBackground(active ? DesktopTheme.SELECTED : sidebar.getBackground());
             link.setForeground(active ? DesktopTheme.ACCENT : DesktopTheme.MUTED);
             link.putClientProperty("JButton.buttonType", active ? null : "borderless");
         }
@@ -83,7 +92,7 @@ final class DesktopShell extends JPanel {
         boolean compact = getWidth() > 0 && getWidth() < 820;
         if (compactMode != null && compactMode == compact) return;
         compactMode = compact;
-        sidebar.setPreferredSize(new Dimension(compact ? 68 : 186, 0));
+        sidebar.setPreferredSize(new Dimension(compact ? 68 : 210, 0));
         brand.setText(compact ? "" : "ForgeLoop");
         version.setText(compact ? "" : "Runner " + DesktopVersion.current());
         for (JButton link : navigation) {

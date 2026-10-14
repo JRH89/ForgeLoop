@@ -55,7 +55,7 @@ public final class DesktopRunner {
     private final Timer statusTimer;
     DesktopRunner(Path directory,boolean autoStart)throws Exception{
         this.directory=directory;worker=new DesktopWorker(directory);
-        var icon=DesktopRunner.class.getResource("/desktop/favicon.png");if(icon!=null)frame.setIconImage(new ImageIcon(icon).getImage());
+        frame.setIconImage(DesktopIcons.windowImage(256));
         model.setEditable(true);
         if(Files.exists(directory.resolve("config.json"))){configuration=JSON.readValue(directory.resolve("config.json").toFile(),DesktopConfiguration.class);endpoint.setText(configuration.endpoint());provider.setSelectedItem(configuration.provider());model.setSelectedItem(configuration.model());input.setText(configuration.inputUsdPerMillion()==null?"":configuration.inputUsdPerMillion().toPlainString());output.setText(configuration.outputUsdPerMillion()==null?"":configuration.outputUsdPerMillion().toPlainString());manualPrices="manual".equals(configuration.priceSource())||(configuration.priceSource()==null&&configuration.inputUsdPerMillion()!=null);}
         if(Files.exists(directory.resolve("endpoint")))endpoint.setText(Files.readString(directory.resolve("endpoint")));
@@ -111,16 +111,17 @@ public final class DesktopRunner {
         key.setToolTipText("Leave blank to keep the saved key for this provider. Enter a key only to replace it.");
         JButton checkKey=new JButton("Check saved key locally");providerForm.add(DesktopLayout.actions(checkKey));providerForm.add(DesktopLayout.text("Checks protected storage, not API credit or key validity."));
         checkKey.addActionListener(e->{String selected=(String)provider.getSelectedItem();background(()->{new DesktopSecretStore(directory,selected).load();log("Saved key is readable from protected storage. No API request was made.");SwingUtilities.invokeLater(()->{if(selected.equals(provider.getSelectedItem()))keyStatus.setText("Saved key readable - no API request made");});});});
+        providerForm.add(DesktopLayout.actions(save));
         JPanel prices=DesktopLayout.stack(16);prices.add(DesktopLayout.field("Input USD / million tokens",input,null));prices.add(DesktopLayout.field("Output USD / million tokens",output,null));prices.setVisible(manualPrices);
         JButton advanced=new JButton(manualPrices?"Use automatic prices":"Use manual prices");advanced.setToolTipText("Override public rates for custom models or account-specific pricing.");advanced.addActionListener(e->{manualPrices=!manualPrices;selectedQuote=null;priceLookupVersion.incrementAndGet();lookingUpPrice=false;prices.setVisible(manualPrices);advanced.setText(manualPrices?"Use automatic prices":"Use manual prices");if(!manualPrices)refreshPricing();else priceStatus.setText("Manual override: enter both prices, or leave both blank for N/A.");});
         JPanel pricing=DesktopLayout.stack(16);pricing.add(priceStatus);pricing.add(DesktopLayout.actions(advanced));pricing.add(prices);
-        JPanel consent=DesktopLayout.stack(12);consent.add(DesktopLayout.actions(login));consent.add(DesktopLayout.text("Optional: automatically process eligible work when you sign in. Model API calls can incur charges."));consent.add(DesktopLayout.actions(save));
+        JPanel consent=DesktopLayout.stack(12);consent.add(DesktopLayout.actions(login));consent.add(DesktopLayout.muted("Optional: automatically process eligible work when you sign in. Model API calls can incur charges. Save provider settings to apply this choice."));
         JPanel providerStep=DesktopLayout.page("Model & provider","Choose the model that will do the work. Credentials stay on this computer.",
                 DesktopLayout.section("Provider settings",null,providerForm),
                 DesktopLayout.section("Token pricing","Public base rates are looked up automatically.",pricing),
-                DesktopLayout.section("Save your settings",null,consent));
+                DesktopLayout.section("Startup behavior",null,consent));
         JPanel controls=DesktopLayout.stack(16);
-        runnerState.setFont(runnerState.getFont().deriveFont(Font.BOLD,24f));
+        runnerState.setFont(runnerState.getFont().deriveFont(Font.PLAIN,30f));
         controls.add(runnerState);controls.add(runnerDetails);controls.add(DesktopLayout.actions(start,pause));
         controls.add(DesktopLayout.muted("Starting processes eligible issues and can use API credits. Docker starts automatically if needed."));
         controls.add(DesktopLayout.actions(cancelDockerStartup));cancelDockerStartup.setVisible(false);
@@ -195,7 +196,7 @@ public final class DesktopRunner {
         GraphicsConfiguration display=frame.getGraphicsConfiguration();Rectangle screen=display.getBounds();Insets systemInsets=Toolkit.getDefaultToolkit().getScreenInsets(display);
         int usableWidth=screen.width-systemInsets.left-systemInsets.right,usableHeight=screen.height-systemInsets.top-systemInsets.bottom;
         frame.setMinimumSize(new Dimension(Math.min(640,usableWidth),Math.min(560,usableHeight)));
-        frame.setSize(Math.min(1040,usableWidth),Math.min(780,usableHeight));frame.setLocationByPlatform(true);frame.setVisible(true);
+        frame.setSize(Math.min(1120,usableWidth),Math.min(780,usableHeight));frame.setLocationByPlatform(true);frame.setVisible(true);
         if(autoStart&&configuration!=null&&configuration.startAtLogin())background(()->{startWorker();log("Started using your saved sign-in consent.");});
     }
     private JButton guideButton(String label,URI guide){
@@ -246,6 +247,19 @@ public final class DesktopRunner {
     }
     /** UI verification may dispose an idle window without terminating its test JVM. */
     void disposeIdle(){if(worker.running()||busy.get())throw new IllegalStateException("Cannot dispose active runner");statusTimer.stop();frame.dispose();}
+    /** Visual previews cannot connect, write credentials, or accidentally start paid work. */
+    void designPreview() {
+        statusTimer.stop();
+        status.setText("DESIGN PREVIEW · Isolated sample settings · No connection or paid work");
+        // FlatLaf's caption buttons live outside the content pane: preserve window controls.
+        disablePreviewActions(frame.getContentPane());
+    }
+    private static void disablePreviewActions(Container parent) {
+        for(Component child:parent.getComponents()) {
+            if(child instanceof AbstractButton button)button.setEnabled(button.getName()!=null&&button.getName().startsWith("navigation-"));
+            if(child instanceof Container container)disablePreviewActions(container);
+        }
+    }
     JFrame window(){return frame;}
     private RunnerClient client(URI uri){return new RunnerClient(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(),uri);}
     /** Never decrypt credentials just to render the UI; distinguish configured from verified. */
