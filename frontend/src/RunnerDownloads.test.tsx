@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render,screen } from '@testing-library/react';
+import { fireEvent,render,screen } from '@testing-library/react';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 import RunnerDownloads,{verifiedManifest} from './RunnerDownloads';
 import { legacyReleaseFixture, releaseFixture } from './testFixtures/desktopRelease';
@@ -32,11 +32,14 @@ it('shows a complete preview with optional checksum verification',async()=>{
   vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>[releaseFixture()]}));
   render(<RunnerDownloads/>);
   expect(await screen.findByRole('heading',{name:'Version 1.0.4 — Preview'})).toBeInTheDocument();
-  expect(screen.getAllByRole('link',{name:/Download for/})).toHaveLength(12);
+  expect(screen.getAllByRole('link',{name:/Download for/})).toHaveLength(3);
+  expect(screen.getAllByRole('combobox').map(element=>element.getAttribute('aria-label'))).toEqual(['Linux package','Windows package','macOS package']);
+  fireEvent.change(screen.getByRole('combobox',{name:'Linux package'}),{target:{value:'x64-rpm'}});
   expect(screen.getByRole('link',{name:'Download for Linux (x64, RPM)'})).toBeInTheDocument();
+  fireEvent.change(screen.getByRole('combobox',{name:'Linux package'}),{target:{value:'x64-pkg.tar.zst'}});
   expect(screen.getByRole('link',{name:'Download for Linux (x64, Arch package)'})).toBeInTheDocument();
-  expect(screen.getByRole('heading',{name:'Linux arm64 · Portable archive'})).toBeInTheDocument();
-  expect(screen.getByRole('heading',{name:'Windows (arm64)'})).toBeInTheDocument();
+  expect(screen.getByRole('option',{name:'Linux arm64 · Portable archive'})).toBeInTheDocument();
+  expect(screen.getByRole('option',{name:'Windows (arm64)'})).toBeInTheDocument();
   expect(screen.queryByText(/AppImage-compatible desktops/)).not.toBeInTheDocument();
   expect(screen.getByText(/Native pacman package for Arch Linux, Omarchy, and Manjaro/i)).toBeInTheDocument();
   expect(screen.getByText(/sudo pacman -U.*linux-x64\.pkg\.tar\.zst/)).toBeInTheDocument();
@@ -44,5 +47,8 @@ it('shows a complete preview with optional checksum verification',async()=>{
   expect(screen.getByText(/Saving provider credentials on Linux requires/)).toBeInTheDocument();
   expect(screen.getByText('secret-tool')).toBeInTheDocument();
   expect(screen.getByText(/These preview installers are unsigned/)).toBeInTheDocument();
-  expect(screen.getAllByText('Verify download')).toHaveLength(12);
+  expect(screen.getAllByText('Verify download')).toHaveLength(3);
+  fireEvent.change(screen.getByRole('combobox',{name:'Linux package'}),{target:{value:'arm64-tar.gz'}});
+  expect(screen.getByRole('link',{name:'Download for Linux (arm64, portable archive)'})).toHaveAttribute('href',expect.stringContaining('linux-arm64.tar.gz'));
+  expect(screen.getByText(/^sha256sum .*linux-arm64.tar.gz$/)).toBeInTheDocument();
 });

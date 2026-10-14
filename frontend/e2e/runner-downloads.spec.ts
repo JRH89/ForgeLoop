@@ -15,13 +15,18 @@ test('public downloads show versioned installers and optional verification witho
     await page.setViewportSize({width,height:900});
     await page.goto('/app/runner-downloads');
     await expect(page.getByRole('heading',{name:'Version 1.0.4 — Preview'})).toBeVisible();
-    await expect(page.getByRole('link',{name:/Download for/})).toHaveCount(12);
-    await expect(page.getByRole('heading',{name:'Linux x64 · RPM'})).toBeVisible();
-    await expect(page.getByRole('heading',{name:'Linux x64 · Arch package'})).toBeVisible();
-    await expect(page.getByRole('heading',{name:'Windows (arm64)'})).toBeVisible();
+    await expect(page.getByRole('link',{name:/Download for/})).toHaveCount(3);
+    await expect(page.locator('.platform-downloads h3')).toHaveText(['Linux','Windows','macOS']);
+    await page.getByRole('combobox',{name:'Linux package'}).selectOption('x64-rpm');
+    await expect(page.getByRole('link',{name:'Download for Linux (x64, RPM)'})).toBeVisible();
+    await page.getByRole('combobox',{name:'Linux package'}).selectOption('x64-pkg.tar.zst');
+    await expect(page.getByRole('link',{name:'Download for Linux (x64, Arch package)'})).toBeVisible();
+    await page.getByRole('combobox',{name:'Windows package'}).selectOption('arm64-msi');
+    await expect(page.getByRole('link',{name:'Download for Windows (arm64)'})).toHaveAttribute('href',/windows-arm64.msi$/);
     await expect(page.getByText(/This is a native pacman package, not an AppImage/)).toHaveCount(2);
     await page.getByText('Verify download',{exact:true}).first().click();
-    await expect(page.getByText(/Get-FileHash/)).toHaveCount(2);
+    await page.getByText('Verify download',{exact:true}).nth(1).click();
+    await expect(page.getByText(/Get-FileHash.*windows-arm64.msi/)).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
   expect(tenantRequests).toEqual([]);

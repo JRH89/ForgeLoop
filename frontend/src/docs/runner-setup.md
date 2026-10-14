@@ -2,6 +2,9 @@
 
 Open [Download runner](/app/runner-downloads) for the latest published desktop
 preview. Downloads come from GitHub Releases and do not require signing in.
+Each operating system has one card: Linux, Windows, then macOS. Use its package
+dropdown to choose a format and architecture; the download and verification
+details always match that selection.
 Choose Windows x64/ARM64, macOS Apple Silicon (arm64) or Intel (x64), or a Linux
 x64/arm64 package: DEB for Debian/Ubuntu, RPM for Fedora/RHEL/openSUSE, a portable
 `.tar.gz` archive, or a native Arch `.pkg.tar.zst` package for x64 and ARM64.
