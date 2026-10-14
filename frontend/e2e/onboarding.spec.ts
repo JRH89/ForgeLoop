@@ -42,6 +42,7 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole('heading', { name: 'Getting started', exact: true })).toBeVisible();
     await expect(page.getByText('No enabled runner is enrolled.', { exact: true })).toBeVisible();
     const navigation = page.getByRole('navigation', { name: 'ForgeLoop navigation' });
+    await expect(navigation.getByRole('button', { name: 'Getting started', exact: true })).toHaveCount(0);
     if (width === 390) await page.getByRole('button', { name: 'Open navigation' }).click();
     await expect(navigation.getByRole('button', { name: 'Issue chat', exact: true })).toBeVisible();
     await expect(navigation.getByRole('button', { name: 'User guide', exact: true })).toBeVisible();

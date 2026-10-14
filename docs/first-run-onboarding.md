@@ -2,7 +2,7 @@
 
 ## Completed scope
 
-- Five-step setup checklist, available from Runs and the sidebar after User guide.
+- Five-step setup checklist, available from **Open setup checklist** on Runs.
 - Repository selection and ten-second, non-overlapping metadata polling with
   explicit stale/error states and manual refresh.
 - Saved harness, intake label, assignee, budget, approval, auto-merge, and gate visibility.

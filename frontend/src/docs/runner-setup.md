@@ -1,33 +1,23 @@
 ## Desktop downloads and updates
 
-Open [Download runner](/app/runner-downloads) for the latest published desktop
-preview. Downloads come from GitHub Releases and do not require signing in.
-Each operating system has one card: Linux, Windows, then macOS. Use its package
-dropdown to choose a format and architecture; the download and verification
-details always match that selection.
-Choose Windows x64/ARM64, macOS Apple Silicon (arm64) or Intel (x64), or a Linux
-x64/arm64 package: DEB for Debian/Ubuntu, RPM for Fedora/RHEL/openSUSE, a portable
-`.tar.gz` archive, or a native Arch `.pkg.tar.zst` package for x64 and ARM64.
-Arch and Omarchy users can install the matching package with `sudo pacman -U`
-followed by the downloaded `.pkg.tar.zst` filename.
-The portable archive works without AppImage or FUSE. Java is bundled; Git and
-Docker are required.
+1. **Download.** Open [Download runner](/app/runner-downloads). Choose your OS card,
+   then a package and architecture: x64 or ARM64 (macOS: Intel or Apple Silicon).
+2. **Verify.** Expand **Verify download**, run the SHA-256 command, and compare
+   the full hash. Do not install a mismatch. Checksums verify integrity, not identity.
+3. **Install.** Open the installer or extract the archive. Java is bundled;
+   install Git and Docker separately.
+4. **Update.** Pause, wait for current work to finish, close the runner, install
+   the newer package, and reopen. Saved keys and settings remain. Updates are manual.
 
-Linux credential storage requires `secret-tool` and an unlocked desktop Secret
-Service keyring; install the libsecret command-line tools for your distribution.
+**Linux notes**
 
-Preview installers are unsigned and macOS previews are not notarized. Windows
-and macOS may warn or block installation; use previews only if your device policy
-permits them. Signing remains a separate release milestone.
+- Debian/Ubuntu/Mint: DEB. Fedora/RHEL/openSUSE: RPM.
+- Arch/Omarchy: `sudo pacman -U <downloaded-file.pkg.tar.zst>`.
+- Portable `.tar.gz`: extract and run; no AppImage or FUSE needed.
+- Credentials: install libsecret's `secret-tool` and unlock your desktop Secret Service keyring.
 
-Expand **Verify download** to copy SHA-256 and see the command for your platform.
-Compare the entire hash. A mismatch means the file must not be installed.
-Checksums confirm file integrity, not the publisher's identity.
-
-For updates, pause the runner, wait for current work to finish, close it, install
-the newer package and reopen it. Your identity, provider keys and settings are
-retained outside the installation folder. The website discovers new releases
-automatically within about five minutes; the app does not install updates itself.
+**Preview warning:** Installers are unsigned; macOS builds are not notarized.
+Your OS may block installation. Proceed only if your device policy permits it.
 
 ## Navigation and usage tracking
 
@@ -38,7 +28,7 @@ the confirmation checkbox to enable approval. Approval alone never starts paid w
 On mobile, open the hamburger button in the header for the navigation dropdown.
 It includes **Support** and **Sign out**, closes when you choose a page, and
 supports Escape to close. Desktop keeps the sidebar and a Sign out button in the
-header. Expand **User guide**, the fifth sidebar item, to choose Quick start,
+header. Expand **User guide** to choose Quick start,
 Runner setup & API keys, Repositories, Runs, Settings, Delivery, or Troubleshooting.
 Choosing a section opens the guide at that section and closes the mobile menu;
 expanding the submenu itself keeps the mobile menu open.
@@ -69,8 +59,7 @@ refresh every ten seconds; failures show a stale-data warning and a retry button
 
 ## Start with the setup checklist
 
-Open **Getting started** in the dashboard sidebar, or **Open setup checklist**
-on Runs. User guide remains the fifth sidebar item. The checklist refreshes
+Select **Open setup checklist** on Runs. The checklist refreshes
 organization-scoped repository, runner, policy, and run metadata every 10 seconds:
 
 1. **Connect GitHub.** An administrator installs the ForgeLoop GitHub App and
