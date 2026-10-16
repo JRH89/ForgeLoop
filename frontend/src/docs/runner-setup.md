@@ -327,7 +327,7 @@ $runnerJar = (Resolve-Path runner/target/runner-0.1.0.jar).Path
 $runnerRoot = Join-Path $env:LOCALAPPDATA 'ForgeLoopRunner'
 New-Item -ItemType Directory -Force -Path $runnerRoot | Out-Null
 $env:FORGELOOP_RUNNER_STATE_FILE = Join-Path $runnerRoot 'identity'
-$controlPlane = 'https://forgeloop.hookerhillstudios.com'
+$controlPlane = 'https://forgeloop.codefrontlabs.com'
 Copy-Item runner/provider-policy.example.json (Join-Path $runnerRoot 'provider-policy.json')
 ```
 

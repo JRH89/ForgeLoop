@@ -43,6 +43,12 @@
 .public-site{--nav-offset:98px}
 .public-site main[id],.public-site main [id]{scroll-margin-top:var(--nav-offset)}
 .public-nav>nav{justify-content:center}.public-nav>.primary{justify-self:end;margin-left:0}
+.public-nav>.brand{gap:12px;justify-self:start;white-space:nowrap}
+.public-nav>.brand img{width:50px;height:50px;flex-shrink:0;border-radius:12px}
+.public-nav>.brand strong{font-size:28px;line-height:1.1}
+@media(max-width:1000px){.public-nav>.brand img{width:44px;height:44px}.public-nav>.brand strong{font-size:25px}}
+/* Center each compact link group in its column, without centering the text inside it. */
+@media(min-width:761px){.public-site .public-footer>nav{justify-self:center;text-align:left}}
 .public-site .public-footer{padding-inline:28px}
 .public-site .menu-toggle{display:none}
 .public-site .mobile-dropdown{display:none}

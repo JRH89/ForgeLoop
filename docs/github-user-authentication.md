@@ -2,7 +2,7 @@
 
 ForgeLoop uses one GitHub App for two separate trust relationships. Installation tokens authorize repository automation; the GitHub web OAuth flow authenticates human operators. A repository installation never creates an authenticated browser session.
 
-Configure the GitHub App callback URL as `https://forgeloop.hookerhillstudios.com/login/oauth2/code/github`, with wildcard matching, device flow, and authorization-during-installation disabled. Supply `FORGELOOP_GITHUB_CLIENT_ID` and `FORGELOOP_GITHUB_CLIENT_SECRET` through the deployment secret manager. The Client ID is not the App ID.
+Configure the GitHub App callback URL as `https://forgeloop.codefrontlabs.com/login/oauth2/code/github`, with wildcard matching, device flow, and authorization-during-installation disabled. Supply `FORGELOOP_GITHUB_CLIENT_ID` and `FORGELOOP_GITHUB_CLIENT_SECRET` through the deployment secret manager. The Client ID is not the App ID.
 
 The public root does not load tenant data. **Sign in with GitHub** redirects through GitHub with OAuth state managed by Spring Security, exchanges the code only on the server, resolves GitHub's immutable numeric user ID, and stores authentication in an HTTP-only, Secure, SameSite cookie. ForgeLoop never uses a GitHub username as an authorization identifier.
 

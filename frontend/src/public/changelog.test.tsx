@@ -9,6 +9,8 @@ it('publishes a discoverable milestone changelog with release references and SEO
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('What changed in ForgeLoop.');
   expect(screen.getByRole('link', { name: /Runner 1.0.11 release/ })).toHaveAttribute('href', 'https://github.com/JRH89/ForgeLoop/releases/tag/desktop-v1.0.11-preview.1');
   expect(screen.getByRole('link', { name: 'Changelog' })).toHaveAttribute('href', '/changelog');
+  expect(screen.getByRole('link', { name: 'Codefront Labs' })).toHaveAttribute('href', 'https://codefrontlabs.com');
+  expect(document.querySelector('.footer-note')).not.toHaveTextContent('Hooker Hill Studios');
   expect(publicPaths).toContain('/changelog');
   expect(metadata('/changelog').title).toContain('changelog');
 });

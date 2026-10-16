@@ -1,10 +1,11 @@
 # Linux server deployment with Cloudflare Tunnel
 
 This guide deploys the current single-host Docker Compose stack at
-`https://forgeloop.hookerhillstudios.com`, with
-`https://forgeloop.codefrontlabs.com` as an additional hostname on the same
-Cloudflare Tunnel. The Hooker Hill Studios hostname remains the configured
-canonical URL. Cloudflare Tunnel is the only public ingress. PostgreSQL, the
+`https://forgeloop.codefrontlabs.com`, the canonical public URL. The legacy
+`https://forgeloop.hookerhillstudios.com` hostname remains on the same tunnel
+for existing runner and authentication connections; public GET/HEAD pages
+redirect to the canonical host after the SEO configuration is deployed.
+Cloudflare Tunnel is the only public ingress. PostgreSQL, the
 control-plane API, and the web UI publish diagnostic ports on loopback only; they
 are not directly reachable from the LAN or Internet.
 
@@ -103,7 +104,7 @@ tunnel's internal service addresses do not change.
 
    ```dotenv
    FORGELOOP_SECURITY_MODE=github
-   FORGELOOP_PUBLIC_BASE_URL=https://forgeloop.hookerhillstudios.com
+   FORGELOOP_PUBLIC_BASE_URL=https://forgeloop.codefrontlabs.com
    CLOUDFLARED_CREDENTIALS_FILE=/etc/forgeloop/secrets/credentials.json
    ```
 
@@ -122,14 +123,13 @@ tunnel's internal service addresses do not change.
    not need.
 
    The GitHub OAuth callback is
-   `https://forgeloop.hookerhillstudios.com/login/oauth2/code/github`. The GitHub
+   `https://forgeloop.codefrontlabs.com/login/oauth2/code/github`. The GitHub
    App setup callback is
-   `https://forgeloop.hookerhillstudios.com/api/github/app/callback`; its webhook
-   URL is `https://forgeloop.hookerhillstudios.com/api/github/webhooks`. These
-   URLs do not change during the server move. Never commit `.env` or print its
+   `https://forgeloop.codefrontlabs.com/api/github/app/callback`; its webhook
+   URL is `https://forgeloop.codefrontlabs.com/api/github/webhooks`. Never commit `.env` or print its
    resolved contents with `docker compose config` when sharing diagnostics.
-   The Codefront Labs hostname is an alternate ingress. Add its OAuth callback
-   URL to the GitHub App configuration before signing in through that hostname.
+   Register the canonical callback before using it. Retain any legacy callback
+   still needed by existing sessions; public-page redirects do not rewrite OAuth or runner endpoints.
 
 4. Install the tunnel credential with restrictive host permissions. Transfer it
    over SSH/SCP or retrieve it from your secret manager; do not put it in the Git
@@ -233,9 +233,9 @@ multi-host deployment.
 From the server:
 
 ```bash
-curl -fsSI https://forgeloop.hookerhillstudios.com/
-curl -sSI https://forgeloop.hookerhillstudios.com/oauth2/authorization/github
-curl -i -X POST https://forgeloop.hookerhillstudios.com/api/github/webhooks \
+curl -fsSI https://forgeloop.codefrontlabs.com/
+curl -sSI https://forgeloop.codefrontlabs.com/oauth2/authorization/github
+curl -i -X POST https://forgeloop.codefrontlabs.com/api/github/webhooks \
   -H 'Content-Type: application/json' -d '{}'
 sudo ss -lnt
 ```
@@ -296,7 +296,7 @@ The GitHub App helper preserves the webhook secret and does not print it:
 
 ```powershell
 node .\scripts\Update-GithubAppWebhook.mjs `
-  https://forgeloop.hookerhillstudios.com/api/github/webhooks
+  https://forgeloop.codefrontlabs.com/api/github/webhooks
 node .\scripts\Update-GithubAppWebhook.mjs --deliveries
 ```
 

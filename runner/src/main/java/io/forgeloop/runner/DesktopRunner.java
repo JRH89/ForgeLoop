@@ -17,7 +17,7 @@ public final class DesktopRunner {
     private final Path directory;
     private final DesktopWorker worker;
     private final JFrame frame=new JFrame("ForgeLoop Runner");
-    private final JTextField endpoint=new JTextField("https://forgeloop.hookerhillstudios.com"),name=new JTextField("My runner"),input=new JTextField(),output=new JTextField();
+    private final JTextField endpoint=new JTextField("https://forgeloop.codefrontlabs.com"),name=new JTextField("My runner"),input=new JTextField(),output=new JTextField();
     private final JComboBox<String> model=new JComboBox<>(new String[]{"claude-sonnet-5"});
     private final DesktopPages steps=new DesktopPages();
     private final JPanel recoveryControls=DesktopLayout.stack(8);

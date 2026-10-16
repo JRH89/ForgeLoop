@@ -15,7 +15,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $root 'runner.jar'))) { throw 'Extra
 $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 icacls.exe $root /inheritance:r /grant:r "*${sid}:(OI)(CI)F" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Could not restrict runner directory permissions.' }
-$endpoint = Read-Host 'ForgeLoop URL (for example https://forgeloop.hookerhillstudios.com)'
+$endpoint = Read-Host 'ForgeLoop URL (for example https://forgeloop.codefrontlabs.com)'
 $uri = [Uri]$endpoint
 if (-not $uri.IsAbsoluteUri -or ($uri.Scheme -ne 'https' -and -not ($uri.Scheme -eq 'http' -and $uri.IsLoopback)) -or $uri.UserInfo) { throw 'Use HTTPS, or HTTP on localhost for development.' }
 $endpoint = $endpoint.TrimEnd('/')

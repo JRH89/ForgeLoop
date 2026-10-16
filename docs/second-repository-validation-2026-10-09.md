@@ -1,6 +1,12 @@
 # Second-repository live validation — 2026-10-09
 
-Status: BLOCKED; the end-to-end test did not pass.
+Status: VALIDATED on October 9. Verified delivery merged as PR #7; the subsequent
+unattended issue #10 / PR #11 test passed without a human approval action. See
+[successful unattended validation](#successful-unattended-validation) for the
+final outcome. The blocked attempts below are retained as the debugging history,
+not the current status.
+
+## Initial attempt — blocked
 
 - Target: `JRH89/project-hub`, issue #6 (trim whitespace in file searches).
 - Run: `440074fe-e140-4c56-a5db-2209b69e4457`.
