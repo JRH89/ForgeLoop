@@ -60,4 +60,4 @@ For updates, pause the runner, wait for current work to finish, close the app,
 and install the new version. Runner identity, settings and provider keys are
 stored outside the installation directory and are preserved during upgrades.
 
-Downloads and setup: https://forgeloop.hookerhillstudios.com/app/runner-downloads
+Downloads and setup: https://forgeloop.codefrontlabs.com/app/runner-downloads

@@ -1,7 +1,8 @@
 import {aboutGuide, featuresGuide, setupGuide, workflowGuide} from './guides';
 import { changelogSections } from './changelog';
 
-export const SITE = 'https://forgeloop.hookerhillstudios.com';
+export const SITE = 'https://forgeloop.codefrontlabs.com';
+export const PUBLISHER = { name: 'Codefront Labs', url: 'https://codefrontlabs.com' } as const;
 export const REPOSITORY = 'https://github.com/JRH89/ForgeLoop';
 export const PUBLISHED = '2026-09-26';
 export type Section = { heading: string; body: string; points?: string[]; links?: {label:string;href:string}[] };

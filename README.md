@@ -2,7 +2,7 @@
 
 **A live software-delivery product—and a case study in making coding agents accountable for verified work.**
 
-[Explore the hosted product](https://forgeloop.hookerhillstudios.com) · [View the source](https://github.com/JRH89/ForgeLoop)
+[Explore the hosted product](https://forgeloop.codefrontlabs.com) · [View the source](https://github.com/JRH89/ForgeLoop)
 
 ForgeLoop takes GitHub issues or feature specifications through planning, bounded agent work, integration, verification, and human review. Its central design principle is simple: an agent saying “done” is not evidence. A run becomes reviewable only when its configured checks and acceptance criteria have supporting results.
 
@@ -18,7 +18,7 @@ Coding agents can produce patches, but reliable software delivery also needs saf
 2. A planner turns the request into a validated dependency graph of bounded tasks.
 3. Runners claim compatible work and execute it in isolated Git worktrees, using locally configured model credentials.
 4. Changes are integrated, then repository-policy checks, acceptance criteria, and an independent review produce evidence.
-5. Failed checks can route into a limited repair cycle. Passing work reaches a human approval boundary before GitHub publication; auto-merge is opt-in and checks the reviewed commit.
+5. Failed checks can route into a limited repair cycle. Passing work follows the configured human-approval policy before GitHub publication; auto-merge is opt-in and checks the verified commit.
 
 Administrators can also manually ask a runner to scan a repository snapshot for evidence-backed issue proposals. Scans are read-only, may incur provider charges, and never create GitHub issues without an explicit review action.
 
@@ -32,7 +32,7 @@ Administrators can also manually ask a runner to scan a repository snapshot for 
 | ForgeLoop runner | Java desktop/CLI process near the repository; uses Git worktrees and Docker for execution, MCP for approved context/tools, and runner-local provider credentials. |
 | External services | GitHub App and OAuth for identity/repository events; configured hosted or local model providers for agent work. |
 
-The control plane coordinates work; the runner handles repository checkout and execution. Repository context goes from the runner to the configured model provider, not through the control-plane database. The service stores workflow records, findings, usage, and evidence metadata. Provider data handling still applies to context sent to a selected model.
+The control plane coordinates work; the runner handles checkout, execution, and model calls. The hosted service stores workflow records, issue text, findings, usage, and verification evidence. Optional detailed run records can also upload prompts, provider responses, and repository context as artifacts. Local execution is not an offline-only or zero-data-transfer promise; provider data handling still applies.
 
 ## Engineering decisions
 
@@ -72,6 +72,9 @@ This is an evolving portfolio product, not a claim that every production launch 
 
 ## Delivery checklist
 
+Checklist reviewed October 15, 2026. Checked items are implemented or have the
+specific evidence stated; they do not imply every production validation is complete.
+
 ### Product and control plane
 
 - [x] GitHub sign-in and self-service account provisioning with organization-scoped membership and roles.
@@ -79,6 +82,7 @@ This is an evolving portfolio product, not a claim that every production launch 
 - [x] Optional per-repository label bypass and Issue Chat label application with explicit paid-work warnings.
 - [x] Optional issue-assignment gate for any assignee or a specified GitHub login; read-only intake diagnostics.
 - [x] Manual repository analysis proposals with bounded/redacted context, runner-local model calls, usage estimates, and administrator-approved issue creation.
+- [x] AI issue chat with editable specifications, explicit issue publication, optional intake-label application, and conversation deletion.
 - [x] Persisted runs, task graphs, gates, acceptance criteria, audit history, approval, cancellation, bounded retries, and queue archive/restore.
 - [x] Organization policies for budgets, concurrency, allowed providers, human approval, and optional verified-check auto-merge.
 - [x] Usage views for model/provider spend estimates, tokens, run costs, pricing coverage, and comparisons.
@@ -92,20 +96,30 @@ This is an evolving portfolio product, not a claim that every production launch 
 - [x] Docker verification with pinned images, time/output limits, and policy-controlled network access.
 - [x] Permissioned MCP context/tool routing with runner-side command controls.
 - [x] Redacted lifecycle logs, provider usage records, checksummed verification evidence, screenshots, and filesystem/S3-compatible artifact storage.
-- [x] Independent review and criterion-level evidence before a run reaches human review.
+- [x] Independent review and criterion-level evidence before delivery, with human approval required only when configured.
 - [x] GitHub check and pull-request publication; guarded auto-merge is opt-in and validates checks and the expected commit.
 
 ### Product experience and engineering quality
 
 - [x] Responsive dashboard and public product pages, user documentation, SEO/social metadata, and structured data.
 - [x] Cross-platform desktop preview packaging and GitHub Release download discovery with SHA-256 verification.
+- [x] Runner 1.0.12 preview published for Windows/macOS x64 and ARM64, plus Linux DEB, RPM, Arch, and portable archives for both architectures; all twelve package digests verified.
+- [x] Navy-and-teal desktop redesign, rounded native icons, HiDPI branding, and local preview/window-control regression coverage.
+- [x] Consolidated Settings, persistent repository expansion/banner preferences, concise download guidance, and OS-specific download selectors.
 - [x] Automated CI for Java modules, frontend checks, MCP checks, Windows setup, and disposable end-to-end workflows.
+- [x] Live public downloads/release-feed smoke check for 1.0.12, separate from installer signing.
+- [x] Linux server Compose deployment with loopback diagnostic ports and server-hosted Cloudflare ingress; physical reboot recovery remains unverified.
 
-### Remaining validation
+### Live validation and remaining launch gates
 
-- [x] Complete a second-repository unattended issue-to-merge run ([October 9 evidence](docs/second-repository-validation-2026-10-09.md)); this does not close the operational production gates below.
+- [x] Complete a live verified delivery and merge test: project-hub issue #6 / PR #7 merged after manual approval ([October 9 evidence](docs/second-repository-validation-2026-10-09.md#completion-and-unattended-follow-up)).
+- [x] Complete a second-repository unattended issue-to-merge test: project-hub issue #10 / PR #11 merged automatically with human approval disabled ([successful validation](docs/second-repository-validation-2026-10-09.md#successful-unattended-validation)). Both delivery tests are complete; operational launch gates remain separate.
 - [ ] Validate a physical workstation/server reboot, tunnel recovery, runner heartbeat, and authenticated access.
 - [ ] Configure encrypted off-host backup retention and complete a restore drill on another host, including evidence objects.
-- [ ] Complete staging burn-in, external alert delivery, and an explicit production go/no-go review.
-- [ ] Sign Windows/macOS installers, notarize macOS packages, and verify published release assets in a public smoke test.
+- [ ] Complete staging burn-in.
+- [ ] Verify external alert delivery.
+- [ ] Record an explicit production go/no-go review after the operational checks above.
+- [ ] Sign Windows/macOS installers and notarize macOS packages; published previews remain unsigned.
+- [ ] Publish the canonical-domain SEO migration and new authorization article, then verify live redirects, sitemap, canonical/social URLs, and images. Implementation and local checks alone do not close this item.
+- [ ] Verify the new domain in Google Search Console and submit its canonical sitemap; search indexing and ranking are not established by build checks.
 - [ ] Enable and verify support email notifications.

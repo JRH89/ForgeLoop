@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { publicPaths, articles, SITE, metadata } from '../.prerender/prerender.js';
 const titles=new Set(),descriptions=new Set(),heroes=new Set();
+assert.equal(SITE,'https://forgeloop.codefrontlabs.com','Canonical origin must remain the approved public domain');
 for(const path of publicPaths){
   const html=await readFile(path==='/'?'dist/index.html':`dist${path}.html`,'utf8');
   const doc=new JSDOM(html).window.document;
@@ -13,6 +14,9 @@ for(const path of publicPaths){
   assert.equal(doc.querySelectorAll('h1').length,1,`${path}: one main heading`);
   assert.equal(doc.querySelector('link[rel="canonical"]').href,SITE+path);
   assert.equal(doc.querySelector('meta[property="og:title"]').content,title);
+  assert.equal(doc.querySelector('meta[property="og:url"]').content,SITE+path);
+  assert.equal(doc.querySelector('meta[name="robots"]').content,'index, follow, max-image-preview:large');
+  assert(!/hooker\s*hill\s*studios/i.test(doc.body.textContent),`${path}: obsolete publisher`);
   assert.equal(doc.querySelector('meta[name="twitter:card"]').content,'summary_large_image');
   const hero=metadata(path).hero;
   assert.equal(doc.querySelector('meta[property="og:image"]').content,SITE+hero.social);
@@ -22,15 +26,23 @@ for(const path of publicPaths){
   assert(!doc.querySelector('.landing-terminal'),`${path}: removed status strip`);
   const schema=JSON.parse(doc.querySelector('script[type="application/ld+json"]').textContent);
   assert.equal(schema['@context'],'https://schema.org');
+  if(metadata(path).article){
+    const posting=schema['@graph'].find(entry=>entry['@type']==='BlogPosting');
+    assert.equal(posting.url,SITE+path);
+    assert.equal(posting.mainEntityOfPage['@id'],SITE+path+'#page');
+  }
   assert(doc.querySelector('main').textContent.length>400,`${path}: real prerendered content`);
   for(const link of doc.querySelectorAll('a[href]')){
     const href=link.getAttribute('href');
+    const linkedHost=new URL(href,SITE).hostname;
+    assert.notEqual(linkedHost,'hookerhillstudios.com',`${path}: obsolete publisher link`);
+    assert.notEqual(linkedHost,'forgeloop.hookerhillstudios.com',`${path}: obsolete public link`);
     if(href.startsWith('/')&&!href.startsWith('/app')&&!href.startsWith('/oauth2')&&!href.startsWith('/support'))assert(publicPaths.includes(href.split('#')[0]),`${path}: broken local link ${href}`);
   }
   assert(doc.querySelector('.public-hero,.landing-hero'),`${path}: missing hero`);
 }
 assert(articles.length>=11,'Expected the original ten articles and a new field note');
-assert(articles.some(article=>article.published==='2026-09-27'),'Today\'s field note is missing');
+assert.equal(new Set(articles.map(article=>article.slug)).size,articles.length,'Article slugs must be unique');
 for(const article of articles){assert(article.body.trim().split(/\s+/).length>=280,`${article.slug}: thin content`);assert(/^\d{4}-\d{2}-\d{2}$/.test(article.published),`${article.slug}: invalid publication date`);}
 assert((await stat('dist/images/delivery-hero.webp')).size<500_000,'Hero exceeds image budget');
 assert((await readFile('dist/app-shell.html','utf8')).includes('noindex, nofollow'));
@@ -38,4 +50,8 @@ assert((await readFile('dist/404.html','utf8')).includes('noindex, nofollow'));
 const sitemap=await readFile('dist/sitemap.xml','utf8');
 assert.equal((sitemap.match(/<loc>/g)||[]).length,publicPaths.length);
 assert(!sitemap.includes('/app'));
+const sitemapDoc=new JSDOM(sitemap,{contentType:'text/xml'}).window.document;
+for(const location of sitemapDoc.querySelectorAll('loc'))assert.equal(new URL(location.textContent).origin,SITE,'Sitemap origin must be canonical');
+const robots=await readFile('dist/robots.txt','utf8');
+assert(robots.includes(`Sitemap: ${SITE}/sitemap.xml`));
 console.log(`SEO checks passed: ${publicPaths.length} pages; ${articles.length} substantive articles; metadata, schema, links, and image budgets.`);

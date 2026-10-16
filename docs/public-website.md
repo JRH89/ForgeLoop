@@ -26,14 +26,27 @@ browser checks verify that closing gap as well.
 - Existing landing-page headlines, paragraphs, capability descriptions, and CTAs
   are retained. Additional explanatory sections and FAQs follow the original copy.
 - `/about`, `/features`, `/how-it-works`, `/security`, `/docs`, `/contact`, `/blog`.
-- Eleven original engineering articles live in `frontend/src/public/articles.ts`.
+- Twelve engineering articles live in `frontend/src/public/articles.ts`.
   Publication dates reflect the actual publication date, not invented history.
   No fabricated customer stories, traffic claims, benchmarks, reviews, or ratings.
   The September 27 field note targets the specific question of recovering a
   self-hosted AI coding runner after a restart; it cites Docker and GitHub
   documentation and distinguishes tested reconnect behavior from deferred reboot proof.
+  The October 15 article covers GitHub App versus fine-grained PAT authorization
+  for AI coding agents, with official GitHub sources and a rollout checklist.
+
+The canonical public origin is `https://forgeloop.codefrontlabs.com`, centralized
+in `content.ts` for canonical tags, social URLs, JSON-LD, robots, and sitemap.
+Legacy-host public GET/HEAD pages redirect permanently on deployment; runner,
+API, OAuth, and pairing endpoints remain compatible. Regression checks reject
+the old origin in generated public HTML. See [the October 15 SEO audit](seo-audit-2026-10-15.md)
+for findings, deployment boundaries, and Search Console follow-up.
+
 - Shared header/footer links cover desktop and mobile. Every public page and the
   404 page has a decorative image-backed hero. Informational text remains HTML.
+- Public navbar branding uses a 50px mark and 28px wordmark (44px/25px on mobile).
+  Above 760px, footer navigation groups are centered within their grid columns,
+  with left-aligned headings/links. Console and mobile-footer styling is unchanged.
 - Each page and article now has unique artwork, responsive derivatives, and a
   matching social preview. See [hero prompts and asset map](public-hero-prompts.md).
 - All hero templates (including 404) apply a dark navy overlay below 1440px,
