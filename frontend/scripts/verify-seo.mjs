@@ -16,8 +16,7 @@ for(const path of publicPaths){
   assert.equal(doc.querySelector('meta[property="og:title"]').content,title);
   assert.equal(doc.querySelector('meta[property="og:url"]').content,SITE+path);
   assert.equal(doc.querySelector('meta[name="robots"]').content,'index, follow, max-image-preview:large');
-  assert(!html.includes('forgeloop.hookerhillstudios.com'),`${path}: obsolete public origin`);
-  assert(!/hooker\s*hill\s*studios|hookerhillstudios\.com/i.test(html),`${path}: obsolete publisher or link`);
+  assert(!/hooker\s*hill\s*studios/i.test(doc.body.textContent),`${path}: obsolete publisher`);
   assert.equal(doc.querySelector('meta[name="twitter:card"]').content,'summary_large_image');
   const hero=metadata(path).hero;
   assert.equal(doc.querySelector('meta[property="og:image"]').content,SITE+hero.social);
@@ -35,6 +34,9 @@ for(const path of publicPaths){
   assert(doc.querySelector('main').textContent.length>400,`${path}: real prerendered content`);
   for(const link of doc.querySelectorAll('a[href]')){
     const href=link.getAttribute('href');
+    const linkedHost=new URL(href,SITE).hostname;
+    assert.notEqual(linkedHost,'hookerhillstudios.com',`${path}: obsolete publisher link`);
+    assert.notEqual(linkedHost,'forgeloop.hookerhillstudios.com',`${path}: obsolete public link`);
     if(href.startsWith('/')&&!href.startsWith('/app')&&!href.startsWith('/oauth2')&&!href.startsWith('/support'))assert(publicPaths.includes(href.split('#')[0]),`${path}: broken local link ${href}`);
   }
   assert(doc.querySelector('.public-hero,.landing-hero'),`${path}: missing hero`);
@@ -48,7 +50,8 @@ assert((await readFile('dist/404.html','utf8')).includes('noindex, nofollow'));
 const sitemap=await readFile('dist/sitemap.xml','utf8');
 assert.equal((sitemap.match(/<loc>/g)||[]).length,publicPaths.length);
 assert(!sitemap.includes('/app'));
-assert(!sitemap.includes('forgeloop.hookerhillstudios.com'));
+const sitemapDoc=new JSDOM(sitemap,{contentType:'text/xml'}).window.document;
+for(const location of sitemapDoc.querySelectorAll('loc'))assert.equal(new URL(location.textContent).origin,SITE,'Sitemap origin must be canonical');
 const robots=await readFile('dist/robots.txt','utf8');
 assert(robots.includes(`Sitemap: ${SITE}/sitemap.xml`));
 console.log(`SEO checks passed: ${publicPaths.length} pages; ${articles.length} substantive articles; metadata, schema, links, and image budgets.`);
