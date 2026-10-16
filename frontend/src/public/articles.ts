@@ -3,6 +3,68 @@ import { PUBLISHED } from './content';
 export type Article = { slug: string; title: string; description: string; category: string; published: string; body: string };
 // Publication dates describe actual publication, never a manufactured project history.
 export const articles: Article[] = [
+  {slug:'github-app-vs-pat-ai-coding-agents',title:'GitHub App vs PAT for AI coding agents',description:'Choose a GitHub App or personal access token for an AI coding runner. Compare repository scope, token lifetime, permissions, and a safe rollout checklist.',category:'GitHub authorization',published:'2026-10-15',body:`
+For an AI coding agent that runs unattended across selected repositories, a **GitHub App is usually the better starting point**. For a short-lived personal experiment, a narrowly scoped personal access token (PAT) can be simpler. The decision is about who owns access, what the credential can do, and what happens when it expires—not which token is easiest to paste into a settings field.
+
+This guide compares GitHub authorization for self-hosted coding runners. It does not compare model API keys: those authorize requests to a model provider, not access to your GitHub repositories.
+
+## GitHub App vs personal access token: the short version
+
+| Decision | GitHub App installation | Fine-grained PAT |
+| --- | --- | --- |
+| Good starting use | A maintained integration serving repositories or teams | A personal script or bounded experiment |
+| Access owner | An app installation | The GitHub user who created the token |
+| Repository boundary | Repositories selected for the installation; tokens can be narrowed further | Selected repositories within the token's resource owner |
+| Credential lifecycle | Generate short-lived installation tokens | Choose an expiry and plan replacement |
+| Operational trade-off | More integration setup; explicit installation management | Less initial setup; user access and token rotation remain dependencies |
+
+GitHub [recommends Apps for long-lived integrations](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/deciding-when-to-build-a-github-app). That does not mean every personal prototype needs an App. It means a token borrowed from a maintainer's account should not quietly become the permanent identity of a shared delivery service.
+
+## Start with repository scope, not a token field
+
+Write down the repositories the runner needs before granting access. Begin with one disposable or low-risk repository, not every repository in an organization. A successful clone is not enough: test that a repository outside the approved set is denied.
+
+Fine-grained PATs can also restrict repository access and permissions; they are not the same as classic PATs. Check GitHub's [current PAT limitations and organization policies](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) against the endpoints you need. Do not work around a denied action by defaulting to a broader classic token.
+
+For a hosted integration, distinguish browser sign-in from repository authorization. Logging in tells the service who the operator is. Installing an App determines which repositories the integration may access. Neither operation should implicitly authorize every issue to start paid agent work.
+
+## Plan for short-lived GitHub installation tokens
+
+An installation access token expires after one hour. GitHub allows the issuer to narrow its repository and permission scope within the installation's existing grant. See the [installation-token generation rules](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app).
+
+In a runner architecture, keep the App private key in the trusted integration service rather than copying it to every worker. A worker should receive only the credential needed for an authorized operation. Keep tokens out of model prompts, repository files, Git remote URLs saved on disk, and diagnostic exports.
+
+Test expiry as a normal operating condition. If checkout fails after an interruption, obtain a fresh authorized grant; do not retry the same expired credential indefinitely. Keep task ownership and retry limits separate from credential renewal so an authentication error cannot create duplicate work.
+
+## Ask for permissions per operation
+
+Use GitHub's [permission-selection guidance](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app) and the documentation for each API endpoint. A useful review starts with this capability inventory:
+
+- **Read source:** checkout the authorized repository.
+- **Publish a branch:** push only the candidate changes that the workflow permits.
+- **Manage issues:** read a specification or explicitly publish a reviewed issue.
+- **Manage pull requests:** open a PR and report its state.
+- **Publish checks:** attach verification results to the exact tested commit.
+
+Do not infer that one permission covers the entire delivery lifecycle. Likewise, granting a capability does not mean enabling it automatically. Keep human approval, issue intake, branch protection, and merge policy as separate decisions. If you later add a permission, test the installation approval path before assuming existing customers have granted it.
+
+## A first-run checklist for an AI coding runner
+
+1. Select one repository with working tests and a reversible task.
+2. Record the credential owner, repository scope, permissions, expiry, and revocation procedure. Never record the secret itself.
+3. Prove that authorized checkout works and unauthorized repository access fails.
+4. Exercise branch publication and PR creation separately from automatic merge.
+5. Simulate expiry or revocation without making a model request. Confirm the runner stops or requests a fresh grant rather than widening access.
+6. Run a small end-to-end task with an explicit budget. Review the candidate diff and test evidence before expanding access.
+
+These are acceptance checks, not a security certification. GitHub authorization limits repository access; it does not sandbox the runner host or prevent source context from reaching the configured model provider. Read [what stays local on a self-hosted AI runner](/blog/self-hosted-ai-runners) before choosing a machine for private code.
+
+## How this maps to ForgeLoop
+
+ForgeLoop uses a GitHub App installation to authorize selected repositories. An enrolled runner requests repository credentials through an active-task grant rather than asking you to paste a personal GitHub token into the desktop app. The task check controls grant issuance; the installation token still carries its granted GitHub scope. Your model-provider key remains a separate runner-local credential. The hosted control plane handles coordination and stores run metadata and evidence; local execution is not an offline-only or zero-data-transfer promise.
+
+If this matches your workflow, follow the [ForgeLoop setup guide](/docs), authorize one repository, and try a small issue before enabling unattended delivery. For the next boundary after authorization, read [reliable GitHub webhook intake](/blog/github-webhooks-reliable-intake) and [guarded auto-merge for AI pull requests](/blog/safe-auto-merge-ai-pull-requests).
+`},
   {slug:'self-hosted-ai-runner-restart-recovery',title:'Recover a Self-Hosted AI Coding Runner',description:'Use a practical restart recovery checklist for self-hosted AI coding runners: verify durable state, credentials, heartbeats, leases, and safe task resumption.',category:'Runner operations',published:'2026-09-27',body:`
 A self-hosted AI coding runner can disappear halfway through a task because a laptop sleeps, Docker restarts, or a host reboots. The dangerous assumption is that “the container is running again” means the work is safe to resume. Restart recovery has two separate questions: can the machine reconnect, and does the delivery system still know who owns the task?
 

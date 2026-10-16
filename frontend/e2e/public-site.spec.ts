@@ -11,6 +11,9 @@ test('public pages serve content and social metadata without JavaScript',async({
     expect(response?.status(),path).toBe(200);
     await expect(page.locator('h1')).toHaveCount(1);
     await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Hooker Hill Studios');
+    await expect(page.locator('a[href*="hookerhillstudios.com"]')).toHaveCount(0);
+    if(path.startsWith('/blog/'))await expect(page.locator('.article-byline a')).toHaveAttribute('href','https://codefrontlabs.com');
     await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content',/social-preview\.jpg$/);
     expect((await page.locator('main').innerText()).length).toBeGreaterThan(400);
   }
@@ -135,7 +138,8 @@ test('about page omits the studio credit and footer has no studio link',async({p
   await page.goto('/about');
   await expect(page.getByRole('heading',{name:'Built by Hooker Hill Studios',exact:true})).toHaveCount(0);
   await expect(page.locator('.footer-note a[href="https://hookerhillstudios.com"]')).toHaveCount(0);
-  await expect(page.locator('.footer-note')).toContainText('© 2026 Hooker Hill Studios.');
+  await expect(page.locator('.footer-note')).toContainText('© 2026 Codefront Labs.');
+  await expect(page.locator('.footer-note').getByRole('link',{name:'Codefront Labs',exact:true})).toHaveAttribute('href','https://codefrontlabs.com');
 });
 
 test('article cards open from their read action and every page has distinct artwork',async({page,request})=>{

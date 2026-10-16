@@ -1,6 +1,7 @@
 # Deferred launch checks
 
-Agreed on 2026-09-26; updated with October 9 validation evidence. Unchecked items
+Agreed on 2026-09-26; reviewed October 15 against the October 9 merge and
+second-repository validation evidence. Both delivery checks are complete. Unchecked items
 remain open; deferral is not a passing result.
 
 - [ ] **Off-host backup and restore — deferred.** Select encrypted, access-controlled
