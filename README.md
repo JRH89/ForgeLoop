@@ -120,6 +120,6 @@ specific evidence stated; they do not imply every production validation is compl
 - [ ] Verify external alert delivery.
 - [ ] Record an explicit production go/no-go review after the operational checks above.
 - [ ] Sign Windows/macOS installers and notarize macOS packages; published previews remain unsigned.
-- [ ] Publish the canonical-domain SEO migration and new authorization article, then verify live redirects, sitemap, canonical/social URLs, and images. Implementation and local checks alone do not close this item.
+- [x] Publish the canonical-domain SEO migration and new authorization article: October 15 live audit checked all 21 public pages with zero findings; old-host article redirects preserve path/query, and the new social image returns HTTP 200 ([audit evidence](docs/seo-audit-2026-10-15.md#deployment-verification)).
 - [ ] Verify the new domain in Google Search Console and submit its canonical sitemap; search indexing and ranking are not established by build checks.
 - [ ] Enable and verify support email notifications.
