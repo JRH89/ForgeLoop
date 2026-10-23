@@ -16,6 +16,8 @@ RPM for Fedora/RHEL/openSUSE, portable `.tar.gz` archives, and native Arch
 - **Execution evidence:** Loop policy is preserved with task context and execution
   pins. Local journals remain private; remote run-record upload still requires
   the repository's separate opt-in.
+- **Security:** Updated the runner’s Jackson dependency to 2.21.7 to address
+  the high-severity findings detected by the release security scan.
 - **Maintenance:** Provider diagnostics and standalone verification commands are
   separated from runner orchestration while preserving the existing CLI commands.
 

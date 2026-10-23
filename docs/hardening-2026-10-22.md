@@ -56,3 +56,13 @@ Local execution results:
 
 Live provider and Docker-backed loop execution, release image scans, physical
 reboot, and external delivery are not established by these offline checks.
+
+## Release scan follow-up
+
+The first hosted HIGH/CRITICAL scan exposed pre-existing Jackson findings and
+root Nginx master processes in both web Dockerfiles. The first 1.0.13 packaging
+run was cancelled before publication. Runner Jackson was updated to 2.21.7; the
+Spring Boot modules pin the Jackson 2 and 3 BOMs to 2.21.7 and 3.1.7. Both web
+images retain their HTTP port and use the nginx account, an owner-writable cache,
+and a PID file under `/tmp`. Local Java verification and hosted security and
+release checks are rerun against these corrections before publishing.
