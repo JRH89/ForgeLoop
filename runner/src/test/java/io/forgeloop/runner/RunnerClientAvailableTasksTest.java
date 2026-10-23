@@ -3,6 +3,7 @@ package io.forgeloop.runner;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -35,7 +36,11 @@ class RunnerClientAvailableTasksTest {
 
             assertTrue(query.get().contains("redPrerequisite{testTaskId targetSha evidenceDigest}"));
             assertTrue(query.get().contains("runRecord"));
-            assertTrue(query.get().contains("agentLoop{enforcement{protectedPaths allowWorkflowChanges finishGate}}"));
+            assertTrue(query.get().contains("budget{maxToolCalls maxTokens maxWallSeconds maxConversationBytes}"));
+            assertTrue(query.get().contains("enforcement{protectedPaths allowWorkflowChanges finishGate}"));
+            assertEquals(20, tasks.getFirst().agentLoop().budget().maxToolCalls());
+            assertEquals(1_000_000, tasks.getFirst().agentLoop().budgetMicros());
+            assertNull(tasks.get(1).agentLoop());
             assertEquals(new RunnerRedPrerequisite("test-writer", "a".repeat(40), "c".repeat(64)),
                     tasks.getFirst().redPrerequisite());
             assertEquals(new RunnerLoopEnforcement(List.of("src/generated/**"), true, "verify"),
@@ -55,6 +60,20 @@ class RunnerClientAvailableTasksTest {
         }
     }
 
+    @Test void rejectsMalformedNonNullLoopBudgetsRatherThanFallingBackToSingleCall() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/graphql", exchange -> {
+            byte[] response = response().replace("\"maxToolCalls\":20", "\"maxToolCalls\":\"20\"").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, response.length);
+            try (var output = exchange.getResponseBody()) { output.write(response); }
+        });
+        server.start();
+        try {
+            RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create("http://127.0.0.1:" + server.getAddress().getPort()));
+            assertThrows(IllegalArgumentException.class, () -> client.availableTasks(new RunnerIdentity("runner", "credential")));
+        } finally { server.stop(0); }
+    }
+
     private static String response() {
         return "{\"data\":{\"availableRunnerTasks\":["
                 + task("implementation", "{\"testTaskId\":\"test-writer\",\"targetSha\":\"" + "a".repeat(40)
@@ -66,10 +85,11 @@ class RunnerClientAvailableTasksTest {
     }
 
     private static String task(String id, String prerequisite, String agentLoop) {
+        if (!"null".equals(agentLoop)) agentLoop = "{\"budget\":{\"maxToolCalls\":20,\"maxTokens\":100000,\"maxWallSeconds\":600,\"maxConversationBytes\":65536},\"gates\":[]," + agentLoop.substring(1);
         return "{\"id\":\"" + id + "\",\"role\":\"IMPLEMENTATION\",\"title\":\"Implement\","
                 + "\"repository\":\"org/repo\",\"baseBranch\":\"main\",\"executionBaseRef\":\"main\","
                 + "\"sourceRef\":\"issue-1\",\"specification\":\"spec\",\"requiredCapability\":\"provider\","
-                + "\"budgetUsd\":1,\"ownedPaths\":[\"src\"],\"dependencyChangeShas\":[],"
+                + "\"budgetUsd\":1,\"budgetMicros\":1000000,\"spentCostMicros\":0,\"ownedPaths\":[\"src\"],\"dependencyChangeShas\":[],"
                 + "\"acceptanceCriteria\":[],\"mcpConfigurations\":[],\"runRecord\":" + ("implementation".equals(id) ? "true" : "false") + ",\"writeBoundary\":\"NO_TESTS\","
                 + "\"testPathGlobs\":[\"**/*Test.java\"],\"expectedTests\":[],\"expectedTestsOverflow\":false,"
                 + "\"redPrerequisite\":" + prerequisite + ",\"agentLoop\":" + agentLoop + "}";

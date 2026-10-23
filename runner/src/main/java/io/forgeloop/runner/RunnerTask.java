@@ -12,7 +12,23 @@ public record RunnerTask(String id, String role, String title, String repository
                          String writeBoundary, List<String> testPathGlobs, String testReportFormat,
                          List<String> expectedTests, boolean expectedTestsOverflow, String testFirstEvidence,
                          RunnerRedPrerequisite redPrerequisite, RunnerLoopEnforcement loopEnforcement,
-                         boolean runRecord) {
+                         boolean runRecord, RunnerLoopConfiguration agentLoop) {
+    /** Old task producers remain on the single-call path unless a complete loop policy is supplied. */
+    public RunnerTask(String id, String role, String title, String repository, String baseBranch,
+                      String sourceRef, String specification, String requiredCapability, double budgetUsd,
+                      List<String> ownedPaths, List<String> dependencyChangeShas, String verificationGateName,
+                      String verificationKind, String verificationImageDigest, List<String> verificationCommand,
+                      String verificationNetworkPolicy, Integer verificationTimeoutSeconds, String verificationBaseRef,
+                      String executionBaseRef, List<String> acceptanceCriteria, List<LocalMcpConfiguration> mcpConfigurations,
+                      String writeBoundary, List<String> testPathGlobs, String testReportFormat, List<String> expectedTests,
+                      boolean expectedTestsOverflow, String testFirstEvidence, RunnerRedPrerequisite redPrerequisite,
+                      RunnerLoopEnforcement loopEnforcement, boolean runRecord) {
+        this(id, role, title, repository, baseBranch, sourceRef, specification, requiredCapability, budgetUsd,
+                ownedPaths, dependencyChangeShas, verificationGateName, verificationKind, verificationImageDigest,
+                verificationCommand, verificationNetworkPolicy, verificationTimeoutSeconds, verificationBaseRef,
+                executionBaseRef, acceptanceCriteria, mcpConfigurations, writeBoundary, testPathGlobs, testReportFormat,
+                expectedTests, expectedTestsOverflow, testFirstEvidence, redPrerequisite, loopEnforcement, runRecord, null);
+    }
     public RunnerTask {
         if (id == null || id.isBlank() || repository == null || !repository.matches("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
                 || baseBranch == null || baseBranch.isBlank() || executionBaseRef == null || executionBaseRef.isBlank()

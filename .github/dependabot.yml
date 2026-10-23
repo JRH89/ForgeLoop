@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directories: ['/frontend', '/mcp-server']
+    schedule:
+      interval: weekly
+  - package-ecosystem: maven
+    directories: ['/control-plane', '/runner', '/harness']
+    schedule:
+      interval: weekly

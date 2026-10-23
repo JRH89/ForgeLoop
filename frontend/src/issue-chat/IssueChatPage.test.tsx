@@ -47,7 +47,7 @@ it('lets an administrator refine a runner draft before explicitly creating an un
     if (request.query.includes('startIssueConversation')) return { ok: true, json: async () => ({ data: { startIssueConversation: { ...base, status: 'PENDING' } } }) };
     if (request.query.includes('issueConversation(')) return { ok: true, json: async () => ({ data: { issueConversation: ready } }) };
     if (request.query.includes('createIssueFromConversation')) return { ok: true, json: async () => ({ data: { createIssueFromConversation: created } }) };
-    if (request.query.includes('featureRuns')) return { ok: true, json: async () => ({ data: { featureRuns: [delivery] } }) };
+    if (request.query.includes('featureRunForSource')) return { ok: true, json: async () => ({ data: { featureRunForSource: delivery } }) };
     if (request.query.includes('featureRunEvidence')) return { ok: true, json: async () => ({ data: { featureRunEvidence: [], featureRunReviewEvidence: [], featureRunArtifacts: [], featureRunEvents: [], featureRunEscalations: [], featureRunAuditEvents: [], featureRunPublication: publication } }) };
     return { ok: true, json: async () => ({ data: {} }) };
   });

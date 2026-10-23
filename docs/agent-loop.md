@@ -1,7 +1,10 @@
 # Runner agent loop: implementation status
 
-The agent-loop core is being built in small, issue-linked slices. Slice 3b adds the runner-local loop, guarded tools, budgets, result shaping, and a durable step journal. **This code is not enabled in production yet.** Dispatch still follows the existing single-call path: the control-plane policy and lease lifecycle are slice 3c, and the runner wiring behind the default-off switch is slice 3d.
+The guarded agent loop is wired into writing-task dispatch behind the runner-local `FORGELOOP_AGENT_LOOP_ENABLED=true` switch. It is **off by default**. A task must also carry the repository's snapshotted `agentLoop` policy, and its reviewed provider policy file must enable tool calling. Planning, integration, review, and official verification keep their existing workers. Non-null malformed loop budgets or gates are rejected rather than downgraded to single-call execution.
 
+The adapter validates the lease before execution, renews every 30 seconds, reports each provider turn, and reserves known spend through the control plane. A renewal failure stops further tools and provider turns. It revalidates the lease before returning a finished commit for delivery; lost leases never publish a commit or close a stale lease. Budget, refusal, and enforcement stops use the existing held-task/escalation lifecycle. Provider and harness failures use categorized bounded repair. `run_gate` uses the existing restricted Docker executor as an advisory check and cannot submit official verification evidence.
+
+To opt in on a controlled runner, configure the repository loop budget as described in [the control-plane contract](agent-loop-control-plane.md), then set the runner process environment variable above. Restarting without the variable restores single-call dispatch for future attempts. This changes source execution behavior; offline tests do not establish live provider or deployed Docker behavior.
 No live provider call is made by the tests. Running the loop against a hosted provider will use the selected provider credential and may incur provider charges.
 
 ## Loop contract
@@ -23,12 +26,12 @@ Available tools are:
 - `search_files`: safe-bounded Java regex over up to 20,000 files, at most 100 matches; binary files are skipped and long lines are searched only at their beginning.
 - `write_file`: atomic whole-file writes, at most 500,000 characters, under owned paths only.
 - `edit_file`: exact text replacement in an existing owned text file; ambiguous matches require explicit `replaceAll`.
-- `run_gate`: an advisory run of a task-declared gate through an injected executor. It does not submit verification evidence or change official gate state. Production Docker wiring is part of slice 3d.
+- `run_gate`: an advisory run of a task-declared gate through an injected executor. It does not submit verification evidence or change official gate state. Dispatch wires the restricted Docker executor.
 - `finish`: validates the final worktree and commits the result.
 
 There is no shell, delete, rename, dependency-install, or unrestricted process tool. Read-only roles receive only the three read tools; integration, planning, and review capabilities do not gain write tools. `run_gate` is only granted to writing roles when gates exist.
 
-The agent-loop gateway uses the descriptor-derived enforcement chain implemented in Version 2 slices 4a–4c. The loop remains dormant until its separate, default-off runner wiring is shipped; see [Agent-loop enforcement](agent-loop-enforcement.md) for rules and current delivery boundaries.
+The agent-loop gateway uses the descriptor-derived enforcement chain implemented in Version 2 slices 4a–4c. The runner switch remains default-off; see [Agent-loop enforcement](agent-loop-enforcement.md) for rules and current delivery boundaries.
 
 ## Budgets and stopping
 
@@ -45,7 +48,7 @@ The loop stops before another provider turn when its token, money, wall-time, or
 
 Tool results entering conversation are capped at 16 KiB each. Long file/search results are cut at line boundaries with a continuation hint. Gate results retain the beginning and end plus the digest; the complete result remains local in the journal. The conversation itself is never compacted.
 
-Unknown model pricing is not guessed. Money stops are enforced only when the task has a positive spend budget and the selected provider/model has configured rates. A provider turn can exceed an estimate before usage is known; the control plane's per-turn accounting remains authoritative once slice 3d wires reporting.
+Unknown model pricing is not guessed. Money stops are enforced only when the task has a positive spend budget and the selected provider/model has configured rates. A provider turn can exceed an estimate before usage is known; the control plane's per-turn accounting and shared reservation remain authoritative.
 
 ## Local journal and sensitive data
 
@@ -57,7 +60,7 @@ The write-ahead JSONL journal is stored at:
 
 It includes repository/task identity, provider/model and adapter/serializer version, the instructions and tool schemas, the initial task message, request hashes, full provider responses/replay data, tool arguments and results, the exact model-visible tool results, and file post-images. That material can contain proprietary source and should be treated as sensitive. On POSIX filesystems the journal directory is owner-only and files are owner-readable/writable. Windows uses the signed-in account's host ACL policy.
 
-Each record is appended with a monotonically increasing sequence, timestamp, lease ID, and SHA-256 link to the previous complete line; writes are forced before return. A torn final fragment is ignored and removed when reopened. The chain has no external signature or remote anchor in this slice, so it is not a third-party proof against an attacker who can rewrite the whole journal. The journal is never uploaded by this slice. Automated retention cleanup and recovery/resume are not implemented yet; resume is deferred to slice 3e.
+Each record is appended with a monotonically increasing sequence, timestamp, lease ID, and SHA-256 link to the previous complete line; writes are forced before return. A torn final fragment is ignored and removed when reopened. The chain has no external signature or remote anchor in this slice, so it is not a third-party proof against an attacker who can rewrite the whole journal. The adapter always keeps a local journal. Remote run-record upload remains separately controlled by the run’s snapshotted `runRecord` opt-in and uses the existing redacted segment upload boundary. Automated retention cleanup and recovery/resume are not implemented yet; resume is deferred to slice 3e.
 
 Do not share or attach the journal without reviewing it for source code, prompts, tool arguments, provider output, and secrets first.
 
@@ -69,4 +72,4 @@ The local contract and security tests run with:
 mvn -B verify
 ```
 
-from `runner/`. They use scripted providers and temporary Git repositories; they do not validate a live provider account, a production control plane, lease renewal, or Docker gate execution. See [Version 2 implementation progress](version-2-implementation-progress.md) for the current issue/PR boundary and evidence.
+from `runner/`. They use scripted providers and temporary Git repositories; they do not validate a live provider account, a production control plane, or Docker gate execution. Dispatch and lifecycle HTTP tests exercise lease renewal, cancellation, malformed acknowledgements, and per-turn reporting offline. See [Version 2 implementation progress](version-2-implementation-progress.md) for the current issue/PR boundary and evidence.

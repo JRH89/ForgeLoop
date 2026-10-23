@@ -1,6 +1,6 @@
 import ConsolePageHeader from '../ConsolePageHeader';
 import { useEffect, useState } from 'react';
-import { loadProviderActivities, loadRunAnalytics, loadRuns, type FeatureRun, type ProviderActivity, type RunAnalytics } from '../api';
+import { loadProviderActivities, loadRunAnalytics, loadRunHistory, type FeatureRun, type ProviderActivity, type RunAnalytics } from '../api';
 import { usageSummary, usd, type UsageBucket } from './usage';
 import './usage.css';
 
@@ -19,7 +19,7 @@ export default function UsagePage({ initialAnalytics, onSettings }: { initialAna
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const [nextRuns, nextAnalytics, nextActivities] = await Promise.all([loadRuns(), loadRunAnalytics(), loadProviderActivities(days, repository)]);
+        const [nextRuns, nextAnalytics, nextActivities] = await Promise.all([loadRunHistory(), loadRunAnalytics(), loadProviderActivities(days, repository)]);
         if (!disposed) { setRuns(nextRuns); setAnalytics(nextAnalytics); setActivities(nextActivities); setUpdated(Date.now()); setError(''); }
       } catch { if (!disposed) setError('Usage refresh failed. Any displayed data is from the last successful check.'); }
       finally { if (!disposed) timer = setTimeout(() => void poll(), 10_000); }

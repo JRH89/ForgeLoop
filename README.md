@@ -123,3 +123,15 @@ specific evidence stated; they do not imply every production validation is compl
 - [x] Publish the canonical-domain SEO migration and new authorization article: October 15 live audit checked all 21 public pages with zero findings; old-host article redirects preserve path/query, and the new social image returns HTTP 200 ([audit evidence](docs/seo-audit-2026-10-15.md#deployment-verification)).
 - [ ] Verify the new domain in Google Search Console and submit its canonical sitemap; search indexing and ranking are not established by build checks.
 - [ ] Enable and verify support email notifications.
+
+### October 22 repository hardening
+
+Run history now uses tenant-scoped database pagination, with direct issue-source
+lookups and complete paginated usage reporting. The guarded multi-turn writing
+worker is connected behind a default-off runner switch and repository policy
+opt-in. Lease renewal, spend reservations, cancellation, and verification
+boundaries are described in [agent-loop activation](docs/agent-loop.md).
+Security updates, immutable CI action pins, code separation, bounded load
+scenarios, and local validation are recorded in the
+[hardening report](docs/hardening-2026-10-22.md). Operational launch gates remain
+separate and unchanged.

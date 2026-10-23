@@ -163,6 +163,16 @@ Execution log for the seven reviewed designs in `docs/Version_2/`. Each implemen
 - **Verification:** control-plane `mvn -q verify` passed (345 tests, 0 failures/errors); runner `mvn -q -Dforgeloop.revision=deadbeef0 verify` passed (308 tests, 0 failures/errors, 9 skipped: 5 platform-dependent and 4 live-fixture agreement checks); harness `mvn -q verify` passed (2 tests, 0 failures/errors). `git diff --check` passed. No paid provider call, live fixture capture, or deployment change.
 - **Delivery:** merged as [PR #100](https://github.com/JRH89/ForgeLoop/pull/100) on 2026-09-29; issue #91 is closed. Hosted checks passed, including end-to-end, all four desktop package targets, CodeQL, and supply-chain checks.
 
+## October 22 hardening — default-off loop dispatch
+
+The local hardening implementation connects the existing loop and enforcement
+components to writing-task dispatch behind a runner-local default-off switch.
+It validates and renews the active lease, reserves known per-turn spend, reports
+usage, maps stops to server lifecycle operations, and revalidates before commit
+delivery. No live provider or deployment enablement is claimed. See
+[hardening details and validation](hardening-2026-10-22.md) and
+[activation contract](agent-loop.md).
+
 ## Update protocol
 
-For each slice, record its linked issue/PR, meaningful commits, behavior, exact verification outcomes, and remaining external or paid validation. Mark complete only after all slice-local work is complete. Keep hosted CI and provider-backed evidence distinct. The product agent loop must stay dormant until the plan explicitly enables it.
+For each slice, record its linked issue/PR, meaningful commits, behavior, exact verification outcomes, and remaining external or paid validation. Mark complete only after all slice-local work is complete. Keep hosted CI and provider-backed evidence distinct. The product agent loop must remain default-off; activation requires both the documented runner switch and a snapshotted repository policy.

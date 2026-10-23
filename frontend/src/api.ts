@@ -90,7 +90,30 @@ async function request<T>(query: string, variables: Record<string, unknown> = {}
   return body.data;
 }
 
-export function loadRuns(): Promise<FeatureRun[]> { return request<{ featureRuns?: FeatureRun[] }>(`query { featureRuns { ${runFields} } }`).then(data => data.featureRuns ?? []); }
+export const RUN_PAGE_SIZE = 50;
+/** Fetch only one stable tenant-scoped page; archive selection is evaluated by the server. */
+export function loadRuns(page = 0, archived?: boolean): Promise<FeatureRun[]> {
+  return request<{ featureRuns?: FeatureRun[] }>(
+    `query($page:Int!,$size:Int!,$archived:Boolean) { featureRuns(page:$page,size:$size,archived:$archived) { ${runFields} } }`,
+    { page, size: RUN_PAGE_SIZE, archived: archived ?? null },
+  ).then(data => data.featureRuns ?? []);
+}
+/** Usage reports must include every page rather than silently reporting only recent runs. */
+export async function loadRunHistory(): Promise<FeatureRun[]> {
+  const history = new Map<string, FeatureRun>();
+  for (let page = 0; page < 1_000; page++) {
+    const runs = await loadRuns(page);
+    for (const run of runs) history.set(run.id, run);
+    if (runs.length < RUN_PAGE_SIZE) return [...history.values()];
+  }
+  throw new Error('Usage history is too large to load safely.');
+}
+export function loadRunForSource(repository: string, sourceRef: string): Promise<FeatureRun | null> {
+  return request<{ featureRunForSource: FeatureRun | null }>(
+    `query($repository:String!,$sourceRef:String!) { featureRunForSource(repository:$repository,sourceRef:$sourceRef) { ${runFields} } }`,
+    { repository, sourceRef },
+  ).then(data => data.featureRunForSource);
+}
 export function loadProviderActivities(days:number,repository:string):Promise<ProviderActivity[]>{return request<{providerActivities?:ProviderActivity[]}>('query($days:Int!,$repository:String){providerActivities(days:$days,repository:$repository){id repository activityType provider model inputTokens outputTokens estimatedCostMicros costKnown recordedAt}}',{days,repository:repository||null}).then(data=>data.providerActivities??[]);}
 export function loadRunAnalytics():Promise<RunAnalytics>{return request<{runAnalytics:RunAnalytics}>('query { runAnalytics { totalRuns activeRuns deliveredRuns providerRequests inputTokens outputTokens knownCostMicros costCoverage modelComparisons { dimension name runCount requestCount successfulRequests inputTokens outputTokens knownCostMicros } harnessComparisons { dimension name runCount requestCount successfulRequests inputTokens outputTokens knownCostMicros } } }').then(data=>data.runAnalytics);}
 export function loadRun(id: string): Promise<FeatureRun> { return request<{ featureRun: FeatureRun }>(`query($id: ID!) { featureRun(id: $id) { ${runFields} } }`, { id }).then(data => data.featureRun); }

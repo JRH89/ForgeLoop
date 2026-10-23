@@ -7,7 +7,7 @@ import {
   loadIssueConversation,
   loadIssueConversations,
   loadRunOperations,
-  loadRuns,
+  loadRunForSource,
   sendIssueConversationMessage,
   startIssueConversation,
   type FeatureRun,
@@ -98,8 +98,7 @@ export default function IssueChatPage({ repositories, operator, onRepositories }
     let timer = 0;
     async function pollDelivery() {
       try {
-        const runs = await loadRuns();
-        const found = runs.find(item => item.repository === repositoryName && item.sourceRef === `issue-${issueNumber}`);
+        const found = await loadRunForSource(repositoryName, `issue-${issueNumber}`);
         if (!disposed && found) {
           setRun(found);
           setOperations(await loadRunOperations(found.id));

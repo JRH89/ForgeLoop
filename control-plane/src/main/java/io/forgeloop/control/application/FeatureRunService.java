@@ -7,13 +7,15 @@ import io.forgeloop.control.domain.FeatureRunRepository;
 import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.TaskState;
 import jakarta.transaction.Transactional;
+import io.forgeloop.control.security.OperatorContext;
+import org.springframework.data.domain.PageRequest;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
 public class FeatureRunService {
-  private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections; private final AuditLedgerService audit; private final PlatformConfigurationService platform;
-  public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections, AuditLedgerService audit, PlatformConfigurationService platform) { this.runs = runs; this.tasks = tasks; this.connections = connections; this.audit = audit; this.platform=platform; }
+  private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections; private final AuditLedgerService audit; private final PlatformConfigurationService platform; private final OperatorContext operators;
+  public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections, AuditLedgerService audit, PlatformConfigurationService platform, OperatorContext operators) { this.runs = runs; this.tasks = tasks; this.connections = connections; this.audit = audit; this.platform=platform; this.operators=operators; }
   @Transactional public FeatureRun submit(FeatureSubmission input) {
     if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
     RepositoryConnection connection = connections.requireEnabled(input.repository());
@@ -56,13 +58,33 @@ public class FeatureRunService {
     FeatureSubmission bounded = new FeatureSubmission(input.repository(), input.sourceRef(), input.title(), input.specification(), effectiveBudgetUsd);
     return persist(bounded, connection, organizationPolicy, harness);
   }
-  @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); connections.requireEnabled(task.getRun().getRepository()); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
+  @Transactional public DeliveryTask transitionTask(String taskId, TaskState state) { DeliveryTask task = tasks.findById(taskId).orElseThrow(() -> new IllegalArgumentException("Task not found")); operators.requireOrganization(task.getRun().getOrganizationId()); connections.requireEnabled(task.getRun().getRepository()); task.transition(state); audit.record("TASK_TRANSITIONED", "TASK", taskId, state.name()); return task; }
   @Transactional public FeatureRun overrideGate(String runId, String gate, String reason) { if(reason==null||reason.isBlank()||reason.length()>1000)throw new IllegalArgumentException("A bounded override reason is required");FeatureRun run=get(runId);run.overrideGate(gate);audit.record("VERIFICATION_GATE_MANUAL_OVERRIDE", "FEATURE_RUN", runId, gate+"|"+reason);return run; }
   @Transactional public FeatureRun cancel(String runId) { FeatureRun run = get(runId); run.cancel(); audit.record("FEATURE_RUN_CANCELLED", "FEATURE_RUN", runId, run.getState().name()); return run; }
   @Transactional public DeliveryTask retry(String taskId, String reason) { if(reason==null||reason.isBlank()||reason.length()>1000)throw new IllegalArgumentException("A bounded retry reason is required");DeliveryTask task=tasks.findById(taskId).orElseThrow(()->new IllegalArgumentException("Task not found"));FeatureRun run=get(task.getRun().getId());if(run.isArchived())throw new IllegalStateException("Restore the archived run before retrying");task.retryByOperator();run.resumeAfterRetry(task);audit.record("TASK_RETRY_APPROVED", "FEATURE_RUN", run.getId(), taskId+"|"+reason);return task; }
   @Transactional public FeatureRun approve(String runId, String actor, String confirmation) { if(!"APPROVE".equals(confirmation))throw new IllegalArgumentException("Approval confirmation must equal APPROVE");FeatureRun run=get(runId);run.approve(actor);audit.record("FEATURE_RUN_APPROVED", "FEATURE_RUN", runId, actor);return run; }
-  @Transactional public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); initializeDisplayGraph(run); connections.requireEnabled(run.getRepository()); return run; }
-  @Transactional public List<FeatureRun> list() { return runs.findAll().stream().filter(run -> { try { initializeDisplayGraph(run); connections.requireEnabled(run.getRepository()); return true; } catch (RuntimeException ignored) { return false; } }).toList(); }
+  @Transactional public FeatureRun get(String id) { FeatureRun run = runs.findById(id).orElseThrow(() -> new IllegalArgumentException("Feature run not found")); operators.requireOrganization(run.getOrganizationId()); connections.requireEnabled(run.getRepository()); initializeDisplayGraph(run); return run; }
+  /** Direct source lookup keeps issue delivery tracking independent of history page boundaries. */
+  @Transactional public FeatureRun findBySource(String repository, String sourceRef) {
+    connections.requireEnabled(repository);
+    return runs.findByRepositoryAndSourceRef(repository, sourceRef)
+        .filter(run -> run.belongsTo(operators.organizationId()))
+        .map(run -> { initializeDisplayGraph(run); return run; }).orElse(null);
+  }
+  /** Internal analytics retain the complete tenant history; browser queries use the bounded overload. */
+  @Transactional public List<FeatureRun> list() {
+    return initializeDisplayGraphs(runs.findVisible(operators.organizationId()));
+  }
+  /** Stable, bounded database pagination; persistence failures propagate to the caller. */
+  @Transactional public List<FeatureRun> list(int page, int size, Boolean archived) {
+    if (page < 0 || page > 100_000 || size < 1 || size > 100)
+      throw new IllegalArgumentException("Run page must be 0..100000 and size must be 1..100");
+    return initializeDisplayGraphs(runs.findVisiblePage(operators.organizationId(), archived, PageRequest.of(page, size)));
+  }
+  private static List<FeatureRun> initializeDisplayGraphs(List<FeatureRun> visible) {
+    visible.forEach(FeatureRunService::initializeDisplayGraph);
+    return visible;
+  }
   /** Initializes all three display collections before leaving the transaction; GraphQL must not lazy-load domain state. */
   private static void initializeDisplayGraph(FeatureRun run) {
     run.getTasks().forEach(task -> { task.getDependencies(); task.getProviderAttempts(); task.getRepairPackages(); });

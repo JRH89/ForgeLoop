@@ -42,6 +42,7 @@ final class RunJournalSession {
         pins.put("coreAutocrlf", safeConfig(worktree));
         pins.put("providerPolicySha256", fileDigest(policyFile));
         pins.put("providerPolicy", policy);
+        pins.put("agentLoop", task.agentLoop());
         pins.put("mcpConfigurations", task.mcpConfigurations());
         pins.put("sourceRef", task.sourceRef()); pins.put("baseBranch", task.baseBranch());
         pins.put("executionBaseRef", task.executionBaseRef()); pins.put("dependencyChangeShas", task.dependencyChangeShas());

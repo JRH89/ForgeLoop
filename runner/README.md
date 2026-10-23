@@ -22,6 +22,7 @@ The runner executes inside customer-controlled infrastructure. It registers with
 * Pushes an integrated commit directly with a lease-bound, short-lived GitHub installation token and exact `--force-with-lease` protection; source content does not transit the control plane.
 * Runs a read-only independent reviewer against the bounded integrated diff and records criterion-level, checksummed review evidence before verification begins.
 * Generates an issue specification only after an administrator explicitly requests the extra provider call; draft output is reviewable, editable, and cannot publish to GitHub.
+* Supports guarded multi-turn writing tasks behind the default-off `FORGELOOP_AGENT_LOOP_ENABLED=true` switch, with repository policy opt-in, lease renewal, shared spend reservations, and categorized stops; see [activation and limits](../docs/agent-loop.md).
 * Polls continuously with bounded parallelism, heartbeats, task-scoped lease files, and worktree cleanup.
 * Runs as a non-root container image.
 
@@ -59,7 +60,7 @@ The explicit `provider-drift-check <anthropic|openai|gemini|local> <model>` diag
 
 To record a canonical fixture, run `provider-fixture-capture <provider> <model> --confirm-live-call` from a source checkout. This is a separate, explicit live operation: it makes exactly one fixed health request with a 128-token output ceiling, does not retry or print the response, and refuses to overwrite an existing fixture. Provider keys may come from the usual runner environment variables; `--desktop-key` reads the selected provider's key from the current user's protected ForgeLoop Runner store instead. Review the resulting `response.json` and `meta.json` before checking them in. Captures contain only the fixed health prompt's response, but still require the provider owner's approval and may incur a charge.
 
-Provider conversation adapters and the runner agent-loop core are being implemented additively. The loop core is dormant: production task dispatch still uses the existing single-call path until the control-plane policy and lease lifecycle and the later runner wiring slice are complete. See [Agent loop status](../docs/agent-loop.md) for its current boundary and local-only journal handling.
+Provider conversations and the guarded agent loop are available behind the default-off runner switch and a repository loop policy. See [Agent loop status](../docs/agent-loop.md) for activation, lease and budget enforcement, and journal handling.
 
 `execute-policy-task` is the production provider-worker entry point. It resolves provider, model, and a one-to-three-attempt retry ceiling from a reviewed runner-local JSON policy, then claims and acknowledges the task lease, creates an isolated worktree, invokes the provider, validates every output field and path before writing, commits atomically written files, submits redacted usage/failure evidence, and completes the lease. Unsupported roles are rejected before a lease is claimed.
 

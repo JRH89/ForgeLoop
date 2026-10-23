@@ -1,6 +1,6 @@
 # Agent-loop enforcement (Slices 4a–4d)
 
-This document describes the fail-closed guard layer added to the dormant agent loop. It is not an enablement guide: no runner dispatch path invokes the loop, and this slice must not enable one.
+This document describes the fail-closed guard layer. The dispatch adapter now invokes it only when the runner’s default-off switch and the repository’s snapshotted loop policy both permit execution. See [agent-loop status](agent-loop.md) for activation and validation boundaries.
 
 ## Before the first provider request
 
@@ -29,7 +29,7 @@ Repository administrators configure zero to 64 protected path globs with `config
 
 Before each agent-loop model turn with known provider pricing, the runner computes a conservative cost bound from the exact serialized request, its input-token upper bound, and the requested output-token cap. It asks the control plane to reserve that amount against both the task budget and the run budget before writing `TURN_REQUESTED` or contacting the provider. The lease reservation is replaceable (so retrying a request is idempotent), and a provider-attempt report settles it to zero after actual usage is recorded. Closing or expiring a lease also releases the reservation; expired leases no longer count while recovery is pending.
 
-The control plane serializes reservations for the same run by locking its tasks, and grants only when known spend plus active reservations stays within both limits. A budget refusal is a normal response: the runner sends no provider request and ends with `BUDGET_STOP/MONEY`. If pricing is unknown, it does not reserve. If the control plane cannot be reached, the runner retries after 2, 4, and 8 seconds, then fails closed as `HARNESS_FAILURE` with `LOOP_SPEND_RESERVATION_UNAVAILABLE`. No dispatch path invokes the agent loop yet; these protections do not enable it.
+The control plane serializes reservations for the same run by locking its tasks, and grants only when known spend plus active reservations stays within both limits. A budget refusal is a normal response: the runner sends no provider request and ends with `BUDGET_STOP/MONEY`. If pricing is unknown, it does not reserve. If the control plane cannot be reached, the runner retries after 2, 4, and 8 seconds, then fails closed as `HARNESS_FAILURE` with `LOOP_SPEND_RESERVATION_UNAVAILABLE`. Dispatch uses these protections only behind the default-off runner switch.
 
 ## Hold and evidence behavior
 

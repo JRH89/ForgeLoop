@@ -5,27 +5,23 @@ RPM for Fedora/RHEL/openSUSE, portable `.tar.gz` archives, and native Arch
 
 ## What changed in this preview
 
-- **Updated branding:** The runner window, navigation mark and native Windows,
-  macOS and Linux installer/launcher icons now derive from the approved green/cyan
-  ForgeLoop logo mark used by the website. Existing identity and keys are unchanged.
+- **Guarded multi-turn execution:** Writing tasks can use the agent loop when both
+  the repository policy and the runner-local `FORGELOOP_AGENT_LOOP_ENABLED=true`
+  switch permit it. The switch is off by default; existing installations retain
+  their current execution behavior after upgrading.
+- **Lease and budget controls:** Loop execution renews its lease, reports usage
+  for every provider turn, reserves known spend, and stops when the lease is lost
+  or a policy or budget limit is reached. A final lease check prevents cancelled
+  work from being returned for delivery. Official verification remains separate.
+- **Execution evidence:** Loop policy is preserved with task context and execution
+  pins. Local journals remain private; remote run-record upload still requires
+  the repository's separate opt-in.
+- **Maintenance:** Provider diagnostics and standalone verification commands are
+  separated from runner orchestration while preserving the existing CLI commands.
 
-- **Docker startup:** Start runner can start a recognized, installed local Docker
-  engine on Windows, macOS, or Linux, then wait for Linux-container readiness.
-  Startup is bounded and cancellable; no model work starts before readiness.
-  Permission failures and remote/custom Docker endpoints show actionable guidance
-  instead of starting a different engine. Linux may use the system's authorization
-  dialog; ForgeLoop never asks for an administrator password.
-- **Desktop layout:** Connect, Provider, and Run now use labeled, stacked fields,
-  compact wrapping buttons, and width-aware scrolling. Long status messages wrap
-  instead of pushing controls off-screen. The initial window also fits the screen's
-  usable area on scaled displays.
-- **Upgrade safety:** The Windows upgrade keeps your existing connection, provider
-  settings, and protected API-key files. Pause and close the runner before updating.
-
-Automatic Docker startup does not install Docker, enable it at boot, change its
-container mode, or replace your selected remote/custom endpoint. First-time pairing
-still requires a running Docker engine. Checking requirements does not start Docker
-or call a model.
+The new loop requires the matching control-plane update. Installers alone do not
+activate it. Pause and close the runner before updating; identity, settings, and
+provider keys remain in their existing external state directories.
 
 ## Setup and costs
 

@@ -163,7 +163,7 @@ public final class RunnerClient {
     /** Retrieves only tasks the authenticated runner may attempt to claim. */
     /** Parses structured server-derived context rather than trusting a local task description. */
     public List<RunnerTask> availableTasks(RunnerIdentity identity) throws Exception {
-        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence runRecord redPrerequisite{testTaskId targetSha evidenceDigest} agentLoop{enforcement{protectedPaths allowWorkflowChanges finishGate}} mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
+        String response = post("query($runnerId:ID!,$credential:String!){availableRunnerTasks(runnerId:$runnerId,credential:$credential){id role:executionRole title repository baseBranch executionBaseRef sourceRef specification:executionSpecification acceptanceCriteria requiredCapability budgetUsd budgetMicros spentCostMicros ownedPaths dependencyChangeShas verificationGateName verificationKind verificationImageDigest verificationCommand verificationNetworkPolicy verificationTimeoutSeconds verificationBaseRef writeBoundary testPathGlobs testReportFormat expectedTests expectedTestsOverflow testFirstEvidence runRecord redPrerequisite{testTaskId targetSha evidenceDigest} agentLoop{budget{maxToolCalls maxTokens maxWallSeconds maxConversationBytes} gates{name kind imageDigest command networkPolicy timeoutSeconds} enforcement{protectedPaths allowWorkflowChanges finishGate}} mcpConfigurations{name command arguments contextTool toolArguments revision}}}", "{\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"credential\":\"" + escape(identity.credential()) + "\"}");
         List<RunnerTask> tasks = new ArrayList<>();
         JsonNode taskNodes=JSON.readTree(response).path("data").path("availableRunnerTasks");
         if(!taskNodes.isArray())throw new ControlPlaneFailure("Invalid task discovery response",true);
@@ -181,7 +181,7 @@ public final class RunnerClient {
                     nullableText(task, "testReportFormat"),
                     JSON.convertValue(task.path("expectedTests"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
                     task.path("expectedTestsOverflow").asBoolean(false), nullableText(task, "testFirstEvidence"),
-                    redPrerequisite(task.path("redPrerequisite")), loopEnforcement(task.path("agentLoop")), task.path("runRecord").asBoolean(false)));
+                    redPrerequisite(task.path("redPrerequisite")), loopEnforcement(task.path("agentLoop")), task.path("runRecord").asBoolean(false), loopConfiguration(task)));
         }
         return List.copyOf(tasks);
     }
@@ -194,6 +194,33 @@ public final class RunnerClient {
                 + "\",\"runnerRevision\":\"" + build.revision() + "\",\"runnerJarSha256\":\"" + build.jarSha256() + "\"}";
         return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$runnerRevision:String,$runnerJarSha256:String){acknowledgeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,runnerRevision:$runnerRevision,runnerJarSha256:$runnerJarSha256){id acknowledged runnerRevision runnerJarSha256}}", variables);
     }
+    /** Loop lifecycle mutations use structured variables and validate acknowledgements before execution continues. */
+    public void renewLease(RunnerIdentity identity, RunnerLease lease) throws Exception {
+        JsonNode result = loopMutation(identity, lease, "renewTaskLease", "", "", java.util.Map.of(), "id");
+        if (!lease.leaseId().equals(result.path("id").asText())) throw new ControlPlaneFailure("Invalid lease renewal", false);
+    }
+    public void holdLease(RunnerIdentity identity, RunnerLease lease, String reason, String summary) throws Exception {
+        loopMutation(identity, lease, "holdTaskLease", ",$reason:String!,$summary:String!", ",reason:$reason,summary:$summary",
+                java.util.Map.of("reason", reason, "summary", summary), "id completed");
+    }
+    public void failLease(RunnerIdentity identity, RunnerLease lease, String category) throws Exception {
+        loopMutation(identity, lease, "completeTaskLease", ",$passed:Boolean!,$category:String", ",passed:$passed,category:$category",
+                java.util.Map.of("passed", false, "category", category), "id completed");
+    }
+    private JsonNode loopMutation(RunnerIdentity identity, RunnerLease lease, String operation, String declarations,
+                                  String arguments, java.util.Map<String, ?> extra, String fields) throws Exception {
+        java.util.Map<String, Object> variables = new java.util.LinkedHashMap<>(extra);
+        variables.put("leaseId", lease.leaseId()); variables.put("nonce", lease.nonce());
+        variables.put("runnerId", identity.runnerId()); variables.put("credential", identity.credential());
+        String query = "mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!" + declarations + "){"
+                + operation + "(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential" + arguments + "){" + fields + "}}";
+        JsonNode result = JSON.readTree(post(query, JSON.writeValueAsString(variables))).path("data").path(operation);
+        if (!result.isObject() || !lease.leaseId().equals(result.path("id").asText())
+                || fields.contains("completed") && !result.path("completed").asBoolean(false))
+            throw new ControlPlaneFailure("Invalid loop lifecycle response", false);
+        return result;
+    }
+
     /** Completes an acknowledged lease and records whether its runner verification passed. */
     public String completeLease(RunnerIdentity identity, String leaseId, String nonce, boolean passed) throws Exception { return post("mutation($leaseId:ID!,$runnerId:ID!,$nonce:String!,$credential:String!,$passed:Boolean!){completeTaskLease(leaseId:$leaseId,runnerId:$runnerId,nonce:$nonce,credential:$credential,passed:$passed){id completed}}", "{\"leaseId\":\"" + escape(leaseId) + "\",\"runnerId\":\"" + escape(identity.runnerId()) + "\",\"nonce\":\"" + escape(nonce) + "\",\"credential\":\"" + escape(identity.credential()) + "\",\"passed\":" + passed + "}"); }
     /** Marks agent-authored work ready for independent integration and verification, never verified. */
@@ -363,6 +390,39 @@ public final class RunnerClient {
         return new RunnerRedPrerequisite(nullableText(node, "testTaskId"), nullableText(node, "targetSha"),
                 nullableText(node, "evidenceDigest"));
     }
+    /** Non-null malformed policies are rejected, never silently downgraded to a single-call task. */
+    private static RunnerLoopConfiguration loopConfiguration(JsonNode task) {
+        JsonNode loop = task.path("agentLoop");
+        if (loop.isMissingNode() || loop.isNull()) return null;
+        JsonNode budget = loop.path("budget");
+        LoopBudget limits = new LoopBudget(requiredInt(budget, "maxToolCalls"), requiredInt(budget, "maxTokens"),
+                requiredInt(budget, "maxWallSeconds"), requiredInt(budget, "maxConversationBytes"));
+        if (!loop.path("gates").isArray()) throw new IllegalArgumentException("Dispatched loop gates are missing");
+        List<LoopGate> gates = new ArrayList<>();
+        for (JsonNode gate : loop.path("gates")) {
+            String network = gate.path("networkPolicy").asText();
+            if (!List.of("NONE", "EGRESS").contains(network)
+                    || !List.of("CONTAINER", "BROWSER", "SECURITY", "CONTRACT", "COMPOSE").contains(gate.path("kind").asText()))
+                throw new IllegalArgumentException("Dispatched loop gate policy is invalid");
+            gates.add(new LoopGate(gate.path("name").asText(), gate.path("imageDigest").asText(),
+                    JSON.convertValue(gate.path("command"), JSON.getTypeFactory().constructCollectionType(List.class, String.class)),
+                    requiredInt(gate, "timeoutSeconds"), "EGRESS".equals(network)));
+        }
+        return new RunnerLoopConfiguration(limits, gates, requiredMicros(task, "budgetMicros"), requiredMicros(task, "spentCostMicros"));
+    }
+    private static int requiredInt(JsonNode node, String field) {
+        if (!node.path(field).isIntegralNumber() || !node.path(field).canConvertToInt())
+            throw new IllegalArgumentException("Dispatched loop limit is invalid");
+        return node.path(field).intValue();
+    }
+    private static long requiredMicros(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        if (!value.isNumber() || !value.canConvertToLong() || !Double.isFinite(value.doubleValue())
+                || value.doubleValue() < 0 || value.doubleValue() != Math.rint(value.doubleValue()))
+            throw new IllegalArgumentException("Dispatched task spend is invalid");
+        return value.longValue();
+    }
+
     private static RunnerLoopEnforcement loopEnforcement(JsonNode node) {
         if (node == null || node.isMissingNode() || node.isNull()) return null;
         JsonNode policy = node.path("enforcement");

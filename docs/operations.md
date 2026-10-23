@@ -30,12 +30,12 @@ Audit entries contain actor, action, resource identity, timestamp, and a SHA-256
 ## Release gates
 
 1. Run backend and harness Maven verification, frontend and MCP checks, Compose health, and Playwright.
-2. Scan the built images and lockfiles in CI; block known critical vulnerabilities.
+2. Scan the built images and lockfiles in CI; block known high and critical vulnerabilities.
 3. Run Flyway against a disposable PostgreSQL instance, then a reviewed production migration window.
 4. Configure OIDC issuer/audience, secret injection, HTTPS termination, backups, database least-privilege roles, log retention, and alert routing.
-5. Protect `main`, require CI, code review, and signed release artifacts before deployment.
+5. Protect `master`, require CI, code review, and signed release artifacts before deployment.
 
-The `Supply-chain evidence` workflow scans dependencies, secrets, configuration, and all three release images for fixed critical vulnerabilities. It also publishes a commit-bound SPDX JSON SBOM for 90 days. Third-party actions are pinned to immutable commit SHAs; review and update those pins through a dependency-update pull request.
+The `Supply-chain evidence` workflow scans dependencies, secrets, configuration, and all three release images for high and critical vulnerabilities, including findings without an available fix. It also publishes a commit-bound SPDX JSON SBOM for 90 days. Third-party actions are pinned to immutable commit SHAs; review and update those pins through a dependency-update pull request.
 
 ## Backup and restore drill
 
@@ -56,3 +56,36 @@ Use `/actuator/health/liveness` for process restarts and `/actuator/health/readi
 Runner progress and automated intervention are documented in [runner-events-and-escalation.md](runner-events-and-escalation.md). Alert on open `HIGH` escalations and on escalations remaining unacknowledged beyond the response SLO. Acknowledging an escalation is not approval to retry or ship.
 
 The application safety net permits 600 requests per minute per runner or network peer by default and returns `429` with `Retry-After`; configure `FORGELOOP_HTTP_REQUESTS_PER_MINUTE` for measured traffic. Health probes bypass this limiter. Production ingress must independently enforce connection, request-body, and distributed tenant/IP limits because an in-process limiter is neither a WAF nor a cross-replica quota system.
+
+## Bounded run history and load scenarios
+
+`featureRuns(page: 0, size: 50, archived: false)` filters the authenticated
+organization and enabled repository connections in the database before loading
+its display graph. Pages are ordered by creation time and ID, newest first.
+Page indexes are 0–100000 and sizes are 1–100; invalid bounds are rejected.
+Omitting `archived` includes both active and archived history. The Runs screen
+uses 50-row pages, resets pagination when changing archive selection, and labels
+its status filters as applying to the current page. Offset pages can move when
+new runs arrive; usage history deduplicates IDs across pages and fails visibly
+rather than returning a partial report beyond its 50,000-row safety ceiling.
+Issue Chat uses the tenant-checked `featureRunForSource(repository, sourceRef)`
+lookup so older issues do not disappear behind a page boundary. Aggregate
+analytics retain the complete authorized history.
+
+The load harness supports `FORGELOOP_LOAD_SCENARIO=history`, `analytics`,
+`detail`, or `mixed`. Detail and mixed require `FORGELOOP_LOAD_RUN_ID` for an
+existing authorized staging run. Every scenario is read-only. Set
+`FORGELOOP_LOAD_REQUEST_TIMEOUT_MS` (100–60000, default 5000) to bound the entire
+request, including response-body reading. A run takes at most the configured
+traffic duration plus one request timeout, excluding process startup. HTTP
+failures, GraphQL errors, missing data, redirects, and timeouts count as failed
+requests. Output includes timeout count and latency sample size; percentiles use
+a representative reservoir capped at 100,000 samples. The gate remains at most
+1% failures and p95 at most 500 ms. `node --test scripts/load-test.test.mjs` runs
+local HTTP failure/timeout fixtures; it does not establish staging capacity.
+
+Dependency scans block HIGH and CRITICAL findings even when no fix is available.
+Resolve or explicitly review a finding before release; do not weaken the scan
+or silently ignore unfixed vulnerabilities. Weekly Dependabot updates cover
+GitHub Actions, both npm packages, and all three Maven modules. Workflow action
+pins are immutable commit SHAs, including the dereferenced CodeQL release tag.

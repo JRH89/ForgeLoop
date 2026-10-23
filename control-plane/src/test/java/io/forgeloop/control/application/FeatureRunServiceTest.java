@@ -20,7 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mockito;
 
 class FeatureRunServiceTest {
-  private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class); private final PlatformConfigurationService platform=Mockito.mock(PlatformConfigurationService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections, audit, platform);
+  private final io.forgeloop.control.security.OperatorContext operators = Mockito.mock(io.forgeloop.control.security.OperatorContext.class);
+  private final FeatureRunRepository runs = Mockito.mock(FeatureRunRepository.class); private final DeliveryTaskRepository tasks = Mockito.mock(DeliveryTaskRepository.class); private final RepositoryConnectionService connections = Mockito.mock(RepositoryConnectionService.class); private final AuditLedgerService audit = Mockito.mock(AuditLedgerService.class); private final PlatformConfigurationService platform=Mockito.mock(PlatformConfigurationService.class); private final FeatureRunService service = new FeatureRunService(runs, tasks, connections, audit, platform, operators);
   @BeforeEach void configurePlatform(){when(platform.policy()).thenReturn(new io.forgeloop.control.domain.OrganizationPolicy("local-development",100,4,List.of("anthropic"),true));when(platform.requireHarness(Mockito.anyString())).thenReturn(new io.forgeloop.control.domain.HarnessDefinition("local-development","JVM_REACT","Standard Java and React delivery",List.of("PLANNER","BACKEND","FRONTEND"),2));}
   @Test void submissionUsesConnectedRepositoryPolicy() {
     String image = "node@sha256:" + "a".repeat(64);
@@ -131,4 +132,44 @@ class FeatureRunServiceTest {
     assertThrows(IllegalStateException.class, () -> service.transitionTask("task-1", io.forgeloop.control.domain.TaskState.RUNNING));
     verify(connections).requireEnabled("acme/support");
   }
+  @Test void listQueriesOnlyTheAuthenticatedOrganizationsPage() {
+    when(operators.organizationId()).thenReturn("tenant-a");
+    FeatureRun visible = new FeatureRun("tenant-a", "acme/support", "issue-1", "Title", "Spec", 10, "GENERIC", 1);
+    var page = org.springframework.data.domain.PageRequest.of(2, 25);
+    when(runs.findVisiblePage("tenant-a", false, page)).thenReturn(List.of(visible));
+    assertEquals(List.of(visible), service.list(2, 25, false));
+    verify(runs, never()).findAll();
+    verify(connections, never()).requireEnabled(any());
+  }
+  @Test void listRejectsUnboundedPagesAndPropagatesDatabaseFailures() {
+    assertThrows(IllegalArgumentException.class, () -> service.list(-1, 50, null));
+    assertThrows(IllegalArgumentException.class, () -> service.list(0, 101, null));
+    assertThrows(IllegalArgumentException.class, () -> service.list(0, 0, null));
+    when(operators.organizationId()).thenReturn("tenant-a");
+    when(runs.findVisiblePage("tenant-a", null, org.springframework.data.domain.PageRequest.of(0, 50)))
+        .thenThrow(new IllegalStateException("Database unavailable"));
+    assertThrows(IllegalStateException.class, () -> service.list(0, 50, null));
+  }
+
+  @Test void directSourceLookupDoesNotExposeAFormerOwnersRun() {
+    when(operators.organizationId()).thenReturn("tenant-a");
+    FeatureRun foreign = new FeatureRun("tenant-b", "acme/support", "issue-1", "Title", "Spec", 10, "GENERIC", 1);
+    when(runs.findByRepositoryAndSourceRef("acme/support", "issue-1")).thenReturn(java.util.Optional.of(foreign));
+    assertEquals(null, service.findBySource("acme/support", "issue-1"));
+    verify(connections).requireEnabled("acme/support");
+  }
+
+  @Test void rejectsForeignRunAccessAndTaskTransitionsBeforeLoadingDisplayState() {
+    FeatureRun foreign = new FeatureRun("tenant-b", "acme/support", "issue-1", "Title", "Spec", 10, "GENERIC", 1);
+    foreign.addTask("IMPLEMENTATION", "Implement", "provider");
+    when(runs.findById("foreign")).thenReturn(java.util.Optional.of(foreign));
+    when(tasks.findById("foreign-task")).thenReturn(java.util.Optional.of(foreign.getTasks().getFirst()));
+    doThrow(new org.springframework.security.access.AccessDeniedException("Foreign organization"))
+        .when(operators).requireOrganization("tenant-b");
+    assertThrows(org.springframework.security.access.AccessDeniedException.class, () -> service.get("foreign"));
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,
+        () -> service.transitionTask("foreign-task", io.forgeloop.control.domain.TaskState.RUNNING));
+    verify(connections, never()).requireEnabled(any());
+  }
+
 }

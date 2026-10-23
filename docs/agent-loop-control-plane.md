@@ -1,6 +1,6 @@
 # Agent-loop control-plane contract
 
-Slice 3c adds the control-plane contract for a future long-running agent loop. It is additive and opt-in: existing repositories and tasks remain on the current single-call runner path, and this slice does not dispatch or execute a loop.
+Slice 3c adds the control-plane contract for a future long-running agent loop. It is additive and opt-in: repositories without a loop policy remain on the single-call path. The dispatch adapter also requires the runner-local default-off switch described in [agent-loop status](agent-loop.md).
 
 ## Repository policy
 
@@ -28,7 +28,7 @@ The runner-facing `renewTaskLease` and `holdTaskLease` mutations require the run
 
 `completeTaskLease` accepts an optional `category` for general execution failures. Verification and review failures keep their existing server-selected categories. Omitting the argument preserves existing behavior.
 
-The event allow-list now recognizes `LOOP_STARTED`, `LOOP_TOOL_CALLED`, `LOOP_ENDED`, and `LOOP_RESUMED`. This slice defines the accepted metadata event types but does not emit them; emission and lease-keeper wiring remain for slice 3d.
+The event allow-list now recognizes `LOOP_STARTED`, `LOOP_TOOL_CALLED`, `LOOP_ENDED`, and `LOOP_RESUMED`. The dispatch adapter emits loop metadata events and renews active loop leases. Resume remains deferred.
 
 ## GraphQL examples
 

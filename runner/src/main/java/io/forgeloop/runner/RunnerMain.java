@@ -45,29 +45,29 @@ public final class RunnerMain {
             return;
         }
         if (arguments.length > 0 && "provider-health".equals(arguments[0])) {
-            providerHealth(arguments);
+            RunnerDiagnosticsCommands.providerHealth(arguments);
             return;
         }
         if (arguments.length > 0 && "provider-fixture-capture".equals(arguments[0])) {
-            providerFixtureCapture(arguments);
+            RunnerDiagnosticsCommands.providerFixtureCapture(arguments);
             return;
         }
         if (arguments.length > 0 && "provider-drift-check".equals(arguments[0])) {
-            int exitCode = providerDriftCheck(arguments);
+            int exitCode = RunnerDiagnosticsCommands.providerDriftCheck(arguments);
             if (exitCode != 0) System.exit(exitCode);
             return;
         }
         if (arguments.length > 0 && "provider-tool-check".equals(arguments[0])) {
-            providerToolCheck(arguments);
+            RunnerDiagnosticsCommands.providerToolCheck(arguments);
             return;
         }
         if (arguments.length > 0 && "verify-run".equals(arguments[0])) {
-            int exitCode = verifyRunRecord(arguments, false);
+            int exitCode = RunnerDiagnosticsCommands.verifyRunRecord(arguments, false);
             if (exitCode != 0) System.exit(exitCode);
             return;
         }
         if (arguments.length > 0 && "verify-journal".equals(arguments[0])) {
-            int exitCode = verifyRunRecord(arguments, true);
+            int exitCode = RunnerDiagnosticsCommands.verifyRunRecord(arguments, true);
             if (exitCode != 0) System.exit(exitCode);
             return;
         }
@@ -108,27 +108,27 @@ public final class RunnerMain {
             return;
         }
         if (arguments.length > 0 && "remove-worktree".equals(arguments[0])) {
-            removeWorktree(arguments);
+            RunnerVerificationCommands.removeWorktree(arguments);
             return;
         }
         if (arguments.length > 0 && "verify".equals(arguments[0])) {
-            verify(arguments);
+            RunnerVerificationCommands.verify(arguments);
             return;
         }
         if (arguments.length > 0 && "verify-container".equals(arguments[0])) {
-            verifyContainer(arguments);
+            RunnerVerificationCommands.verifyContainer(arguments);
             return;
         }
         if (arguments.length > 0 && "verify-container-and-record".equals(arguments[0])) {
-            verifyContainerAndRecord(arguments);
+            RunnerVerificationCommands.verifyContainerAndRecord(arguments);
             return;
         }
         if (arguments.length > 0 && "verify-container-gate-and-record".equals(arguments[0])) {
-            verifyContainerGateAndRecord(arguments);
+            RunnerVerificationCommands.verifyContainerGateAndRecord(arguments);
             return;
         }
         if (arguments.length > 0 && "verify-container-and-bundle".equals(arguments[0])) {
-            verifyContainerAndBundle(arguments);
+            RunnerVerificationCommands.verifyContainerAndBundle(arguments);
             return;
         }
         RunnerConfig config = configFrom(arguments);
@@ -206,104 +206,6 @@ public final class RunnerMain {
         System.out.println("Task worktree prepared: " + worktree);
     }
 
-    /** Executes one bounded, non-repository provider request to prove runner-local credentials work without exposing them. */
-    private static void providerHealth(String[] arguments) throws Exception {
-        if (arguments.length != 3) throw new IllegalArgumentException("Usage: provider-health <anthropic|openai|gemini|local> <model>");
-        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], 1);
-        ProviderClient provider = new ProviderClientFactory().create(policy);
-        ProviderResult result = provider.execute(new ProviderRequest(arguments[2], "You are a credential health check.", "Reply with exactly: ForgeLoop provider ready.", 128));
-        System.out.println("Provider health check passed. request=" + result.providerRequestId() + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens());
-    }
-
-    /** Explicitly captures one fixed 128-token live response without printing it or overwriting a fixture. */
-    private static void providerFixtureCapture(String[] arguments) throws Exception {
-        if (arguments.length < 4 || arguments.length > 5 || !"--confirm-live-call".equals(arguments[3])
-                || arguments.length == 5 && !"--desktop-key".equals(arguments[4])) {
-            throw new IllegalArgumentException("Usage: provider-fixture-capture <anthropic|openai|gemini|local> <model> --confirm-live-call [--desktop-key]");
-        }
-        String provider = arguments[1], model = arguments[2];
-        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(provider, model, 1);
-        final String credential;
-        if (arguments.length == 5) {
-            if ("local".equals(provider)) throw new IllegalArgumentException("Local provider credentials are configured through the local provider environment");
-            credential = new DesktopSecretStore(DesktopFiles.directory(), provider).load();
-        } else credential = null;
-        ProviderClientFactory codecs = new ProviderClientFactory();
-        ProviderFixtureCapture.Captured capture = new ProviderFixtureCapture().capture(provider, model,
-                () -> codecs.create(policy, credential), Path.of("runner", "src", "test", "resources", "provider-fixtures"),
-                java.time.Instant.now());
-        System.out.println("Live provider fixture captured. provider=" + provider + " model=" + model
-                + " fixture=runner/src/test/resources/provider-fixtures/" + provider
-                + " inputTokens=" + capture.inputTokens()
-                + " outputTokens=" + capture.outputTokens());
-    }
-
-    /** Requires a live-recorded, pin-matched fixture before creating a client or sending one bounded health request. */
-    private static int providerDriftCheck(String[] arguments) throws Exception {
-        if (arguments.length != 3 && (arguments.length != 4 || !"--desktop-key".equals(arguments[3]))) {
-            System.err.println("Usage: provider-drift-check <anthropic|openai|gemini|local> <model> [--desktop-key]");
-            return 2;
-        }
-        String provider = arguments[1], model = arguments[2];
-        String credential = null;
-        if (arguments.length == 4) {
-            if ("local".equals(provider)) {
-                System.err.println("Local provider credentials are configured through the local provider environment.");
-                return 2;
-            }
-            credential = new DesktopSecretStore(DesktopFiles.directory(), provider).load();
-        }
-        final String savedCredential = credential;
-        final ProviderFixtureStore.Fixture fixture;
-        try { fixture = new ProviderFixtureStore().load(provider); }
-        catch (Exception invalid) { System.err.println("Could not run provider drift check: fixture is unavailable or invalid."); return 2; }
-        ProviderClientFactory codecs = new ProviderClientFactory();
-        ProviderDriftProbe.Result result = new ProviderDriftProbe().run(provider, model, fixture,
-                () -> codecs.create(new ProviderExecutionPolicy(provider, model, 1), savedCredential));
-        if (result.exitCode() == 0) System.out.println(result.message());
-        else {
-            System.err.println(result.message());
-            result.differences().forEach(path -> System.err.println("- " + path));
-        }
-        return result.exitCode();
-    }
-
-    /** Live two-turn check; output is limited to normalized stop reasons and token counts. */
-    private static void providerToolCheck(String[] arguments) throws Exception {
-        if (arguments.length != 3) throw new IllegalArgumentException("Usage: provider-tool-check <anthropic|openai|gemini|local> <model>");
-        ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], 1);
-        ConversationClient client = (ConversationClient) new ProviderClientFactory().create(policy);
-        ProviderToolCheckResult result = new ProviderToolCheck().run(client, policy.model(), policy.maxAttempts());
-        System.out.println("Provider tool check passed. firstStop=" + result.firstStopReason() + " secondStop=" + result.secondStopReason()
-                + " inputTokens=" + result.inputTokens() + " outputTokens=" + result.outputTokens()
-                + " attempts=" + result.firstAttempts() + "+" + result.secondAttempts());
-    }
-
-    /** Runs the record verifier without reading provider keys, control-plane credentials, or network state. */
-    private static int verifyRunRecord(String[] arguments, boolean journalOnly) {
-        String command = journalOnly ? "verify-journal" : "verify-run";
-        if (arguments.length != 3 && arguments.length != 5
-                || arguments.length == 5 && !"--json".equals(arguments[3])) {
-            System.err.println("Usage: " + command + (journalOnly
-                    ? " <journal.jsonl> <repository-path> [--json <report-file>]"
-                    : " <archive.zip> <repository-path> [--json <report-file>]"));
-            return 2;
-        }
-        try {
-            RunRecordVerifier verifier = new RunRecordVerifier();
-            VerifyReport report = journalOnly
-                    ? verifier.verifyJournal(Path.of(arguments[1]), Path.of(arguments[2]))
-                    : verifier.verifyRun(Path.of(arguments[1]), Path.of(arguments[2]));
-            report.printTo(System.out);
-            if (arguments.length == 5) report.writeJson(Path.of(arguments[4]));
-            return report.exitCode();
-        } catch (Exception failure) {
-            System.err.println("Run-record verification could not run: " + failure.getMessage());
-            return 2;
-        }
-    }
-
-    /** Generates and commits a schema-validated Claude patch only within operator-supplied policy prefixes. */
     private static void generatePatch(String[] arguments) throws Exception {
         if (arguments.length != 8) throw new IllegalArgumentException("Usage: generate-patch <anthropic|openai|gemini|local> <model> <max-attempts> <worktree> <allowed-prefixes> <title> <specification>");
         ProviderExecutionPolicy policy = new ProviderExecutionPolicy(arguments[1], arguments[2], Integer.parseInt(arguments[3]));
@@ -860,6 +762,11 @@ public final class RunnerMain {
                                             String workspaceRoot, ProviderExecutionPolicy policy, String allowedPrefixes,
                                             String leaseFile, Path policyFile) throws Exception {
         if (!GuardedPatchWorker.supports(task.role())) throw new IllegalArgumentException("Task role is not supported by the guarded patch worker");
+        boolean loop = task.agentLoop() != null && "true".equalsIgnoreCase(System.getenv("FORGELOOP_AGENT_LOOP_ENABLED"));
+        if (loop) {
+            if (policyFile == null) throw new IllegalArgumentException("Agent-loop dispatch requires a reviewed provider policy file");
+            loop = AgentLoopWorker.enabled(task, true, RunnerProviderPolicy.load(policyFile).toolCalling(task.role()));
+        }
         RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(identityFile));
         RunnerClient client = new RunnerClient(HttpClient.newHttpClient(), URI.create(controlPlane));
         RunnerLease lease = client.claimTask(identity, task.id());
@@ -874,6 +781,10 @@ public final class RunnerMain {
             journal = RunJournalSession.start(task, lease, Path.of(leaseFile), worktree, policy, policyFile);
             RunnerTask contextualTask = withAdditionalContext(task,
                     collectMcpOrFail(task, worktree, journal));
+            if (loop) {
+                executeAgentLoop(contextualTask, policy, worktree, Path.of(leaseFile), identity, lease, client, events, journal);
+                return;
+            }
             List<String> preferredContextPaths = new ArrayList<>(task.ownedPaths());
             preferredContextPaths.addAll(new GitWorktreeManager().changedFiles(worktree,
                     checkoutRef(task, task.baseBranch())));
@@ -906,6 +817,46 @@ public final class RunnerMain {
         System.out.println("Provider task completed: commit=" + result.commitSha());
     }
 
+    private static void executeAgentLoop(RunnerTask task, ProviderExecutionPolicy policy, Path worktree,
+                                         Path leaseFile, RunnerIdentity identity, RunnerLease lease, RunnerClient client,
+                                         RunnerEventReporter events, RunJournalSession session) throws Exception {
+        LoopJournal journal = session == null
+                ? new StepJournal(leaseFile.toAbsolutePath().getParent(), task.id(), lease.leaseId(), java.time.Clock.systemUTC())
+                : session.journal();
+        ProviderClient provider = new ProviderClientFactory().create(policy);
+        if (!(provider instanceof ConversationClient conversation)) throw new IllegalArgumentException("Provider does not support conversations");
+        LoopReporter reporter = new LoopReporter() {
+            public void providerAttempt(ProviderAttemptReport report) throws Exception { client.recordProviderAttempt(identity, lease, report); }
+            public void event(String type, String message) { events.info(type, message); }
+        };
+        LoopResult result = new AgentLoopWorker().execute(task, policy, conversation, worktree, lease.leaseId(), journal,
+                reporter, micros -> client.reserveSpend(identity, lease, micros), () -> client.renewLease(identity, lease),
+                (gate, tree, timeout) -> {
+                    // Both mounts must live under the configured workspace for a host Docker daemon.
+                    Path evidence = tree.getParent().resolve("evidence").resolve(task.id()).resolve("advisory");
+                    return new ContainerVerificationExecutor().execute(tree, dockerVisibleWorktree(tree), evidence,
+                            dockerVisibleWorktree(evidence), gate.image(), gate.command(), timeout, gate.allowNetwork());
+                });
+        if (result.outcome() == LoopOutcome.LEASE_LOST) {
+            // The control plane owns recovery/cancellation after loss; never publish or close a stale lease.
+            events.warn("EXECUTION_PROGRESS", "Agent loop stopped after lease loss");
+            return;
+        }
+        if (result.outcome() == LoopOutcome.FINISHED) {
+            new GitWorktreeManager().pinTaskCommit(worktree, task.id(), result.changeSha());
+            if (session != null) safeCommitEvidence(session, worktree, result.changeSha());
+            finishJournal(task, identity, lease, client, events, session, "COMPLETED", result.changeSha());
+            events.info("TASK_COMPLETED", "Agent loop implementation commit created");
+            client.completeProviderWork(identity, lease, result.changeSha());
+            return;
+        }
+        String hold = AgentLoopWorker.holdReason(result);
+        String category = result.category() == null ? result.outcome().name() : result.category();
+        finishJournal(task, identity, lease, client, events, session, category, null);
+        if (hold != null) client.holdLease(identity, lease, hold, "Agent loop stopped: " + hold);
+        else client.failLease(identity, lease, category);
+    }
+
     /** Claims exactly one server-advertised task, then creates its isolated worktree from a pre-cloned local checkout. */
     private static void claimAndPrepareTask(String[] arguments) throws Exception {
         if (arguments.length != 7) {
@@ -928,7 +879,7 @@ public final class RunnerMain {
         }
     }
     private static Path checkout(RunnerClient client,RunnerIdentity identity,RunnerLease lease,String repositoriesRoot,String expectedRepository)throws Exception{GithubCheckoutGrant grant=client.issueGithubCheckoutGrant(identity,lease);if(!expectedRepository.equals(grant.repository()))throw new IllegalStateException("Checkout grant repository mismatch");return new RepositoryWorkspaceResolver().resolveOrClone(Path.of(repositoriesRoot),grant);}
-    private static String checkoutRef(RunnerTask task,String requested){return task.baseBranch().equals(requested)?"refs/remotes/origin/"+task.baseBranch():requested;}
+    static String checkoutRef(RunnerTask task,String requested){return task.baseBranch().equals(requested)?"refs/remotes/origin/"+task.baseBranch():requested;}
 
     /** Prepares the same policy-selected base ref that normal task execution uses. */
     static Path createExecutionWorktree(Path repository, RunnerTask task, Path workspaceRoot) throws Exception {
@@ -943,7 +894,7 @@ public final class RunnerMain {
                 task.verificationImageDigest(), task.verificationCommand(), task.verificationNetworkPolicy(),
                 task.verificationTimeoutSeconds(), task.verificationBaseRef(), task.executionBaseRef(),
                 task.acceptanceCriteria(), task.mcpConfigurations(), task.writeBoundary(), task.testPathGlobs(), task.testReportFormat(),
-                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence(), task.redPrerequisite(), task.loopEnforcement(), task.runRecord());
+                task.expectedTests(), task.expectedTestsOverflow(), task.testFirstEvidence(), task.redPrerequisite(), task.loopEnforcement(), task.runRecord(), task.agentLoop());
     }
 
     private static String collectMcpOrFail(RunnerTask task, Path worktree, RunJournalSession journal) throws Exception {
@@ -977,111 +928,6 @@ public final class RunnerMain {
     private static void safeCommitEvidence(RunJournalSession journal, Path worktree, String commitSha) {
         try { journal.commit(new GitWorktreeManager().commitEvidence(worktree, commitSha)); }
         catch (Exception ignored) { /* Preserve delivery; the record will be explicitly incomplete. */ }
-    }
-
-    private static void removeWorktree(String[] arguments) throws Exception {
-        if (arguments.length != 4) throw new IllegalArgumentException("Usage: remove-worktree <repository-path> <task-id> <workspace-root>");
-        new GitWorktreeManager().remove(Path.of(arguments[1]), arguments[2], Path.of(arguments[3]));
-        System.out.println("Task worktree removed.");
-    }
-
-    private static void verify(String[] arguments) throws Exception {
-        if (arguments.length < 4) throw new IllegalArgumentException("Usage: verify <worktree-path> <timeout-seconds> <command> [arguments...]");
-        long timeoutSeconds = Long.parseLong(arguments[2]);
-        VerificationResult result = new VerificationExecutor().execute(Path.of(arguments[1]), Arrays.asList(arguments).subList(3, arguments.length), Duration.ofSeconds(timeoutSeconds));
-        System.out.println(result.passed() ? "Verification passed." : "Verification failed or timed out.");
-        System.out.print(result.output());
-        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
-    }
-
-    private static void verifyContainer(String[] arguments) throws Exception {
-        if (arguments.length < 6) {
-            throw new IllegalArgumentException(
-                    "Usage: verify-container <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
-        }
-        boolean allowNetwork = switch (arguments[3]) {
-            case "none" -> false;
-            case "allow" -> true;
-            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
-        };
-        long timeoutSeconds = Long.parseLong(arguments[2]);
-        VerificationResult result = new ContainerVerificationExecutor().execute(
-                Path.of(arguments[1]),
-                dockerVisibleWorktree(Path.of(arguments[1])),
-                arguments[4],
-                Arrays.asList(arguments).subList(5, arguments.length),
-                Duration.ofSeconds(timeoutSeconds),
-                allowNetwork);
-        System.out.println(result.passed() ? "Container verification passed." : "Container verification failed or timed out.");
-        System.out.print(result.output());
-        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
-    }
-
-    /** Executes, reports, then leaves lease completion to an explicit policy decision. */
-    private static void verifyContainerAndRecord(String[] arguments) throws Exception {
-        if (arguments.length < 10) {
-            throw new IllegalArgumentException("Usage: verify-container-and-record <control-plane-url> <identity-file> <lease-file> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
-        }
-        boolean allowNetwork = switch (arguments[6]) {
-            case "none" -> false;
-            case "allow" -> true;
-            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
-        };
-        Path worktree = Path.of(arguments[4]);
-        List<String> command = Arrays.asList(arguments).subList(8, arguments.length);
-        VerificationResult result = new ContainerVerificationExecutor().execute(
-                worktree, dockerVisibleWorktree(worktree), arguments[7], command, Duration.ofSeconds(Long.parseLong(arguments[5])), allowNetwork);
-        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
-        RunnerLease lease = new RunnerLeaseStore().load(Path.of(arguments[3]));
-        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).recordEvidence(identity, lease,
-                new VerificationEvidenceReport("CONTAINER", null, arguments[7], String.join(" ", command), result));
-        System.out.println(result.passed() ? "Container verification recorded as passed." : "Container verification recorded as failed.");
-        System.out.print(result.output());
-        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
-    }
-
-    /** Runs a named required gate and lets the control plane update its run-level state from the signed lease report. */
-    private static void verifyContainerGateAndRecord(String[] arguments) throws Exception {
-        if (arguments.length < 11) {
-            throw new IllegalArgumentException("Usage: verify-container-gate-and-record <control-plane-url> <identity-file> <lease-file> <gate> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
-        }
-        boolean allowNetwork = switch (arguments[7]) {
-            case "none" -> false;
-            case "allow" -> true;
-            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
-        };
-        Path worktree = Path.of(arguments[5]);
-        List<String> command = Arrays.asList(arguments).subList(9, arguments.length);
-        VerificationResult result = new ContainerVerificationExecutor().execute(
-                worktree, dockerVisibleWorktree(worktree), arguments[8], command, Duration.ofSeconds(Long.parseLong(arguments[6])), allowNetwork);
-        RunnerIdentity identity = new RunnerIdentityStore().load(Path.of(arguments[2]));
-        RunnerLease lease = new RunnerLeaseStore().load(Path.of(arguments[3]));
-        new RunnerClient(HttpClient.newHttpClient(), URI.create(arguments[1])).recordEvidence(identity, lease,
-                new VerificationEvidenceReport("CONTAINER", arguments[4], arguments[8], String.join(" ", command), result));
-        System.out.println(result.passed() ? "Verification gate recorded as passed." : "Verification gate recorded as failed.");
-        System.out.print(result.output());
-        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
-    }
-
-    /** Runs a bounded container check and writes a checksummed local evidence bundle without sending source or credentials remotely. */
-    private static void verifyContainerAndBundle(String[] arguments) throws Exception {
-        if (arguments.length < 8) {
-            throw new IllegalArgumentException("Usage: verify-container-and-bundle <bundle-directory> <worktree-path> <timeout-seconds> <network:none|allow> <image> <command> [arguments...]");
-        }
-        boolean allowNetwork = switch (arguments[4]) {
-            case "none" -> false;
-            case "allow" -> true;
-            default -> throw new IllegalArgumentException("Container network policy must be none or allow");
-        };
-        Path worktree = Path.of(arguments[2]);
-        List<String> command = Arrays.asList(arguments).subList(6, arguments.length);
-        VerificationResult result = new ContainerVerificationExecutor().execute(
-                worktree, dockerVisibleWorktree(worktree), arguments[5], command, Duration.ofSeconds(Long.parseLong(arguments[3])), allowNetwork);
-        Path artifact = new EvidenceBundleWriter().write(Path.of(arguments[1]),
-                new VerificationEvidenceReport("CONTAINER", null, arguments[5], String.join(" ", command), result));
-        System.out.println("Verification evidence bundle written: " + artifact.toAbsolutePath().normalize());
-        System.out.print(result.output());
-        if (!result.passed()) System.exit(result.timedOut() ? 124 : result.exitCode());
     }
 
     /**
