@@ -21,7 +21,9 @@ COPY --from=frontend /app/dist /usr/share/nginx/html
 COPY --from=runner-package /downloads /usr/share/nginx/html/downloads
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 # Nginx needs writable cache/pid paths, but does not need a root master process.
-RUN sed -i 's@/var/run/nginx.pid@/tmp/nginx.pid@' /etc/nginx/nginx.conf \
+RUN apk upgrade --no-cache \
+    && sed -i 's@^[[:space:]]*pid[[:space:]].*;@pid /tmp/nginx.pid;@' /etc/nginx/nginx.conf \
+    && grep -q '^pid /tmp/nginx.pid;' /etc/nginx/nginx.conf \
     && chown -R nginx:nginx /var/cache/nginx
 USER nginx
 EXPOSE 80
