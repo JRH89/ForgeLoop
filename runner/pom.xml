@@ -8,7 +8,7 @@
   </resources><plugins>
     <plugin><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version></plugin>
     <plugin><artifactId>maven-surefire-plugin</artifactId><version>3.5.4</version></plugin>
-    <plugin><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version><configuration><encoding>UTF-8</encoding><propertiesEncoding>UTF-8</propertiesEncoding></configuration></plugin>
+    <plugin><artifactId>maven-resources-plugin</artifactId><version>3.5.0</version><configuration><encoding>UTF-8</encoding><propertiesEncoding>UTF-8</propertiesEncoding></configuration></plugin>
     <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId><version>3.6.1</version><executions><execution><phase>package</phase><goals><goal>shade</goal></goals><configuration><createDependencyReducedPom>false</createDependencyReducedPom><shadedArtifactAttached>false</shadedArtifactAttached></configuration></execution></executions></plugin>
   </plugins></build>
   <dependencies>
