@@ -10,7 +10,7 @@ if (/^\/app(?:\/|$)/.test(window.location.pathname)) {
   void import('./public/preview');
 } else if(new URLSearchParams(window.location.search).get('login')==='failed') {
   const message=document.createElement('p');message.className='landing-alert';message.setAttribute('role','alert');
-  message.textContent='GitHub sign-in could not be completed. Confirm that your account has been invited to this ForgeLoop organization.';
+  message.textContent='GitHub sign-in could not be completed. Please try signing in again. If it still fails, contact support.';
   document.getElementById('main-content')?.prepend(message);
 }
 

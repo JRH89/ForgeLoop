@@ -36,3 +36,16 @@ This workspace must be clean before a webhook can deploy it. Commit or
 otherwise resolve local changes deliberately; do not discard them just to make
 the hook pass. A successful local readiness check does not prove the public
 Cloudflare route or all user flows are healthy.
+
+## GitHub sign-in diagnostics
+
+A `login=failed` redirect is a general OAuth failure, not evidence that a user
+needs an invitation. Check the control-plane logs for the underlying exception.
+The token exchange uses the JDK HTTP transport with bounded connection/read
+waits because GitHub can return CSP header lines exceeding Apache's default
+line limit. TLS verification remains enabled. The OAuth regression test exercises
+both a 20 KB response header and a rejected grant.
+
+Homepage hero content uses compact top padding at desktop and mobile sizes;
+it must not be vertically centered in a full-height viewport. The public-site
+browser tests check the distance between navigation and the first line of copy.
