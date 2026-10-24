@@ -49,3 +49,7 @@ both a 20 KB response header and a rejected grant.
 Homepage hero content uses compact top padding at desktop and mobile sizes;
 it must not be vertically centered in a full-height viewport. The public-site
 browser tests check the distance between navigation and the first line of copy.
+
+The follow-up MCP dependency refresh pins Zod 4.6.6 and resolves body-parser
+2.4.0 to clear the high-severity findings reported during this deployment.
+MCP type checking and service tests must pass when refreshing its lockfile.
