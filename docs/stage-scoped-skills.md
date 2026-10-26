@@ -184,10 +184,10 @@ paying for repeated read-only reviews.
 
 The corrected pipeline generated, integrated, independently reviewed and verified
 a README-only change, then published https://github.com/JRH89/project-hub/pull/13.
-Run `b8c2c192-a032-4139-aaf7-a0e6e70aec4a` retained its original$2 budget across
-configuration corrections. Recorded run model estimates were$0.520350; the local
-ledger including probes and conservative unresolved holds was$0.933846. Paid
+Run `b8c2c192-a032-4139-aaf7-a0e6e70aec4a` retained its original $2 budget across
+configuration corrections. Recorded run model estimates were $0.520350; the local
+ledger including probes and conservative unresolved holds was $0.933846. Paid
 work was paused afterwards. This validates the small documentation delivery path;
 test-writing behavior is covered by regression tests and remains a separate live
-quality experiment. Final validation passed442 runner tests (five existing skips)
-and385 control-plane tests with zero failures or errors.
+quality experiment. Final validation passed 442 runner tests (five existing skips)
+and 385 control-plane tests with zero failures or errors.
