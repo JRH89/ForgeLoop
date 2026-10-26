@@ -28,6 +28,7 @@ final class RecordingProviderClient implements ProviderClient {
             Map<String, Object> requested = new LinkedHashMap<>();
             requested.put("call", 1); requested.put("try", currentTry); requested.put("model", request.model());
             requested.put("instructions", request.instructions()); requested.put("input", request.input());
+            if (request.skillSelection().enabled()) requested.put("skills", request.skillSelection().metadata());
             requested.put("maxOutputTokens", request.maxOutputTokens()); requested.put("outputSchema", request.outputSchema());
             requested.put("requestSha256", sha256(body.getBytes(StandardCharsets.UTF_8)));
             journal.append("CALL_REQUESTED", requested);

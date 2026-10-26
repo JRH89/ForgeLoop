@@ -38,6 +38,22 @@ class ReplayProviderClientTest {
         assertThrows(ReplayDivergence.class, () -> replay.execute(request));
     }
 
+    @Test void skillEnhancedRequestsReplayWithTheirOriginalInstructionsAndPins() throws Exception {
+        StepJournal journal = new StepJournal(temporary, "skill-task", "lease-skills", Clock.systemUTC());
+        SkillSelection selection = new StageSkillResolver(StageSkillResolver.PROFILE, java.util.Set.of("org/repo"))
+                .resolveRole("PLANNER", "org/repo");
+        ProviderRequest request = new ProviderRequest("gpt-test", "JSON contract", "input", 128).withSkills(selection);
+        ProviderClient recording = new RecordingProviderClient(ignored -> {
+            try { return OpenAiResponsesProviderClient.parse(RESPONSE); }
+            catch (Exception failure) { throw new ProviderException("Invalid test fixture", false, failure); }
+        }, new ProviderExecutionPolicy("openai", "gpt-test", 1), journal);
+        recording.execute(request);
+        ReplayProviderClient replay = new ReplayProviderClient("openai", JournalFile.open(journal.path()));
+        assertThrows(ReplayDivergence.class, () -> replay.execute(new ProviderRequest("gpt-test", "JSON contract", "input", 128)));
+        assertEquals("recorded answer", replay.execute(request).output());
+        assertEquals(selection.metadata().get("selectionSha256"), journal.records().getFirst().path("skills").path("selectionSha256").asText());
+    }
+
     @Test void changedRequestsDivergeWithoutAdvancingAndRecordedFailuresKeepRetryability() throws Exception {
         StepJournal journal = new StepJournal(temporary, "failure-task", "lease-2", Clock.systemUTC());
         ProviderRequest request = new ProviderRequest("gpt-test", "rules", "input", 128);

@@ -1,0 +1,80 @@
+{
+  "schema": "forgeloop.skill-pack/1",
+  "profile": "superpowers-experimental-v1",
+  "version": "1.0.0",
+  "upstream": {
+    "repository": "https://github.com/obra/superpowers",
+    "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b",
+    "license": "MIT"
+  },
+  "skills": [
+    {
+      "id": "autonomous-specification",
+      "version": "1.0.0",
+      "sha256": "9d8718dca7e512cfa818ecd38206590f6354ae3a05676b1da2b7b1eff119f0b3",
+      "stages": [
+        "AUTONOMOUS_SPECIFICATION"
+      ]
+    },
+    {
+      "id": "interactive-specification",
+      "version": "1.0.0",
+      "sha256": "492c10dfd4db80c4c173ef0adb7a2308866f814ea5951a1fe2bbb797b08cdb76",
+      "stages": [
+        "INTERACTIVE_SPECIFICATION"
+      ]
+    },
+    {
+      "id": "structured-planning",
+      "version": "1.0.0",
+      "sha256": "90e847881cc2d40def3039cb2021d3d7a2d95b09520e9f1d200de6df50f30573",
+      "stages": [
+        "PLANNING"
+      ]
+    },
+    {
+      "id": "scoped-implementation",
+      "version": "1.0.0",
+      "sha256": "4c951e8a0fae857e30d49036175e875a3d11893b27e60a8c48e479a9b8ca8135",
+      "stages": [
+        "IMPLEMENTATION",
+        "REPAIR"
+      ]
+    },
+    {
+      "id": "independent-test-design",
+      "version": "1.0.0",
+      "sha256": "84d7beb3a6d3fa584a2b7918eef53c7ba5410d1a55bee8a475289262e6f215d5",
+      "stages": [
+        "INDEPENDENT_TEST"
+      ]
+    },
+    {
+      "id": "systematic-repair",
+      "version": "1.0.0",
+      "sha256": "3ac642633769d7a8b7df44348f2c9e361221f9e693b7e55d7d614b6a6c847ecc",
+      "stages": [
+        "REPAIR"
+      ]
+    },
+    {
+      "id": "independent-review",
+      "version": "1.0.0",
+      "sha256": "a334fe6f66ca14007ef70c4b202654c4b6183598d245a5f8e2ffaac361fc0053",
+      "stages": [
+        "REVIEW"
+      ]
+    },
+    {
+      "id": "evidence-based-completion",
+      "version": "1.0.0",
+      "sha256": "3d615a165179f21cdcf434baf1c96c4b1db3e73ec19fc291876f698960878e46",
+      "stages": [
+        "IMPLEMENTATION",
+        "INDEPENDENT_TEST",
+        "REPAIR",
+        "REVIEW"
+      ]
+    }
+  ]
+}

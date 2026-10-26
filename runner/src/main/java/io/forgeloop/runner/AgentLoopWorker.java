@@ -8,6 +8,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Dispatch adapter for the existing guarded loop; official verification still runs in separate tasks. */
 final class AgentLoopWorker {
+    private final StageSkillResolver skills;
+    AgentLoopWorker() { this(StageSkillResolver.fromEnvironment()); }
+    AgentLoopWorker(StageSkillResolver skills) {
+        if (skills == null) throw new IllegalArgumentException("Skill resolver is required");
+        this.skills = skills;
+    }
     static boolean enabled(RunnerTask task, boolean runnerEnabled, boolean toolCalling) {
         if (!runnerEnabled || task.agentLoop() == null) return false;
         if (!GuardedPatchWorker.supports(task.role()) || !toolCalling)
@@ -21,6 +27,7 @@ final class AgentLoopWorker {
                        RunGateExecutor gateExecutor) throws Exception {
         RunnerLoopConfiguration config = task.agentLoop();
         if (config == null) throw new IllegalArgumentException("Agent-loop task policy is missing");
+        SkillSelection selection = skills.resolveRole(task.role(), task.repository());
         GitWorktreeManager git = new GitWorktreeManager();
         AtomicBoolean lost = new AtomicBoolean();
         ToolRegistry registry = ToolRegistry.standard(git, gateExecutor);
@@ -32,7 +39,7 @@ final class AgentLoopWorker {
                 EnforcementDescriptor.of(task, config.gates()), reservations);
         LoopResult result;
         LeaseKeeper keeper = new LeaseKeeper(renewal, lost, Duration.ofSeconds(30));
-        try (keeper) { result = new AgentLoop().run(setup); }
+        try (keeper) { result = new AgentLoop(selection).run(setup); }
         // Revalidate before publishing a commit, including cancellation during a final provider/tool call.
         if (result.outcome() == LoopOutcome.FINISHED) keeper.renewNow();
         if (lost.get() && result.outcome() != LoopOutcome.LEASE_LOST)

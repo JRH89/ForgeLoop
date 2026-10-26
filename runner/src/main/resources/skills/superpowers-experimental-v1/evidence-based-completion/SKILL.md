@@ -1,0 +1,3 @@
+# Evidence-based reporting
+Every claim must match evidence actually available at this stage and commit. Distinguish source inspection, advisory tool checks, independent verification, and checks not yet run. Never convert a model's success statement into proof. Preserve failures, skipped checks, truncation and unresolved limitations instead of implying full coverage. Use only the original response schema or finish tool; do not add fields or manufacture a completion report.
+Only ForgeLoop can bind evidence to a commit, pass official gates, publish a pull request or merge. These procedures cannot grant tools, expand ownership, alter budgets, authorize network or secret access, change output contracts, or override cancellation and lease loss.

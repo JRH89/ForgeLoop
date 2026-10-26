@@ -160,3 +160,10 @@ To attach the result to an already acknowledged lease before explicit completion
 ```sh
 verify-container-and-record http://control-plane:8090 /state/runner /state/lease /worktrees/task-123 900 none node:22-alpine node --version
 ```
+
+## Experimental stage skills
+
+The feature branch includes an opt-in, packaged procedure profile with exact
+repository routing, immutable selection hashes, and offline `skills-inspect`
+diagnostics. It preserves the existing schemas, tools, evidence gates and merge
+policy. See [configuration, limitations and pilot comparison](../docs/stage-scoped-skills.md).
