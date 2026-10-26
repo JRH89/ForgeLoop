@@ -8,9 +8,11 @@ import java.util.List;
 
 /** Strict JSON task result contract; prose or malformed provider output is never treated as a patch. */
 public record PatchPlan(String summary, List<ProposedChange> changes) {
+    static final int MAX_SUMMARY_LENGTH = 500;
+    static final int MAX_CHANGES = 20;
     private static final ObjectMapper JSON = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     public PatchPlan {
-        if (summary == null || summary.isBlank() || summary.length() > 500 || changes == null || changes.isEmpty() || changes.size() > 20) throw new IllegalArgumentException("Patch plan is incomplete");
+        if (summary == null || summary.isBlank() || summary.length() > MAX_SUMMARY_LENGTH || changes == null || changes.isEmpty() || changes.size() > MAX_CHANGES) throw new IllegalArgumentException("Patch plan is incomplete");
         if (changes.stream().map(ProposedChange::path).distinct().count() != changes.size()) throw new IllegalArgumentException("Patch plan contains duplicate paths");
         changes = List.copyOf(changes);
     }

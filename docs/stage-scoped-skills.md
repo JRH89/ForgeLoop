@@ -142,3 +142,11 @@ compatibility with smaller models. Path, schema, retry and run-budget controls
 are unchanged. Planner calls now apply the same
 configured-rate cost calculation as writing tasks, so their usage contributes to
 known spending instead of always appearing unpriced. Regression tests cover both.
+
+The pilot also found that a schema-valid patch could carry a summary longer than
+the existing 500-character application limit. Writing instructions now state that
+limit and the existing 20-file ceiling using the validator constants; validation
+is not relaxed. Sonnet 5 default thinking also exhausted long single-call writing
+requests, so remaining pilot calls use an isolated Sonnet 4.6 policy with its
+$3/$15 per-million token prices and the 16K writing allowance. The saved desktop
+provider configuration is unchanged; each attempt pins its actual local policy.

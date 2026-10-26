@@ -42,6 +42,7 @@ class GuardedPatchWorkerTest {
         ProviderClient provider = request -> {
             // Live reasoning-capable models can consume most of 8K before emitting file contents.
             assertEquals(16_384, request.maxOutputTokens());
+            assertTrue(request.instructions().contains("summary must be nonempty and at most 500 characters"));
             return new ProviderResult("{\"summary\":\"change\",\"changes\":[{\"path\":\"src/result.txt\",\"content\":\"done\",\"message\":\"write result\"}]}", 3, 2, "request-budget");
         };
         new GuardedPatchWorker(16_384).execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,

@@ -70,6 +70,8 @@ public final class GuardedPatchWorker {
         }
         String instructions = "You are the " + role + " worker. Return JSON only: "
                 + "{summary:string,changes:[{path:string,content:string,message:string}]}. "
+                + "The summary must be nonempty and at most " + PatchPlan.MAX_SUMMARY_LENGTH + " characters. "
+                + "Return one to " + PatchPlan.MAX_CHANGES + " complete-file changes. "
                 + "Propose complete file contents only. Do not use paths outside the allowed prefixes."
                 + boundaryInstructions(boundary);
         String repositoryContext = new RepositoryContextBuilder().build(worktree, preferredContextPaths);
