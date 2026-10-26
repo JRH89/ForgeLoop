@@ -191,3 +191,8 @@ work was paused afterwards. This validates the small documentation delivery path
 test-writing behavior is covered by regression tests and remains a separate live
 quality experiment. Final validation passed 442 runner tests (five existing skips)
 and 385 control-plane tests with zero failures or errors.
+
+Packaging validation also pins bundled skill resources to LF in `.gitattributes`:
+Windows checkout conversion must not change bytes covered by manifest hashes.
+The runtime Docker stages refresh Alpine security packages so base-image package
+fixes are included in rebuilt release artifacts.
