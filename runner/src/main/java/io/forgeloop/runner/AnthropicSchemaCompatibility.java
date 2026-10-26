@@ -25,6 +25,15 @@ final class AnthropicSchemaCompatibility {
     private static void removeUnsupportedBounds(JsonNode node) {
         if (node.isObject()) {
             ObjectNode object = (ObjectNode) node;
+            // Keep human-readable guidance when a vendor cannot enforce a bound itself.
+            StringBuilder description = new StringBuilder(object.path("description").asText(""));
+            for (String bound : UNSUPPORTED_BOUNDS) {
+                JsonNode value = object.get(bound);
+                if (value == null) continue;
+                if (!description.isEmpty()) description.append(" ");
+                description.append(bound).append(": ").append(value.toString()).append(".");
+            }
+            if (!description.isEmpty()) object.put("description", description.toString());
             object.remove(UNSUPPORTED_BOUNDS);
             normalizeMinItems(object);
             Iterator<JsonNode> children = object.elements();

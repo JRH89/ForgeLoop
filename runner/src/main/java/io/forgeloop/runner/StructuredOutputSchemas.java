@@ -59,7 +59,49 @@ public final class StructuredOutputSchemas {
 
     private StructuredOutputSchemas() { }
     public static JsonNode plan() { return PLAN.deepCopy(); }
-    public static JsonNode patch() { return PATCH.deepCopy(); }
+    public static JsonNode patch() {
+        com.fasterxml.jackson.databind.node.ObjectNode schema = PATCH.deepCopy();
+        var summary = (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("summary");
+        summary.put("minLength", 1);
+        summary.put("maxLength", PatchPlan.MAX_SUMMARY_LENGTH);
+        // Regex remains enforceable by vendors that do not support maxLength.
+        summary.put("pattern", "^\\S[^\\r\\n]{0," + (PatchPlan.MAX_SUMMARY_LENGTH - 1) + "}$");
+        summary.put("description", "A concise, single-line summary; at most " + PatchPlan.MAX_SUMMARY_LENGTH + " characters.");
+        var changes = (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("changes");
+        changes.put("minItems", 1);
+        changes.put("maxItems", PatchPlan.MAX_CHANGES);
+        return schema;
+    }
+
+    /** Mirrors the task's prefix fence in constrained generation; file guards still validate every result. */
+    public static JsonNode patch(java.util.List<String> allowedPrefixes) {
+        if (allowedPrefixes == null || allowedPrefixes.isEmpty())
+            throw new IllegalArgumentException("Patch output scope is required");
+        java.util.List<String> patterns = new java.util.ArrayList<>();
+        boolean rootAllowed = false;
+        for (String prefix : allowedPrefixes) {
+            if (prefix == null || prefix.isBlank() || prefix.contains("\\"))
+                throw new IllegalArgumentException("Patch output prefix is invalid");
+            java.nio.file.Path path = java.nio.file.Path.of(prefix).normalize();
+            if (path.isAbsolute() || path.startsWith(".."))
+                throw new IllegalArgumentException("Patch output prefix must stay inside the repository");
+            String normalized = path.toString().replace('\\', '/');
+            if (normalized.isEmpty() || normalized.equals(".")) { rootAllowed = true; continue; }
+            StringBuilder escaped = new StringBuilder();
+            for (char character : normalized.toCharArray()) {
+                if ("\\.^$|?*+()[]{}".indexOf(character) >= 0) escaped.append('\\');
+                escaped.append(character);
+            }
+            patterns.add(escaped + "(/.*)?");
+        }
+        String pattern = rootAllowed ? "^.+$" : "^(" + String.join("|", patterns) + ")$";
+        var schema = (com.fasterxml.jackson.databind.node.ObjectNode) patch();
+        var path = (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("changes")
+                .path("items").path("properties").path("path");
+        path.put("pattern", pattern);
+        path.put("description", "Only paths inside these assigned prefixes: " + String.join(", ", allowedPrefixes));
+        return schema;
+    }
     public static JsonNode review() { return REVIEW.deepCopy(); }
     /** Bind output to canonical server criteria instead of relying on prose-copying precision. */
     public static JsonNode review(java.util.List<String> statements) {

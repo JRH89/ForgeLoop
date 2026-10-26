@@ -21,7 +21,12 @@ class DeliveryTaskWriteBoundaryTest {
         testWriter.transition(TaskState.LEASED);
         testWriter.transition(TaskState.REPAIR_QUEUED);
 
-        assertEquals("REPAIR", testWriter.getExecutionRole());
+        assertEquals("INDEPENDENT_TEST", testWriter.getExecutionRole());
+        new RepairPackage(testWriter, "INVALID_OUTPUT", null);
+        testWriter.transition(TaskState.LEASED);
+        assertEquals("INDEPENDENT_TEST", testWriter.getExecutionRole());
+        org.junit.jupiter.api.Assertions.assertTrue(testWriter.getExecutionSpecification().contains("Failure category: INVALID_OUTPUT"));
+        org.junit.jupiter.api.Assertions.assertTrue(testWriter.getExecutionSpecification().contains("500 characters"));
         assertEquals("TESTS_ONLY", testWriter.getWriteBoundary());
         assertEquals("NO_TESTS", implementation.getWriteBoundary());
         assertEquals("NO_TESTS", qualityRepair.getWriteBoundary());

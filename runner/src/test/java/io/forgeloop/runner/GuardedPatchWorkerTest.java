@@ -50,6 +50,16 @@ class GuardedPatchWorkerTest {
         assertEquals("done", Files.readString(repository.resolve("src/result.txt")));
     }
 
+    @Test void independentTestsMustExerciseProductionInterfaces() throws Exception {
+        initializeRepository();
+        ProviderClient provider = request -> {
+            assertTrue(request.instructions().contains("Import and execute the real production modules"));
+            return new ProviderResult("{\"summary\":\"test\",\"changes\":[{\"path\":\"tests/feature.js\",\"content\":\"import '../src/feature.js';\",\"message\":\"test public interface\"}]}", 1, 1, "test-interface");
+        };
+        new GuardedPatchWorker().execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "INDEPENDENT_TEST", "test", "spec", repository, List.of("tests/"));
+    }
+
     @Test void malformedProviderOutputCannotModifyOrAdvanceWork() throws Exception {
         initializeRepository();
         ProviderClient malformed = ignored -> new ProviderResult("not-json", 1, 1, "request-2");

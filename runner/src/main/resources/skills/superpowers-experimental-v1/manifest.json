@@ -1,7 +1,7 @@
 {
   "schema": "forgeloop.skill-pack/1",
   "profile": "superpowers-experimental-v1",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "upstream": {
     "repository": "https://github.com/obra/superpowers",
     "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b",
@@ -26,16 +26,16 @@
     },
     {
       "id": "structured-planning",
-      "version": "1.0.0",
-      "sha256": "90e847881cc2d40def3039cb2021d3d7a2d95b09520e9f1d200de6df50f30573",
+      "version": "1.0.1",
+      "sha256": "b09d0ba7d4e161eb54960651e4f244eca5752b24ce3cd0edc8bb763931b7df92",
       "stages": [
         "PLANNING"
       ]
     },
     {
       "id": "scoped-implementation",
-      "version": "1.0.0",
-      "sha256": "4c951e8a0fae857e30d49036175e875a3d11893b27e60a8c48e479a9b8ca8135",
+      "version": "1.0.1",
+      "sha256": "dcdbed390321f50302339c2be1b42e6218f441afbd853700d549a95901b4753c",
       "stages": [
         "IMPLEMENTATION",
         "REPAIR"
@@ -43,8 +43,8 @@
     },
     {
       "id": "independent-test-design",
-      "version": "1.0.0",
-      "sha256": "84d7beb3a6d3fa584a2b7918eef53c7ba5410d1a55bee8a475289262e6f215d5",
+      "version": "1.0.1",
+      "sha256": "7739a3aebbeaa7c92fcb055d54ccc5c6e376334226b2e92eb09cdc8d82afb9c9",
       "stages": [
         "INDEPENDENT_TEST"
       ]

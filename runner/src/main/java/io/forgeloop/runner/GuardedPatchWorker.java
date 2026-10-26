@@ -72,8 +72,11 @@ public final class GuardedPatchWorker {
                 + "{summary:string,changes:[{path:string,content:string,message:string}]}. "
                 + "The summary must be nonempty and at most " + PatchPlan.MAX_SUMMARY_LENGTH + " characters. "
                 + "Return one to " + PatchPlan.MAX_CHANGES + " complete-file changes. "
-                + "Propose complete file contents only. Do not use paths outside the allowed prefixes."
+                + "Propose complete file contents only. Do not use paths outside the allowed prefixes. The overall specification describes other agents' work too; implement only this task's assigned files. "
                 + boundaryInstructions(boundary);
+        if ("INDEPENDENT_TEST".equals(role)) instructions += " Import and execute the real production modules or public interfaces. "
+                + "Never define a test-local replacement for the behavior being tested. Mock external services only. "
+                + "Use the planner's real scaffold/dependency contract for new interfaces; missing imports or skipped tests are not valid RED evidence.";
         String repositoryContext = new RepositoryContextBuilder().build(worktree, preferredContextPaths);
         if (journal != null) journal.append("CONTEXT_BUILT", java.util.Map.of("kind", "REPOSITORY",
                 "sha256", EvidenceDigests.sha256(repositoryContext.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
@@ -81,7 +84,7 @@ public final class GuardedPatchWorker {
                 + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n" + repositoryContext;
         // Reasoning and complete replacement files share the provider output allowance.
         ProviderExecutionResult execution = new ProviderExecutionService().executeDetailed(provider,
-                new ProviderRequest(policy.model(), instructions, input, maxOutputTokens, StructuredOutputSchemas.patch()), policy.maxAttempts());
+                new ProviderRequest(policy.model(), instructions, input, maxOutputTokens, StructuredOutputSchemas.patch(allowedPrefixes)), policy.maxAttempts());
         ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution,
                 new ProviderCostCalculator().fromEnvironment(policy, execution.result()), correlationId);
         PatchPlan plan;

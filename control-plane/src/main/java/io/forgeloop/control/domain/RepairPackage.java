@@ -37,7 +37,7 @@ public class RepairPackage {
 
     public RepairPackage(DeliveryTask task, String failureCategory, String evidenceDigest, List<String> failingTests) {
         this.task = task;
-        this.attempt = task.getAttempts();
+        this.attempt = task.nextRepairPackageAttempt();
         this.failureCategory = failureCategory == null || failureCategory.isBlank() ? "EXECUTION_FAILED" : failureCategory;
         this.changeSha = task.getChangeSha();
         this.evidenceDigest = evidenceDigest;
@@ -54,6 +54,26 @@ public class RepairPackage {
         this.failingTests = boundedTests.isEmpty() ? null : boundedTests.toString();
         this.createdAt = Instant.now();
         task.attachRepairPackage(this);
+    }
+
+    /** Static category guidance carries no provider prose, source code, prompts or credentials. */
+    public String getCorrectionGuidance() {
+        return switch (failureCategory) {
+            case "INVALID_PROVIDER_OUTPUT", "INVALID_OUTPUT" ->
+                    "Return the exact requested JSON schema, with a nonempty summary of at most 500 characters. "
+                    + "Keep every changed file within the owned paths and original write boundary; include complete file content only in the changes field. "
+                    + "Correct invalid metadata or scope without dropping acceptance criteria or weakening tests.";
+            case "TEST_BOUNDARY_VIOLATION", "SCOPE_VIOLATION" ->
+                    "Remove changes outside the owned paths or original write boundary. Test writers may edit only declared test files; "
+                    + "implementation repairs must preserve tests. Do not expand scope to make the patch pass.";
+            case "BUDGET_EXHAUSTED" ->
+                    "Execution was refused by the spend limit. Review the remaining approved budget and accounting before another attempt; "
+                    + "do not retry provider calls or change source code to bypass the limit.";
+            case "OUTPUT_TOKEN_LIMIT", "CONFIGURATION_ERROR", "PERMANENT_PROVIDER_FAILURE" ->
+                    "Provider execution requires operator review of the output budget or provider configuration before another attempt. "
+                    + "Do not treat a truncated response or configuration failure as a source defect.";
+            default -> "Inspect the referenced evidence and failing tests, then make the smallest correction within the owned paths and original write boundary.";
+        };
     }
 
     public String getId() { return id; }

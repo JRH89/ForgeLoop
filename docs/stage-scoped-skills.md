@@ -150,3 +150,16 @@ is not relaxed. Sonnet 5 default thinking also exhausted long single-call writin
 requests, so remaining pilot calls use an isolated Sonnet 4.6 policy with its
 $3/$15 per-million token prices and the 16K writing allowance. The saved desktop
 provider configuration is unchanged; each attempt pins its actual local policy.
+
+## Recovery after the first live trial
+
+The failed live trial remains failed. The manually recovered fixture PR is not
+proof of autonomous delivery. Recovery fixes now mirror the parser's summary
+limit and each task's owned prefixes into constrained output schemas. Anthropic
+schema adaptation retains removed bounds in field descriptions. Independent-test
+repairs keep their role and bounded failure context after claim; their procedures
+require real production interfaces rather than copied test-local implementations.
+Rejected output receipts retain usage, output limits stop identical retries, and
+an optional durable local provider ceiling protects an isolated paid canary even
+if receipt delivery or the runner process fails. See runner/README.md for its
+explicit prices, POSIX filesystem requirements and non-distributed scope.

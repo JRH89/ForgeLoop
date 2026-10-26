@@ -55,6 +55,13 @@ final class RecordingProviderClient implements ProviderClient {
         try {
             Map<String, Object> fields = new LinkedHashMap<>();
             fields.put("call", 1); fields.put("try", currentTry); fields.put("retryable", failure.retryable());
+            fields.put("category", failure.category());
+            if (failure.receipt() != null) {
+                ProviderResult receipt = failure.receipt();
+                fields.put("responseBody", receipt.responseBody()); fields.put("inputTokens", receipt.inputTokens());
+                fields.put("outputTokens", receipt.outputTokens()); fields.put("answeredModel", receipt.answeredModel());
+                fields.put("providerRequestId", receipt.providerRequestId());
+            }
             String summary = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
             String safeSummary = EvidenceRedactor.redactTokens(summary);
             fields.put("summary", safeSummary.substring(0, Math.min(safeSummary.length(), 400)));

@@ -41,3 +41,11 @@ docker compose ps
 ```
 
 For a migration proof, start the Compose project against an empty, disposable volume and confirm Flyway reaches schema version 16 before Hibernate validation succeeds. Never remove the normal ForgeLoop database volume for this check.
+
+### Independent test retries and provider stops
+
+Independent test writers retain the `INDEPENDENT_TEST` execution role and their original test-only write boundary on every retry. The latest bounded repair package survives lease claim and acknowledgement; it includes static category-specific correction instructions, owned paths, acceptance criteria, test identifiers and evidence references, without retaining provider responses, prompts or repository source. Invalid patch metadata must satisfy the existing exact schema and 500-character summary bound; scope corrections must remain inside existing ownership.
+
+`OUTPUT_TOKEN_LIMIT`, `CONFIGURATION_ERROR`, `PERMANENT_PROVIDER_FAILURE` and `BUDGET_EXHAUSTED` hold the task and block the run for operator review rather than consume another autonomous source-repair attempt. A deliberate operator retry retains the bounded reason. Repair-package ordinals advance independently of the autonomous attempt counter so repeated operator-approved executions retain unique immutable context. Truncated output is never applied or counted as verified work.
+
+Independent tests must import or execute real production modules or public entry points. Test-local copies of filtering, rendering or validation behavior are invalid substitutes. Planners must provide actual public interface paths and schedule minimal production scaffolding when necessary so new tests compile and reach behavior assertions before implementation. Fixtures and expected ordering must agree with their actual values and the specification.

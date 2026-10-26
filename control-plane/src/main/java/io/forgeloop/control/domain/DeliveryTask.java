@@ -93,6 +93,10 @@ public class DeliveryTask {
         if (sha == null || !sha.matches("[0-9a-f]{40,64}")) throw new IllegalArgumentException("Change SHA is invalid");
         this.changeSha = sha;
     }
+    /** Package identity also advances for operator retries that do not spend autonomous repair attempts. */
+    int nextRepairPackageAttempt() {
+        return Math.max(attempts, repairPackages.stream().mapToInt(RepairPackage::getAttempt).max().orElse(-1) + 1);
+    }
     void attachRepairPackage(RepairPackage repairPackage) { repairPackages.add(repairPackage); }
     void attachTestCheckEvidence(TestCheckEvidence item) { testCheckEvidence.add(item); }
     public boolean dependenciesSatisfied() {
@@ -126,10 +130,10 @@ public class DeliveryTask {
     public String getId() { return id; } public String getPlanKey() { return planKey; } public String getRole() { return role; } public String getTitle() { return title; }
     /**
      * Converts a retry into a repair worker only when the original task was allowed to write source files.
-     * Control stages retain their original role so a planner or integrator can never inherit repair write access.
+     * Independent test writers and control stages retain their original procedures and write boundaries.
      */
     public String getExecutionRole() {
-        return state == TaskState.REPAIR_QUEUED && List.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "INDEPENDENT_TEST", "REPAIR").contains(role)
+        return state == TaskState.REPAIR_QUEUED && List.of("IMPLEMENTATION", "BACKEND", "FRONTEND", "REPAIR").contains(role)
                 ? "REPAIR"
                 : role;
     }
@@ -140,12 +144,15 @@ public class DeliveryTask {
     public String getSourceRef() { return run.getSourceRef(); }
     public String getSpecification() { return run.getSpecification(); }
     public String getExecutionSpecification() {
-        if ((state != TaskState.REPAIR_QUEUED && !"REPAIR".equals(role)) || repairPackages.isEmpty()) return run.getSpecification();
-        RepairPackage repair = repairPackages.getLast();
+        // Keep the package through claim/acknowledgement: those transitions must not erase retry instructions.
+        if (repairPackages.isEmpty()) return run.getSpecification();
+        RepairPackage repair = repairPackages.stream().max(java.util.Comparator.comparingInt(RepairPackage::getAttempt)
+                .thenComparing(RepairPackage::getCreatedAt)).orElseThrow();
         return run.getSpecification() + "\n\nBounded repair context:\nFailure category: " + repair.getFailureCategory()
                 + "\nChange SHA: " + (repair.getChangeSha() == null ? "unknown" : repair.getChangeSha())
                 + "\nEvidence digest: " + (repair.getEvidenceDigest() == null ? "unknown" : repair.getEvidenceDigest())
                 + "\nOwned paths: " + String.join(",", repair.getOwnedPaths())
+                + "\nCorrection: " + repair.getCorrectionGuidance()
                 + (repair.getFailingTests().isEmpty() ? "" : "\nFailing tests:\n- " + String.join("\n- ", repair.getFailingTests()))
                 + "\nAcceptance criteria:\n- " + String.join("\n- ", repair.getAcceptanceCriteria());
     }

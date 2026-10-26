@@ -47,6 +47,8 @@ class SkillWorkerIntegrationTest {
         assertEquals("TEST_BOUNDARY_VIOLATION", failure.category());
         assertEquals("new", Files.readString(repo.resolve("src/value.txt")));
         assertTrue(captured.get().instructions().contains("# Independent test design"));
+        assertTrue(captured.get().instructions().contains("Import and execute the real production modules"));
+        assertTrue(captured.get().instructions().contains("test-local replacement"));
     }
 
     @Test void reviewKeepsCanonicalCriteriaAndStaticBeforeExecutionContract() throws Exception {

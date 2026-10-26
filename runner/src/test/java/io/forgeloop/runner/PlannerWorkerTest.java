@@ -26,6 +26,7 @@ class PlannerWorkerTest {
 
         assertTrue(captured.get().instructions().contains("at most one dependency on another writing task"));
         assertTrue(captured.get().instructions().contains("starts from that task's commit"));
+        assertTrue(captured.get().instructions().contains("actual production interfaces, not copied implementations"));
     }
 
     @Test

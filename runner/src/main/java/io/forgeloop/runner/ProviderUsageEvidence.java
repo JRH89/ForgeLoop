@@ -29,7 +29,13 @@ public record ProviderUsageEvidence(String provider, String model, String reques
         ProviderResult result = execution.result();
         String providerRequestId = result.providerRequestId();
         String digestInput = providerRequestId == null || providerRequestId.isBlank() ? correlationId : providerRequestId;
-        return new ProviderUsageEvidence(policy.provider(), policy.model(), digest(digestInput), result.inputTokens(), result.outputTokens(), execution.attemptCount(), cost.estimatedCostMicros(), cost.known(), result.answeredModel());
+        long input = execution.receipts().stream().mapToLong(ProviderResult::inputTokens).sum();
+        long output = execution.receipts().stream().mapToLong(ProviderResult::outputTokens).sum();
+        // A transport failure has no receipt: its charge is unknown even if a later attempt succeeded.
+        if (!execution.usageKnown()) cost = ProviderCostEstimate.unknown();
+        else if (execution.receipts().size() > 1)
+            cost = new ProviderCostCalculator().fromEnvironment(policy, new ProviderResult("receipt", input, output, null));
+        return new ProviderUsageEvidence(policy.provider(), policy.model(), digest(digestInput), input, output, execution.attemptCount(), cost.estimatedCostMicros(), cost.known(), result.answeredModel());
     }
 
     public static ProviderUsageEvidence fromTurn(ProviderExecutionPolicy policy, ConversationExecution execution,

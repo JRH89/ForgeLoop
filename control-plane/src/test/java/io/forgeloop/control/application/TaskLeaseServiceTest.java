@@ -85,6 +85,51 @@ class TaskLeaseServiceTest {
     }
 
     @Test
+    void claimedTestWriterRetryRetainsIndependentRoleAndBoundedCorrection() {
+        FeatureRun run = new FeatureRun("a/b", "issue-1", "x", "spec", 1, "GENERIC", 1);
+        DeliveryTask task = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 0);
+        run.beginPlanning();
+        run.queuePlannedWork();
+        task.transition(TaskState.LEASED);
+        task.transition(TaskState.REPAIR_QUEUED);
+        new RepairPackage(task, "INVALID_PROVIDER_OUTPUT", null);
+        Runner runner = new Runner("org", "node", "1", List.of("provider"), "credential-hash");
+        when(tasks.findById("task")).thenReturn(Optional.of(task));
+        when(tasks.findAllForUpdateByRunId(run.getId())).thenReturn(List.of(task));
+        when(runners.findById("runner")).thenReturn(Optional.of(runner));
+        when(leases.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        service.claim("task", "runner");
+
+        assertEquals(TaskState.LEASED, task.getState());
+        assertEquals("INDEPENDENT_TEST", task.getExecutionRole());
+        org.junit.jupiter.api.Assertions.assertTrue(task.getExecutionSpecification().contains("500 characters"));
+        org.junit.jupiter.api.Assertions.assertTrue(task.getExecutionSpecification().contains("tests"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"OUTPUT_TOKEN_LIMIT", "CONFIGURATION_ERROR", "PERMANENT_PROVIDER_FAILURE", "BUDGET_EXHAUSTED"})
+    void providerStopRequiresOperatorReviewInsteadOfBlindSourceRepair(String category) {
+        FeatureRun run = activeRun();
+        DeliveryTask task = run.getTasks().getFirst();
+        when(tasks.findById(task.getId())).thenReturn(Optional.of(task));
+        TaskLease authenticated = mock(TaskLease.class);
+        when(authenticated.belongsTo("runner")).thenReturn(true);
+        when(authenticated.matchesNonceHash(any())).thenReturn(true);
+        when(authenticated.active()).thenReturn(true);
+        when(authenticated.isAcknowledged()).thenReturn(true);
+        when(authenticated.getTaskId()).thenReturn(task.getId());
+        when(leases.findById("lease")).thenReturn(Optional.of(authenticated));
+        service.complete("lease", "runner", "nonce", false, category);
+        assertEquals(TaskState.HELD, task.getState());
+        assertEquals(RunState.BLOCKED, run.getState());
+        assertEquals(0, task.getAttempts());
+        verify(escalations).escalate(eq(task), eq(category), any());
+        verify(authenticated).closeForHold(category);
+        verify(authenticated, never()).complete(org.mockito.ArgumentMatchers.anyBoolean(), any());
+    }
+
+    @Test
     void onlyLeaseBoundRepositoryCheckoutIsAllowedBeforeAcknowledgement() {
         TaskLease lease = mock(TaskLease.class);
         when(leases.findById("lease")).thenReturn(Optional.of(lease));

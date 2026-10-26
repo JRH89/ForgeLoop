@@ -15,9 +15,24 @@ class AnthropicMessagesProviderClientTest {
         ProviderResult result = AnthropicMessagesProviderClient.parse("{\"id\":\"msg_1\",\"usage\":{\"input_tokens\":11,\"output_tokens\":7},\"content\":[{\"type\":\"text\",\"text\":\"safe patch\"},{\"type\":\"tool_use\",\"name\":\"ignored\"}]}");
         assertEquals("safe patch", result.output()); assertEquals(11, result.inputTokens()); assertEquals(7, result.outputTokens());
     }
-    @Test void rejectsAResponseWithoutText() { assertThrows(IllegalArgumentException.class, () -> AnthropicMessagesProviderClient.parse("{\"id\":\"msg_1\",\"usage\":{},\"content\":[]}")); }
-    @Test void rejectsTruncatedOutputBeforeSchemaParsing() {
-        assertThrows(IllegalArgumentException.class, () -> AnthropicMessagesProviderClient.parse("{\"id\":\"msg_1\",\"stop_reason\":\"max_tokens\",\"usage\":{},\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}"));
+    @Test void rejectsAResponseWithoutText() { assertThrows(ProviderException.class, () -> AnthropicMessagesProviderClient.parse("{\"id\":\"msg_1\",\"usage\":{},\"content\":[]}")); }
+    @Test void rejectsTruncatedOutputWithActionableReceipt() throws Exception {
+        String body = "{\"id\":\"msg_1\",\"model\":\"actual\",\"stop_reason\":\"max_tokens\",\"usage\":{\"input_tokens\":31757,\"output_tokens\":8192},\"content\":[]}";
+        var failure = assertThrows(ProviderException.class, () -> AnthropicMessagesProviderClient.parse(body));
+        assertFalse(failure.retryable());
+        assertEquals("OUTPUT_TOKEN_LIMIT", failure.category());
+        assertEquals(31757, failure.receipt().inputTokens());
+        assertEquals(8192, failure.receipt().outputTokens());
+        assertEquals(body, failure.receipt().responseBody());
+    }
+    @Test void rejectedTextRetainsReceiptAndAbsentUsageIsUnknown() {
+        var failure = assertThrows(ProviderException.class, () -> AnthropicMessagesProviderClient.parse(
+                "{\"id\":\"msg-empty\",\"model\":\"actual\",\"usage\":{\"input_tokens\":5,\"output_tokens\":3},\"content\":[]}"));
+        assertEquals("INVALID_OUTPUT", failure.category()); assertFalse(failure.retryable());
+        assertEquals(5, failure.receipt().inputTokens()); assertEquals(3, failure.receipt().outputTokens());
+        var missing = assertThrows(ProviderException.class, () -> AnthropicMessagesProviderClient.parse(
+                "{\"stop_reason\":\"max_tokens\",\"content\":[]}"));
+        assertNull(missing.receipt());
     }
     @Test void sendsSchemaThroughCurrentOutputConfigContract() throws Exception {
         String body = AnthropicMessagesProviderClient.requestBody(new ProviderRequest("claude", "instructions", "input", 128, StructuredOutputSchemas.plan()));

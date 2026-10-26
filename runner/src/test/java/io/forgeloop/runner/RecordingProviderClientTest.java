@@ -46,6 +46,21 @@ class RecordingProviderClientTest {
         assertEquals(body, OpenAiResponsesProviderClient.parse(body).responseBody());
     }
 
+    @Test void journalsRejectedReceiptVerbatimForReplay() throws Exception {
+        var journal = new StepJournal(temporary, "task-rejected", "lease-rejected", Clock.systemUTC());
+        var receipt = new ProviderResult("private partial", 31757, 8192, "msg-1", "actual", "raw private response");
+        ProviderClient provider = ignored -> { throw new ProviderException("budget exhausted", false, null, null, "OUTPUT_TOKEN_LIMIT", receipt); };
+        var recording = new RecordingProviderClient(provider, new ProviderExecutionPolicy("anthropic", "model", 1), journal);
+        org.junit.jupiter.api.Assertions.assertThrows(ProviderException.class,
+                () -> recording.execute(new ProviderRequest("model", "rules", "input", 8192)));
+        var failed = journal.records().getLast();
+        assertEquals("CALL_FAILED", failed.path("type").asText());
+        assertEquals("raw private response", failed.path("responseBody").asText());
+        assertEquals(31757, failed.path("inputTokens").asLong());
+        assertEquals(8192, failed.path("outputTokens").asLong());
+        assertEquals("OUTPUT_TOKEN_LIMIT", failed.path("category").asText());
+    }
+
     private static String sha256(String value) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
