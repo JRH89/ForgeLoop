@@ -29,6 +29,10 @@ repository, pack version, manifest hash, ordered procedure references, and the
 selection hash. Try `REPAIR`, `INDEPENDENT_TEST`, `REVIEW`, and `AI_CHAT` to see the
 differences. `MERGE` and unselected repositories return `enabled:false`.
 
+The profile is applied to dispatched worker tasks and enrolled issue-drafting jobs.
+Standalone provider diagnostics and the ad hoc `generate-patch` command retain
+their existing behavior because they have no server-assigned repository context.
+
 The repository allowlist is required, exact and case-sensitive. Comma-separated
 entries are supported; wildcards, empty entries, unknown profiles, and malformed
 names fail closed. The pack itself is checked before a selected worker calls its
@@ -123,3 +127,7 @@ Local verification on this feature branch: full runner Maven verification passed
 The shaded JAR includes the pack, manifest, license and attribution. Offline CLI
 checks selected the planner pack for an allowlisted repository and returned
 `enabled:false` for merge and the default-off case. No live provider was called.
+
+Independent whole-branch review found no actionable defects and confirmed the
+experiment is ready for an opt-in branch trial. Live model quality and cost
+improvements remain to be measured; this is not production enablement.
