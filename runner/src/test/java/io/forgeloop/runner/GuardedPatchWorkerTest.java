@@ -27,6 +27,73 @@ class GuardedPatchWorkerTest {
         assertFalse(result.commitSha().isBlank());
     }
 
+    @Test void writingOutputAllowancePreservesDefaultAndValidatesOptIn() {
+        assertEquals(8192, GuardedPatchWorker.patchOutputTokens(null));
+        assertEquals(8192, GuardedPatchWorker.patchOutputTokens(""));
+        assertEquals(16384, GuardedPatchWorker.patchOutputTokens("16384"));
+        assertEquals(32768, GuardedPatchWorker.patchOutputTokens("32768"));
+        for (String invalid : List.of("8191", "32769", "-1", "many")) {
+            assertThrows(IllegalArgumentException.class, () -> GuardedPatchWorker.patchOutputTokens(invalid));
+        }
+    }
+
+    @Test void fullFilePatchesHaveRoomAfterProviderReasoning() throws Exception {
+        initializeRepository();
+        ProviderClient provider = request -> {
+            // Live reasoning-capable models can consume most of 8K before emitting file contents.
+            assertEquals(16_384, request.maxOutputTokens());
+            assertTrue(request.instructions().contains("summary must be nonempty and at most 500 characters"));
+            return new ProviderResult("{\"summary\":\"change\",\"changes\":[{\"path\":\"src/result.txt\",\"content\":\"done\",\"message\":\"write result\"}]}", 3, 2, "request-budget");
+        };
+        new GuardedPatchWorker(16_384).execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "IMPLEMENTATION", "task", "spec", repository, List.of("src/"));
+        assertEquals("done", Files.readString(repository.resolve("src/result.txt")));
+    }
+
+    @Test void independentTestsMustExerciseProductionInterfaces() throws Exception {
+        initializeRepository();
+        ProviderClient provider = request -> {
+            assertTrue(request.instructions().contains("Import and execute the real production modules"));
+            return new ProviderResult("{\"summary\":\"test\",\"changes\":[{\"path\":\"tests/feature.js\",\"content\":\"import '../src/feature.js';\",\"message\":\"test public interface\"}]}", 1, 1, "test-interface");
+        };
+        new GuardedPatchWorker().execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "INDEPENDENT_TEST", "test", "spec", repository, List.of("tests/"));
+    }
+
+    @Test void verboseCommitProseDoesNotDiscardOtherwiseValidFileChanges() throws Exception {
+        initializeRepository();
+        String output = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of(
+                "summary", "details ".repeat(120), "changes", java.util.List.of(java.util.Map.of(
+                        "path", "src/result.txt", "content", "exact contents\n", "message", "write result"))));
+        assertThrows(IllegalArgumentException.class, () -> PatchPlan.parse(output));
+        ProviderClient provider = request -> new ProviderResult(output, 1, 1, "verbose-metadata");
+        new GuardedPatchWorker().execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "IMPLEMENTATION", "task", "spec", repository, List.of("src/"));
+        assertEquals("exact contents\n", Files.readString(repository.resolve("src/result.txt")));
+    }
+
+    @Test void metadataNormalizationNeverPermitsOutOfScopeCode() throws Exception {
+        initializeRepository();
+        String output = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(java.util.Map.of(
+                "summary", "details ".repeat(120), "changes", java.util.List.of(java.util.Map.of(
+                        "path", "tests/outside.js", "content", "forbidden", "message", "write"))));
+        ProviderClient provider = request -> new ProviderResult(output, 1, 1, "scoped-metadata");
+        assertThrows(GuardedPatchFailure.class, () -> new GuardedPatchWorker().execute(
+                new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "IMPLEMENTATION", "task", "spec", repository, List.of("src/")));
+        assertFalse(Files.exists(repository.resolve("tests/outside.js")));
+    }
+
+    @Test void normalizedMetadataStillRejectsBlankAndDoesNotSplitSurrogates() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        var changes = java.util.List.of(java.util.Map.of("path", "src/result.txt", "content", "unaltered", "message", "write"));
+        assertThrows(IllegalArgumentException.class, () -> PatchPlan.parseForWorker(json.writeValueAsString(java.util.Map.of("summary", " ", "changes", changes))));
+        assertThrows(IllegalArgumentException.class, () -> PatchPlan.parseForWorker(json.writeValueAsString(java.util.Map.of("summary", 12, "changes", changes))));
+        var plan = PatchPlan.parseForWorker(json.writeValueAsString(java.util.Map.of("summary", "a".repeat(499) + "\uD83D\uDE00" + "rest", "changes", changes)));
+        assertEquals(499, plan.summary().length());
+        assertEquals("unaltered", plan.changes().getFirst().content());
+    }
+
     @Test void malformedProviderOutputCannotModifyOrAdvanceWork() throws Exception {
         initializeRepository();
         ProviderClient malformed = ignored -> new ProviderResult("not-json", 1, 1, "request-2");

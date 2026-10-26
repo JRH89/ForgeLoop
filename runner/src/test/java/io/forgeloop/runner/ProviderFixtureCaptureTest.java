@@ -67,9 +67,10 @@ class ProviderFixtureCaptureTest {
             @Override public String executeRaw(ProviderRequest request) { return "{\"content\":[],\"usage\":{}}"; }
         };
 
-        assertThrows(IllegalArgumentException.class, () -> new ProviderFixtureCapture().capture("anthropic", "claude-sonnet-5",
+        ProviderException rejected = assertThrows(ProviderException.class, () -> new ProviderFixtureCapture().capture("anthropic", "claude-sonnet-5",
                 () -> client, fixtureRoot, Instant.now()));
-
+        assertEquals("INVALID_OUTPUT", rejected.category());
+        assertFalse(rejected.retryable());
         assertFalse(Files.exists(fixtureRoot.resolve("anthropic")));
     }
 }

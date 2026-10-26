@@ -25,8 +25,15 @@ public final class AgentLoop {
     private final RepositoryContextBuilder contexts;
     private final ResultShaper shaper;
     private final SpendGovernor spendGovernor;
+    private final SkillSelection skills;
+    private final String instructions;
 
     public AgentLoop() { this(new ConversationExecutionService(), new ProviderCostCalculator(), new RepositoryContextBuilder(), new ResultShaper(), new SpendGovernor()); }
+
+    public AgentLoop(SkillSelection selection) {
+        this(new ConversationExecutionService(), new ProviderCostCalculator(), new RepositoryContextBuilder(),
+                new ResultShaper(), new SpendGovernor(), selection);
+    }
 
     AgentLoop(ConversationExecutionService conversations, ProviderCostCalculator costs,
               RepositoryContextBuilder contexts, ResultShaper shaper) {
@@ -35,12 +42,21 @@ public final class AgentLoop {
 
     AgentLoop(ConversationExecutionService conversations, ProviderCostCalculator costs,
               RepositoryContextBuilder contexts, ResultShaper shaper, SpendGovernor spendGovernor) {
+        this(conversations, costs, contexts, shaper, spendGovernor, SkillSelection.none());
+    }
+
+    private AgentLoop(ConversationExecutionService conversations, ProviderCostCalculator costs,
+                      RepositoryContextBuilder contexts, ResultShaper shaper, SpendGovernor spendGovernor,
+                      SkillSelection selection) {
+        if (selection == null) throw new IllegalArgumentException("Loop skill selection is required");
         this.conversations = conversations; this.costs = costs; this.contexts = contexts; this.shaper = shaper;
-        this.spendGovernor = spendGovernor;
+        this.spendGovernor = spendGovernor; this.skills = selection;
+        this.instructions = selection.composeInstructions(LoopInstructions.text());
     }
 
     public LoopResult run(LoopSetup setup) {
         if (setup == null) throw new IllegalArgumentException("Agent loop setup is required");
+        skills.requireRole(setup.role(), setup.repository());
         Meter meter = new Meter();
         Instant started = setup.clock().instant();
         try {
@@ -264,7 +280,7 @@ public final class AgentLoop {
         int outputTokens = outputCap;
         for (int recalculation = 0; recalculation < 8; recalculation++) {
             if (outputTokens < 128) return null;
-            ConversationRequest request = new ConversationRequest(setup.providerPolicy().model(), LoopInstructions.text(),
+            ConversationRequest request = new ConversationRequest(setup.providerPolicy().model(), instructions,
                     List.copyOf(items), specs, outputTokens, timeout);
             String serialized = setup.conversationClient().serialize(request);
             TurnCostBound bound = TurnCostBound.calculate(serialized, meter.lastSerializedRequestBytes,
@@ -322,7 +338,6 @@ public final class AgentLoop {
     private void journalStarted(LoopSetup setup, Set<String> tools) throws IOException {
         List<ToolSpec> specs = setup.toolRegistry().specifications(tools);
         String toolsHash = Hashing.sha256(JSON.writeValueAsString(specs));
-        String instructions = LoopInstructions.text();
         Map<String, Object> start = new LinkedHashMap<>();
         start.put("taskId", setup.taskId()); start.put("repository", setup.repository());
         start.put("executionRole", setup.role()); start.put("title", setup.title());
@@ -335,6 +350,7 @@ public final class AgentLoop {
         start.put("toolsSha256", toolsHash); start.put("tools", specs); start.put("budget", setup.budget());
         start.put("gates", setup.gates());
         start.put("enforcement", setup.enforcementDescriptor().journalValue());
+        if (skills.enabled()) start.put("skills", skills.metadata());
         start.put("startedAt", setup.clock().instant().toString()); start.put("runnerVersion", "0.1.0");
         setup.journal().append("LOOP_STARTED", start);
     }

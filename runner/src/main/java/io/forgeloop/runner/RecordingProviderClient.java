@@ -28,6 +28,7 @@ final class RecordingProviderClient implements ProviderClient {
             Map<String, Object> requested = new LinkedHashMap<>();
             requested.put("call", 1); requested.put("try", currentTry); requested.put("model", request.model());
             requested.put("instructions", request.instructions()); requested.put("input", request.input());
+            if (request.skillSelection().enabled()) requested.put("skills", request.skillSelection().metadata());
             requested.put("maxOutputTokens", request.maxOutputTokens()); requested.put("outputSchema", request.outputSchema());
             requested.put("requestSha256", sha256(body.getBytes(StandardCharsets.UTF_8)));
             journal.append("CALL_REQUESTED", requested);
@@ -54,6 +55,13 @@ final class RecordingProviderClient implements ProviderClient {
         try {
             Map<String, Object> fields = new LinkedHashMap<>();
             fields.put("call", 1); fields.put("try", currentTry); fields.put("retryable", failure.retryable());
+            fields.put("category", failure.category());
+            if (failure.receipt() != null) {
+                ProviderResult receipt = failure.receipt();
+                fields.put("responseBody", receipt.responseBody()); fields.put("inputTokens", receipt.inputTokens());
+                fields.put("outputTokens", receipt.outputTokens()); fields.put("answeredModel", receipt.answeredModel());
+                fields.put("providerRequestId", receipt.providerRequestId());
+            }
             String summary = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
             String safeSummary = EvidenceRedactor.redactTokens(summary);
             fields.put("summary", safeSummary.substring(0, Math.min(safeSummary.length(), 400)));

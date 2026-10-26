@@ -28,6 +28,7 @@ public final class AnthropicMessagesProviderClient implements ProviderClient, Co
     @Override public ProviderResult execute(ProviderRequest request) throws ProviderException {
         String body = executeRaw(request);
         try { return parse(body); }
+        catch (ProviderException exception) { throw exception; }
         catch (Exception exception) { throw new ProviderException("Anthropic provider response could not be parsed", true, exception); }
     }
 
@@ -59,11 +60,27 @@ public final class AnthropicMessagesProviderClient implements ProviderClient, Co
 
     static ProviderResult parse(String body) throws Exception {
         JsonNode response = JSON.readTree(body);
-        if ("max_tokens".equals(response.path("stop_reason").asText())) throw new IllegalArgumentException("Anthropic output reached the token limit");
+        if ("max_tokens".equals(response.path("stop_reason").asText())) {
+            ProviderResult receipt = rejectedReceipt(response, body);
+            throw new ProviderException("Anthropic output token budget exhausted; increase the budget or reduce the requested output", false,
+                    null, null, "OUTPUT_TOKEN_LIMIT", receipt);
+        }
         StringBuilder output = new StringBuilder();
         for (JsonNode content : response.path("content")) if ("text".equals(content.path("type").asText())) output.append(content.path("text").asText());
+        if (output.toString().isBlank()) throw new ProviderException("Anthropic response contained no usable text", false, null, null,
+                "INVALID_OUTPUT", rejectedReceipt(response, body));
         JsonNode usage = response.path("usage");
         return new ProviderResult(output.toString(), usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(), response.path("id").asText(null), response.path("model").asText(null), body);
+    }
+
+    /** Preserve the billable envelope even when its completion cannot be accepted. */
+    private static ProviderResult rejectedReceipt(JsonNode response, String body) {
+        JsonNode usage = response.path("usage");
+        if (!usage.path("input_tokens").isIntegralNumber() || !usage.path("output_tokens").isIntegralNumber()
+                || !usage.path("input_tokens").canConvertToLong() || !usage.path("output_tokens").canConvertToLong()
+                || usage.path("input_tokens").asLong() < 0 || usage.path("output_tokens").asLong() < 0) return null;
+        return new ProviderResult(body, usage.path("input_tokens").asLong(), usage.path("output_tokens").asLong(),
+                response.path("id").asText(null), response.path("model").asText(null), body);
     }
 
     @Override public String serialize(ConversationRequest request) {

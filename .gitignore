@@ -19,3 +19,6 @@ deploy/cloudflared/*.json
 # Internal planning notes and unreleased Version 2 design specifications.
 docs/2026-09-2026-roadmap.md
 docs/Version_2/
+
+# Local execution ledgers
+.superpowers/

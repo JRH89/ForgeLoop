@@ -20,6 +20,12 @@ public final class RunnerMain {
     }
 
     public static void main(String[] arguments) throws Exception {
+        if (arguments.length > 0 && "skills-inspect".equals(arguments[0])) {
+            if (arguments.length != 3) throw new IllegalArgumentException("Usage: skills-inspect <role> <owner/repository>");
+            SkillSelection selection = StageSkillResolver.fromEnvironment().resolveRole(arguments[1], arguments[2]);
+            System.out.println(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(selection.metadata()));
+            return;
+        }
         if (arguments.length == 3 && "model-price".equals(arguments[0])) {
             Object result;
             try { result = new ModelPriceCatalog().find(arguments[1], arguments[2]).<Object>map(found -> found).orElse(java.util.Map.of("known", false)); }
@@ -475,7 +481,7 @@ public final class RunnerMain {
             String repositoryContext = new RepositoryContextBuilder().build(worktree, List.of("README.md", "AGENTS.md"));
             if (journal != null) journal.context("REPOSITORY", repositoryContext, null, false);
             String mcpContext = collectMcpOrFail(task, worktree, journal);
-            PlannerResult result = new PlannerWorker().execute(policy, providerClient(policy, events, journal), task,
+            PlannerResult result = new PlannerWorker().execute(policy, providerClient(policy, events, journal, task), task,
                     repositoryContext + mcpContext, lease.leaseId());
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
             finishJournal(task, identity, lease, client, events, journal, "COMPLETED", null);
@@ -629,7 +635,7 @@ public final class RunnerMain {
         try {
             ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("ISSUE_SPECIFICATION");
             RepositoryIssueProposalResult result = new RepositoryIssueProposalWorker().execute(policy,
-                    new ProviderClientFactory().create(policy), grant);
+                    skillProviderClient(policy, "ISSUE_SPECIFICATION", grant.repository()), grant);
             client.completeRepositoryIssueProposal(identity, grant, result);
             System.out.println("Issue proposal generated: " + grant.repository() + ", cost="
                     + (result.usage().costKnown() ? result.usage().estimatedCostMicros() + " micros" : "N/A"));
@@ -651,7 +657,7 @@ public final class RunnerMain {
     private static void executeIssueChatTurn(RunnerClient client, RunnerIdentity identity, IssueChatTurnGrant grant, String[] arguments) {
         try {
             ProviderExecutionPolicy policy = RunnerProviderPolicy.load(Path.of(arguments[5])).select("AI_CHAT");
-            IssueChatResult result = new IssueChatWorker().execute(policy, new ProviderClientFactory().create(policy), grant);
+            IssueChatResult result = new IssueChatWorker().execute(policy, skillProviderClient(policy, "AI_CHAT", grant.repository()), grant);
             client.completeIssueChatTurn(identity, grant, result);
             System.out.println("Issue chat draft updated: " + grant.repository() + ", cost="
                     + (result.usage().costKnown() ? result.usage().estimatedCostMicros() + " micros" : "N/A"));
@@ -728,7 +734,7 @@ public final class RunnerMain {
                     .stream().map(GitWorktreeManager.ChangedFile::path).toList();
             String reviewSource = new RepositoryContextBuilder().build(worktree, reviewPaths);
             if (journal != null) journal.context("REVIEW_SOURCE", reviewSource, diffBase, false);
-            ReviewResult result = new ReviewWorker().execute(policy, providerClient(policy, events, journal), contextualTask,
+            ReviewResult result = new ReviewWorker().execute(policy, providerClient(policy, events, journal, task), contextualTask,
                     diff, lease.leaseId(), reviewSource);
             client.recordReviewEvidence(identity, lease, result);
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.succeeded(result.usage()));
@@ -749,7 +755,8 @@ public final class RunnerMain {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(invalid.usage(), invalid.category()));
             if (journal != null) safePatchRefused(journal, invalid);
             finishJournal(task, identity, lease, client, events, journal, invalid.category(), null);
-            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            // A malformed read-only result needs a provider/schema correction, not another source-repair spend.
+            client.failLease(identity, lease, "CONFIGURATION_ERROR");
             throw invalid;
         } catch (Exception failure) {
             finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
@@ -788,7 +795,7 @@ public final class RunnerMain {
             List<String> preferredContextPaths = new ArrayList<>(task.ownedPaths());
             preferredContextPaths.addAll(new GitWorktreeManager().changedFiles(worktree,
                     checkoutRef(task, task.baseBranch())));
-            result = new GuardedPatchWorker().execute(policy, providerClient(policy, events, journal), task.role(),
+            result = new GuardedPatchWorker().execute(policy, providerClient(policy, events, journal, task), task.role(),
                     task.title(), contextualTask.specification(), worktree, List.of(allowedPrefixes.split(",")),
                     preferredContextPaths, lease.leaseId(), new WriteBoundary(task.writeBoundary(), task.testPathGlobs()),
                     journal == null ? null : journal.journal());
@@ -904,10 +911,16 @@ public final class RunnerMain {
     }
 
     private static ProviderClient providerClient(ProviderExecutionPolicy policy, RunnerEventReporter events,
-                                                 RunJournalSession journal) {
+                                                 RunJournalSession journal, RunnerTask task) {
+        SkillSelection selection = StageSkillResolver.fromEnvironment().resolveRole(task.role(), task.repository());
         ProviderClient provider = new ProviderClientFactory().create(policy);
         if (journal != null) provider = new RecordingProviderClient(provider, policy, journal.journal());
-        return new ProgressProviderClient(provider, events);
+        return new SkillProviderClient(new ProgressProviderClient(provider, events), selection);
+    }
+
+    private static ProviderClient skillProviderClient(ProviderExecutionPolicy policy, String role, String repository) {
+        SkillSelection selection = StageSkillResolver.fromEnvironment().resolveRole(role, repository);
+        return new SkillProviderClient(new ProviderClientFactory().create(policy), selection);
     }
 
     /** Records before the server closes a lease; upload failure is metadata-only and never blocks delivery. */

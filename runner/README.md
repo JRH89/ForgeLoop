@@ -160,3 +160,35 @@ To attach the result to an already acknowledged lease before explicit completion
 ```sh
 verify-container-and-record http://control-plane:8090 /state/runner /state/lease /worktrees/task-123 900 none node:22-alpine node --version
 ```
+
+## Experimental stage skills
+
+The feature branch includes an opt-in, packaged procedure profile with exact
+repository routing, immutable selection hashes, and offline `skills-inspect`
+diagnostics. It preserves the existing schemas, tools, evidence gates and merge
+policy. See [configuration, limitations and pilot comparison](../docs/stage-scoped-skills.md).
+
+### Optional local provider spend ceiling
+
+For an isolated paid trial, set both `FORGELOOP_PROVIDER_SPEND_LIMIT_MICROS`
+(integer micro-dollars; `2000000` is $2) and
+`FORGELOOP_PROVIDER_SPEND_LEDGER` (absolute path in an existing private directory).
+The runner reserves a conservative priced bound before each HTTP attempt,
+including retries and raw diagnostics, and settles trustworthy receipts to actual
+estimated usage. An unknown transport outcome retains its entire reservation.
+The ledger is shared by processes using that path and survives restart; never
+reset or replace it while requests may still be outstanding. Use a fresh path
+only for an explicitly new budget. All selected policies must have explicit
+input/output prices. Missing configuration, unknown prices, corrupt or unsafe
+files, and an exhausted ceiling stop before another provider request.
+
+This optional operator ceiling requires a POSIX filesystem supporting owner-only
+permissions, atomic replacement and directory fsync. Unsupported filesystems fail
+closed. It complements server run budgets; it is not a distributed organization
+billing limit. Without these variables, existing provider configuration is unchanged.
+
+Output-token exhaustion now reports `OUTPUT_TOKEN_LIMIT` without repeating the
+same request. Rejected response receipts retain billable tokens/cost, and retry
+usage aggregates all received receipts. A missing receipt remains explicitly
+unknown, rather than a free call. Provider configuration/token-limit stops hold
+the task for a corrected policy instead of consuming source-repair attempts.

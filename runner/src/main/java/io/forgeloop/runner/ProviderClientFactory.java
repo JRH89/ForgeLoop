@@ -77,13 +77,14 @@ public final class ProviderClientFactory {
     /** Builds a client with a caller-supplied secret without copying it into process environment. */
     ProviderClient create(ProviderExecutionPolicy policy, String credential) {
         HttpClient client = HttpClient.newHttpClient();
-        return switch (policy.provider()) {
+        ProviderClient provider = switch (policy.provider()) {
             case "anthropic" -> new AnthropicMessagesProviderClient(client, URI.create(ANTHROPIC_ENDPOINT), credentialOrEnvironment(credential, "ANTHROPIC_API_KEY"));
             case "openai" -> new OpenAiResponsesProviderClient(client, URI.create(OPENAI_ENDPOINT), credentialOrEnvironment(credential, "OPENAI_API_KEY"));
             case "gemini" -> new GeminiGenerateContentProviderClient(client, URI.create(GEMINI_ENDPOINT), credentialOrEnvironment(credential, "GEMINI_API_KEY"));
             case "local" -> new OpenAiChatCompatibleProviderClient(client, localEndpoint(), optional("FORGELOOP_LOCAL_PROVIDER_API_KEY"));
             default -> throw new IllegalStateException("Unsupported provider policy");
         };
+        return SpendLimitedProviderClient.protect(policy, provider, System.getenv());
     }
 
     String pinnedEndpoint(String provider) {

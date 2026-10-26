@@ -46,4 +46,48 @@ class RepairPackagePersistenceTest {
         assertEquals(repairTaskId, stored.getTaskId());
         assertEquals("REPAIR", entityManager.find(DeliveryTask.class, repairTaskId).getRole());
     }
+    @Test
+    void claimedIndependentTestRetryRetainsLatestCorrectionAfterReload() {
+        FeatureRun run = new FeatureRun("org", "acme/repo", "issue-10", "Feature", "Must pass", 5,
+                "GENERIC", "main", 1);
+        DeliveryTask task = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 0);
+        entityManager.persist(run);
+        task.transition(TaskState.LEASED);
+        task.transition(TaskState.REPAIR_QUEUED);
+        entityManager.persist(new RepairPackage(task, "EXECUTION_FAILED", null));
+        task.transition(TaskState.LEASED);
+        task.transition(TaskState.REPAIR_QUEUED);
+        entityManager.persist(new RepairPackage(task, "INVALID_PROVIDER_OUTPUT", null));
+        task.transition(TaskState.LEASED);
+        entityManager.flush();
+        String taskId = task.getId();
+        entityManager.clear();
+
+        DeliveryTask stored = entityManager.find(DeliveryTask.class, taskId);
+        assertEquals("INDEPENDENT_TEST", stored.getExecutionRole());
+        org.junit.jupiter.api.Assertions.assertTrue(stored.getExecutionSpecification().contains("Failure category: INVALID_PROVIDER_OUTPUT"));
+        org.junit.jupiter.api.Assertions.assertTrue(stored.getExecutionSpecification().contains("500 characters"));
+    }
+
+    @Test
+    void repeatedProviderHoldsKeepUniqueContextWithoutSpendingRepairBudget() {
+        FeatureRun run = new FeatureRun("org", "acme/repo", "issue-11", "Feature", "Must pass", 5,
+                "GENERIC", "main", 1);
+        DeliveryTask task = run.addPlannedTask("tests", "INDEPENDENT_TEST", "Tests", "provider", List.of("tests"), 2, 0);
+        entityManager.persist(run);
+        task.transition(TaskState.LEASED);
+        task.hold();
+        RepairPackage first = new RepairPackage(task, "OUTPUT_TOKEN_LIMIT", null);
+        entityManager.persist(first);
+        entityManager.flush();
+        task.retryByOperator();
+        task.transition(TaskState.LEASED);
+        task.hold();
+        RepairPackage second = new RepairPackage(task, "CONFIGURATION_ERROR", null);
+        entityManager.persist(second);
+        entityManager.flush();
+        assertEquals(0, task.getAttempts());
+        org.junit.jupiter.api.Assertions.assertTrue(second.getAttempt() > first.getAttempt());
+    }
+
 }

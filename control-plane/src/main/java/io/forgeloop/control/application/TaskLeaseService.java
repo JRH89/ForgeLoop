@@ -116,6 +116,18 @@ public class TaskLeaseService {
         String category = failureCategory != null ? failureCategory
                 : latestProviderCategory != null ? latestProviderCategory
                 : "VERIFICATION".equals(task.getRole()) ? "VERIFICATION_NOT_RECORDED" : "EXECUTION_FAILED";
+        // An unchanged provider request cannot repair output exhaustion or invalid configuration.
+        // Preserve a bounded package for a deliberate operator retry without spending source-repair attempts.
+        if (!passed && List.of("OUTPUT_TOKEN_LIMIT", "CONFIGURATION_ERROR", "PERMANENT_PROVIDER_FAILURE", "BUDGET_EXHAUSTED").contains(category)) {
+            if (!lease.active() || !lease.isAcknowledged()) throw new IllegalStateException("Provider stop requires an active acknowledged lease");
+            task.hold();
+            task.getRun().block();
+            lease.closeForHold(category);
+            RepairPackage repair = new RepairPackage(task, category, null);
+            repairPackages.save(repair);
+            escalations.escalate(task, category, repair.getCorrectionGuidance());
+            return lease;
+        }
         lease.complete(passed, passed ? "COMPLETED" : category);
         if (!passed) {
             String digest = evidence.findFirstByLease_IdOrderByRecordedAtDesc(leaseIdForEvidence)

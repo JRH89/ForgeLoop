@@ -29,6 +29,29 @@ class AgentLoopTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     @TempDir Path temporaryDirectory;
 
+    @Test void selectedSkillsAreIdenticalAcrossEveryTurnAndJournalWithoutNewTools() throws Exception {
+        Path repo = gitRepository("stage-skills");
+        ScriptedClient client = new ScriptedClient(
+                turn(List.of(call("write_file", "{\"path\":\"src/Feature.java\",\"content\":\"class Feature {}\"}")), StopReason.TOOL_USE),
+                turn(List.of(call("finish", "{\"summary\":\"Add feature\"}")), StopReason.TOOL_USE));
+        SkillSelection skills = new StageSkillResolver(StageSkillResolver.PROFILE, java.util.Set.of("JRH89/agent-loop-test"))
+                .resolveRole("IMPLEMENTATION", "JRH89/agent-loop-test");
+        LoopResult result = run("stage-skills", repo, client, new RecordingReporter(), new AtomicBoolean(),
+                standardBudget(5, 100_000, 65_536), new ProviderExecutionPolicy("openai", "model", 1), "small specification",
+                0, 0, Clock.systemUTC(), null, new AgentLoop(skills));
+        assertEquals(LoopOutcome.FINISHED, result.outcome());
+        assertEquals(2, client.requests.size());
+        for (ConversationRequest request : client.requests) {
+            assertEquals(skills.composeInstructions(LoopInstructions.text()), request.instructions());
+            assertEquals(ToolGrants.forRole("IMPLEMENTATION", false), request.tools().stream().map(ToolSpec::name).collect(java.util.stream.Collectors.toSet()));
+        }
+        JsonNode started = new StepJournal(temporaryDirectory.resolve("stage-skills-state"), "task-1", "lease-1", Clock.systemUTC()).records()
+                .stream().filter(value -> value.path("type").asText().equals("LOOP_STARTED")).findFirst().orElseThrow();
+        assertEquals(client.requests.getFirst().instructions(), started.path("instructions").asText());
+        assertEquals(Hashing.sha256(client.requests.getFirst().instructions()), started.path("instructionsSha256").asText());
+        assertEquals(skills.metadata().get("selectionSha256"), started.path("skills").path("selectionSha256").asText());
+    }
+
     @Test
     void finishCommitsOwnedWorkAndNoLaterToolCallRuns() throws Exception {
         Path repo = gitRepository("finish");

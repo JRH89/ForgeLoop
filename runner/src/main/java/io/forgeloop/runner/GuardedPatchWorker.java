@@ -5,6 +5,28 @@ import java.util.List;
 
 /** Executes one code-producing worker with no shell access and writes only schema-validated, prefix-scoped files. */
 public final class GuardedPatchWorker {
+    private final int maxOutputTokens;
+
+    public GuardedPatchWorker() {
+        this(patchOutputTokens(System.getenv("FORGELOOP_PATCH_MAX_OUTPUT_TOKENS")));
+    }
+
+    GuardedPatchWorker(int maxOutputTokens) {
+        this.maxOutputTokens = patchOutputTokens(Integer.toString(maxOutputTokens));
+    }
+
+    /** Retain the compatible default; larger reasoning/file responses require an explicit opt-in. */
+    static int patchOutputTokens(String configured) {
+        if (configured == null || configured.isBlank()) return 8192;
+        final int value;
+        try { value = Integer.parseInt(configured.strip()); }
+        catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException("FORGELOOP_PATCH_MAX_OUTPUT_TOKENS must be an integer from 8192 to 32768", invalid);
+        }
+        if (value < 8192 || value > 32768)
+            throw new IllegalArgumentException("FORGELOOP_PATCH_MAX_OUTPUT_TOKENS must be from 8192 to 32768");
+        return value;
+    }
     public static boolean supports(String role) {
         try { return WorkerRolePolicy.require(role).repositoryWrite(); }
         catch (IllegalArgumentException exception) { return false; }
@@ -48,20 +70,26 @@ public final class GuardedPatchWorker {
         }
         String instructions = "You are the " + role + " worker. Return JSON only: "
                 + "{summary:string,changes:[{path:string,content:string,message:string}]}. "
-                + "Propose complete file contents only. Do not use paths outside the allowed prefixes."
+                + "The summary must be nonempty and at most " + PatchPlan.MAX_SUMMARY_LENGTH + " characters. "
+                + "Return one to " + PatchPlan.MAX_CHANGES + " complete-file changes. "
+                + "Propose complete file contents only. Do not use paths outside the allowed prefixes. The overall specification describes other agents' work too; implement only this task's assigned files. "
                 + boundaryInstructions(boundary);
+        if ("INDEPENDENT_TEST".equals(role)) instructions += " Import and execute the real production modules or public interfaces. "
+                + "Never define a test-local replacement for the behavior being tested. Mock external services only. "
+                + "Use the planner's real scaffold/dependency contract for new interfaces; missing imports or skipped tests are not valid RED evidence.";
         String repositoryContext = new RepositoryContextBuilder().build(worktree, preferredContextPaths);
         if (journal != null) journal.append("CONTEXT_BUILT", java.util.Map.of("kind", "REPOSITORY",
                 "sha256", EvidenceDigests.sha256(repositoryContext.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
         String input = "Task: " + title + "\nAllowed prefixes: " + String.join(",", allowedPrefixes)
                 + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n" + repositoryContext;
+        // Reasoning and complete replacement files share the provider output allowance.
         ProviderExecutionResult execution = new ProviderExecutionService().executeDetailed(provider,
-                new ProviderRequest(policy.model(), instructions, input, 8192, StructuredOutputSchemas.patch()), policy.maxAttempts());
+                new ProviderRequest(policy.model(), instructions, input, maxOutputTokens, StructuredOutputSchemas.patch(allowedPrefixes)), policy.maxAttempts());
         ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution,
                 new ProviderCostCalculator().fromEnvironment(policy, execution.result()), correlationId);
         PatchPlan plan;
         try {
-            plan = PatchPlan.parse(execution.result().output());
+            plan = PatchPlan.parseForWorker(execution.result().output());
             new PatchWriter().apply(worktree, plan, allowedPrefixes, boundary);
         } catch (WriteBoundaryViolation boundaryViolation) {
             throw new GuardedPatchFailure("TEST_BOUNDARY_VIOLATION", usage, boundaryViolation);

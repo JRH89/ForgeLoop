@@ -26,6 +26,23 @@ class PlannerWorkerTest {
 
         assertTrue(captured.get().instructions().contains("at most one dependency on another writing task"));
         assertTrue(captured.get().instructions().contains("starts from that task's commit"));
+        assertTrue(captured.get().instructions().contains("actual production interfaces, not copied implementations"));
+    }
+
+    @Test
+    void plannerAccountsForUsageWithConfiguredRates() throws Exception {
+        ProviderClient provider = request -> new ProviderResult("""
+                {"acceptanceCriteria":["works"],"tasks":[
+                  {"key":"implementation","role":"IMPLEMENTATION","title":"Implement","requiredCapability":"provider","dependencies":[],"ownedPaths":["src"],"attemptBudget":1,"budgetMicros":0},
+                  {"key":"integration","role":"INTEGRATION","title":"Integrate","requiredCapability":"git","dependencies":["implementation"],"ownedPaths":[],"attemptBudget":1,"budgetMicros":0}
+                ]}
+                """, 100, 20, "priced-plan");
+        var policy = new ProviderExecutionPolicy("anthropic", "model", 1,
+                new java.math.BigDecimal("2"), new java.math.BigDecimal("10"));
+        RunnerTask task = new RunnerTask("task-1", "PLANNER", "Plan", "org/repository", "main", null, "spec", "provider");
+        var result = new PlannerWorker().execute(policy, provider, task, "manifest", "plan-priced");
+        assertTrue(result.usage().costKnown());
+        org.junit.jupiter.api.Assertions.assertEquals(400, result.usage().estimatedCostMicros());
     }
 
     @Test

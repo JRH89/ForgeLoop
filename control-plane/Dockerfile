@@ -5,7 +5,8 @@ COPY src src
 RUN mvn -q verify
 FROM eclipse-temurin:21-jre-alpine
 # A fresh named artifact volume inherits this path's ownership when Docker initializes it.
-RUN addgroup -S forgeloop && adduser -S forgeloop -G forgeloop \
+RUN apk upgrade --no-cache \
+    && addgroup -S forgeloop && adduser -S forgeloop -G forgeloop \
     && mkdir -p /var/lib/forgeloop/artifacts \
     && chown forgeloop:forgeloop /var/lib/forgeloop/artifacts
 WORKDIR /app
