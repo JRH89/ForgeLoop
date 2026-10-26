@@ -13,7 +13,11 @@
 - [x] Classify output exhaustion as non-transient with receipt, aggregate retry usage, retain unknown transport uncertainty, and journal rejected receipts locally.
 - [x] Preserve independent-test role and repair context after claim, prohibit copied test-local implementations, and hold configuration failures rather than blindly spending on identical repairs.
 - [x] Add durable locked, owner-only runner-wide provider spend ledger with reservation before each request, actual known settlement, and conservative retention on unknown receipt. Refuse unpriced or over-cap requests before dispatch when enabled.
-- [ ] Verify full runner/control-plane suites, fresh review, rebuild feature runner and local API, and use a new documentation-only fixture run with $2 server budget plus independent $2 runner cap. One provider try per task; no merge/release.
-- [ ] Report real run outcome, PR if delivery succeeds, actual/uncertain spend separately. Keep prior failed run intact; do not count manual completion as an autonomous success.
+- [x] Verify full runner/control-plane suites, fresh review, rebuild feature runner and local API, and use a new documentation-only fixture run with $2 server budget plus independent $2 runner cap. One provider try per task; no merge/release.
+- [x] Report real run outcome, PR if delivery succeeds, actual/uncertain spend separately. Keep prior failed run intact; do not count manual completion as an autonomous success.
 
 Offline verification: runner 437 tests, zero failures/errors, five existing platform/live-fixture skips; control-plane385 tests, zero failures/errors. Independent review found no blockers for the explicitly priced, single-attempt, fresh-ledger $2 canary.
+
+Live validation: run b8c2c192-a032-4139-aaf7-a0e6e70aec4a reached verified/approved delivery and opened fixture PR https://github.com/JRH89/project-hub/pull/13 through ForgeLoop. The fixture is README-only. Recorded model estimates: 520350 micros; known schema-probe estimates: 3366 micros; conservative ledger including retained rejected-request holds: 933846 micros, below the authorized2000000-micro cap. Previous failed runs and attempts remain intact. The paid runner is paused after this canary.
+
+The live canary exposed two additional transport weaknesses, both fixed with regressions: normalize only non-code commit metadata when vendor grammar cannot enforce its length, and return stable review criterion IDs instead of copying quoted canonical prose. Final runner suite:442 tests, zero failures/errors, five existing skips; control suite:385 tests, zero failures/errors.
