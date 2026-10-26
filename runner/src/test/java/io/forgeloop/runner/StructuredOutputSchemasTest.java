@@ -21,17 +21,16 @@ class StructuredOutputSchemasTest {
     @Test void patchSchemaConstrainsMetadataAndTaskOwnedPrefixesBeforeGeneration() {
         var schema = StructuredOutputSchemas.patch(java.util.List.of("src/Feature.js", "README.md"));
         var properties = schema.path("properties");
-        String summaryPattern = properties.path("summary").path("pattern").asText();
-        org.junit.jupiter.api.Assertions.assertTrue("Short summary".matches(summaryPattern));
-        assertFalse("x".repeat(501).matches(summaryPattern));
-        assertFalse("".matches(summaryPattern));
+        assertEquals(500, properties.path("summary").path("maxLength").asInt());
+        assertFalse(properties.path("summary").has("pattern"));
         String paths = properties.path("changes").path("items").path("properties").path("path").path("pattern").asText();
         org.junit.jupiter.api.Assertions.assertTrue("src/Feature.js".matches(paths));
         org.junit.jupiter.api.Assertions.assertTrue("README.md".matches(paths));
         assertFalse("tests/Feature.test.js".matches(paths));
         assertFalse("src/Feature.js.bak".matches(paths));
         var normalized = AnthropicSchemaCompatibility.normalize(schema);
-        assertEquals(summaryPattern, normalized.path("properties").path("summary").path("pattern").asText());
+        assertFalse(normalized.path("properties").path("summary").has("maxLength"));
+        org.junit.jupiter.api.Assertions.assertTrue(normalized.path("properties").path("summary").path("description").asText().contains("500"));
         assertEquals(paths, normalized.path("properties").path("changes").path("items").path("properties").path("path").path("pattern").asText());
         assertFalse(StructuredOutputSchemas.patch().path("properties").path("changes").path("items").path("properties").path("path").has("pattern"));
     }

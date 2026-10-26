@@ -163,3 +163,12 @@ Rejected output receipts retain usage, output limits stop identical retries, and
 an optional durable local provider ceiling protects an isolated paid canary even
 if receipt delivery or the runner process fails. See runner/README.md for its
 explicit prices, POSIX filesystem requirements and non-distributed scope.
+
+The $2 canary caught Anthropic grammar limits on long bounded summary regexes.
+Summary length remains descriptive schema guidance and a strict application
+invariant. The worker canonicalizes only commit prose (whitespace and a
+surrogate-safe 500-character cutoff) before constructing a strict PatchPlan;
+standalone strict parsing is unchanged. File paths, contents, message fields,
+JSON shape, and write permissions are never normalized or relaxed. Original
+provider responses remain recorded. A tiny same-ledger schema probe validates
+native vendor compatibility before resuming full-context work.

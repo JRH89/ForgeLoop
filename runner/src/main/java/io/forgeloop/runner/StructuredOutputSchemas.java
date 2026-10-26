@@ -64,8 +64,6 @@ public final class StructuredOutputSchemas {
         var summary = (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("summary");
         summary.put("minLength", 1);
         summary.put("maxLength", PatchPlan.MAX_SUMMARY_LENGTH);
-        // Regex remains enforceable by vendors that do not support maxLength.
-        summary.put("pattern", "^\\S[^\\r\\n]{0," + (PatchPlan.MAX_SUMMARY_LENGTH - 1) + "}$");
         summary.put("description", "A concise, single-line summary; at most " + PatchPlan.MAX_SUMMARY_LENGTH + " characters.");
         var changes = (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("changes");
         changes.put("minItems", 1);

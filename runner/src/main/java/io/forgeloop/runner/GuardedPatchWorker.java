@@ -89,7 +89,7 @@ public final class GuardedPatchWorker {
                 new ProviderCostCalculator().fromEnvironment(policy, execution.result()), correlationId);
         PatchPlan plan;
         try {
-            plan = PatchPlan.parse(execution.result().output());
+            plan = PatchPlan.parseForWorker(execution.result().output());
             new PatchWriter().apply(worktree, plan, allowedPrefixes, boundary);
         } catch (WriteBoundaryViolation boundaryViolation) {
             throw new GuardedPatchFailure("TEST_BOUNDARY_VIOLATION", usage, boundaryViolation);
