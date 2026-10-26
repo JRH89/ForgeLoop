@@ -17,8 +17,9 @@ control-plane restart.
 at service startup in the `postgres-backups` Compose volume. Each snapshot has
 a SHA-256 checksum, an archive of local evidence objects, and a `.complete`
 marker written only after both complete. Health fails when no completed backup
-exists within seven hours. Check `docker compose logs database-backup` and
-`docker compose ps`. No backups are automatically deleted.
+exists within seven hours. Scheduling checks wall time at least once per minute,
+so an overdue backup runs promptly after a suspended host resumes. Check
+`docker compose logs database-backup` and `docker compose ps`. No backups are automatically deleted.
 
 These are local recovery copies, not protection against loss of this computer.
 Copy completed bundles to access-controlled, encrypted off-host storage before

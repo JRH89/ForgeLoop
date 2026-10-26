@@ -77,6 +77,8 @@ jobs:
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Verify backup scheduling after host suspend
+        run: python3 ./scripts/Test-BackupScheduling.py
       - name: Verify Compose network and secret boundaries
         run: node ./scripts/Test-ComposeSecurity.mjs
         env:

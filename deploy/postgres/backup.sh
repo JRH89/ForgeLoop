@@ -23,5 +23,13 @@ while true; do
         echo "Database backup failed" >&2
         exit 1
     fi
-    sleep "${BACKUP_INTERVAL_SECONDS:-21600}"
+    # Relative sleeps pause during host suspend; recheck wall time so backups
+    # catch up promptly after resume instead of aging past the health deadline.
+    deadline=$(( $(date +%s) + ${BACKUP_INTERVAL_SECONDS:-21600} ))
+    while true; do
+        remaining=$(( deadline - $(date +%s) ))
+        [ "$remaining" -gt 0 ] || break
+        [ "$remaining" -le 60 ] || remaining=60
+        sleep "$remaining"
+    done
 done
