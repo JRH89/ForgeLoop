@@ -136,7 +136,7 @@ improvements remain to be measured; this is not production enablement.
 
 The local project-hub trial exposed full-file patch responses exhausting an 8K
 output allowance when the provider also uses it for reasoning. The local pilot sets
-`FORGELOOP_PATCH_MAX_OUTPUT_TOKENS=16384` to leave room for reasoning and complete
+`FORGELOOP_PATCH_MAX_OUTPUT_TOKENS=32768` to leave room for reasoning and complete
 files. This bounded override accepts 8192–32768; the default remains 8192 for
 compatibility with smaller models. Path, schema, retry and run-budget controls
 are unchanged. Planner calls now apply the same
