@@ -8,7 +8,8 @@ public final class PlannerWorker {
                 + "\n\nBounded repository context:\n" + repositoryContext;
         ProviderExecutionResult execution = new ProviderExecutionService().executeDetailed(provider,
                 new ProviderRequest(policy.model(), instructions, input, 8192, StructuredOutputSchemas.plan()), policy.maxAttempts());
-        ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution, ProviderCostEstimate.unknown(), correlationId);
+        ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution,
+                new ProviderCostCalculator().fromEnvironment(policy, execution.result()), correlationId);
         try {
             boolean testFirst = !task.testPathGlobs().isEmpty();
             return new PlannerResult(PlannerPlan.parse(execution.result().output()).validate(task.budgetUsd(), testFirst), usage);

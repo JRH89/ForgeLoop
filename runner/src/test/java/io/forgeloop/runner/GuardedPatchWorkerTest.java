@@ -27,6 +27,28 @@ class GuardedPatchWorkerTest {
         assertFalse(result.commitSha().isBlank());
     }
 
+    @Test void writingOutputAllowancePreservesDefaultAndValidatesOptIn() {
+        assertEquals(8192, GuardedPatchWorker.patchOutputTokens(null));
+        assertEquals(8192, GuardedPatchWorker.patchOutputTokens(""));
+        assertEquals(16384, GuardedPatchWorker.patchOutputTokens("16384"));
+        assertEquals(32768, GuardedPatchWorker.patchOutputTokens("32768"));
+        for (String invalid : List.of("8191", "32769", "-1", "many")) {
+            assertThrows(IllegalArgumentException.class, () -> GuardedPatchWorker.patchOutputTokens(invalid));
+        }
+    }
+
+    @Test void fullFilePatchesHaveRoomAfterProviderReasoning() throws Exception {
+        initializeRepository();
+        ProviderClient provider = request -> {
+            // Live reasoning-capable models can consume most of 8K before emitting file contents.
+            assertEquals(16_384, request.maxOutputTokens());
+            return new ProviderResult("{\"summary\":\"change\",\"changes\":[{\"path\":\"src/result.txt\",\"content\":\"done\",\"message\":\"write result\"}]}", 3, 2, "request-budget");
+        };
+        new GuardedPatchWorker(16_384).execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider,
+                "IMPLEMENTATION", "task", "spec", repository, List.of("src/"));
+        assertEquals("done", Files.readString(repository.resolve("src/result.txt")));
+    }
+
     @Test void malformedProviderOutputCannotModifyOrAdvanceWork() throws Exception {
         initializeRepository();
         ProviderClient malformed = ignored -> new ProviderResult("not-json", 1, 1, "request-2");

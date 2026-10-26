@@ -5,6 +5,28 @@ import java.util.List;
 
 /** Executes one code-producing worker with no shell access and writes only schema-validated, prefix-scoped files. */
 public final class GuardedPatchWorker {
+    private final int maxOutputTokens;
+
+    public GuardedPatchWorker() {
+        this(patchOutputTokens(System.getenv("FORGELOOP_PATCH_MAX_OUTPUT_TOKENS")));
+    }
+
+    GuardedPatchWorker(int maxOutputTokens) {
+        this.maxOutputTokens = patchOutputTokens(Integer.toString(maxOutputTokens));
+    }
+
+    /** Retain the compatible default; larger reasoning/file responses require an explicit opt-in. */
+    static int patchOutputTokens(String configured) {
+        if (configured == null || configured.isBlank()) return 8192;
+        final int value;
+        try { value = Integer.parseInt(configured.strip()); }
+        catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException("FORGELOOP_PATCH_MAX_OUTPUT_TOKENS must be an integer from 8192 to 32768", invalid);
+        }
+        if (value < 8192 || value > 32768)
+            throw new IllegalArgumentException("FORGELOOP_PATCH_MAX_OUTPUT_TOKENS must be from 8192 to 32768");
+        return value;
+    }
     public static boolean supports(String role) {
         try { return WorkerRolePolicy.require(role).repositoryWrite(); }
         catch (IllegalArgumentException exception) { return false; }
@@ -55,8 +77,9 @@ public final class GuardedPatchWorker {
                 "sha256", EvidenceDigests.sha256(repositoryContext.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
         String input = "Task: " + title + "\nAllowed prefixes: " + String.join(",", allowedPrefixes)
                 + "\nSpecification:\n" + specification + "\n\nBounded repository context:\n" + repositoryContext;
+        // Reasoning and complete replacement files share the provider output allowance.
         ProviderExecutionResult execution = new ProviderExecutionService().executeDetailed(provider,
-                new ProviderRequest(policy.model(), instructions, input, 8192, StructuredOutputSchemas.patch()), policy.maxAttempts());
+                new ProviderRequest(policy.model(), instructions, input, maxOutputTokens, StructuredOutputSchemas.patch()), policy.maxAttempts());
         ProviderUsageEvidence usage = ProviderUsageEvidence.from(policy, execution,
                 new ProviderCostCalculator().fromEnvironment(policy, execution.result()), correlationId);
         PatchPlan plan;

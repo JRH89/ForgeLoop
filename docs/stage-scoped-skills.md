@@ -131,3 +131,14 @@ checks selected the planner pack for an allowlisted repository and returned
 Independent whole-branch review found no actionable defects and confirmed the
 experiment is ready for an opt-in branch trial. Live model quality and cost
 improvements remain to be measured; this is not production enablement.
+
+## Live pilot findings
+
+The local project-hub trial exposed full-file patch responses exhausting an 8K
+output allowance when the provider also uses it for reasoning. The local pilot sets
+`FORGELOOP_PATCH_MAX_OUTPUT_TOKENS=16384` to leave room for reasoning and complete
+files. This bounded override accepts 8192–32768; the default remains 8192 for
+compatibility with smaller models. Path, schema, retry and run-budget controls
+are unchanged. Planner calls now apply the same
+configured-rate cost calculation as writing tasks, so their usage contributes to
+known spending instead of always appearing unpriced. Regression tests cover both.
