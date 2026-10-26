@@ -12,8 +12,9 @@ class ReviewWorkerTest {
         var criteria = schema.path("properties").path("criteria");
         assertEquals(2, criteria.path("minItems").asInt());
         assertEquals(2, criteria.path("maxItems").asInt());
-        assertEquals("Search.search('   ') returns []", criteria.path("items").path("properties")
-                .path("statement").path("enum").get(0).asText());
+        assertEquals("criterion-1", criteria.path("items").path("properties")
+                .path("criterionId").path("enum").get(0).asText());
+        assertFalse(criteria.path("items").path("properties").has("statement"));
         assertThrows(IllegalArgumentException.class, () -> StructuredOutputSchemas.review(List.of("same", "same")));
     }
     @Test void suppliesFullReturnContractBeyondDiffHunks() throws Exception {
@@ -47,5 +48,24 @@ class ReviewWorkerTest {
         assertTrue(captured.get().input().contains("Test-first evidence recorded by ForgeLoop"));
         assertTrue(captured.get().input().contains("3 new tests fail before the implementation"));
         assertTrue(captured.get().instructions().contains("fail a criterion that no added test exercises"));
+    }
+    @Test void stableIdsPreserveQuotedCanonicalStatementsWithoutEchoingThem() throws Exception {
+        String quoted = "README contains a \"Running tests\" heading";
+        RunnerTask quotedTask = new RunnerTask("quoted", "REVIEW", "review", "org/repo", "main", "canary", "docs", "provider",
+                2, List.of(), List.of("a".repeat(40)), null, null, null, List.of(), null, null, "main", "main", List.of(quoted));
+        ProviderClient provider = request -> {
+            assertEquals("criterion-1", request.outputSchema().path("properties").path("criteria").path("items")
+                    .path("properties").path("criterionId").path("enum").get(0).asText());
+            assertTrue(request.input().contains("{\"criterionId\":\"criterion-1\",\"statement\":"));
+            return new ProviderResult("{\"approved\":true,\"summary\":\"Reviewed\",\"criteria\":[{\"criterionId\":\"criterion-1\",\"status\":\"PASS\",\"evidence\":\"Heading is present\"}]}", 10, 5, "id-review");
+        };
+        var result = new ReviewWorker().execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider, quotedTask, "diff", "quoted-review");
+        assertTrue(result.approved());
+        assertEquals(quoted, result.criteria().getFirst().statement());
+    }
+
+    @Test void unknownCriterionIdsCannotAuthorizeAReview() {
+        ProviderClient provider = request -> new ProviderResult("{\"approved\":true,\"summary\":\"Reviewed\",\"criteria\":[{\"criterionId\":\"criterion-999\",\"status\":\"PASS\",\"evidence\":\"claimed\"}]}", 1, 1, "unknown-id");
+        assertThrows(GuardedPatchFailure.class, () -> new ReviewWorker().execute(new ProviderExecutionPolicy("anthropic", "model", 1), provider, task, "diff", "bad-id"));
     }
 }

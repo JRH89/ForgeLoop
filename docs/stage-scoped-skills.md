@@ -172,3 +172,10 @@ standalone strict parsing is unchanged. File paths, contents, message fields,
 JSON shape, and write permissions are never normalized or relaxed. Original
 provider responses remain recorded. A tiny same-ledger schema probe validates
 native vendor compatibility before resuming full-context work.
+
+Review responses now reference stable criterion IDs. ForgeLoop maps them back to
+the exact server statements before recording evidence, avoiding malformed vendor
+JSON when a canonical statement contains quotes or other punctuation. Legacy
+well-formed statement responses remain accepted only with exact full coverage.
+Malformed review output is held as a configuration error instead of automatically
+paying for repeated read-only reviews.

@@ -101,21 +101,20 @@ public final class StructuredOutputSchemas {
         return schema;
     }
     public static JsonNode review() { return REVIEW.deepCopy(); }
-    /** Bind output to canonical server criteria instead of relying on prose-copying precision. */
+    /** Bind short IDs to canonical criteria; never ask a provider to echo quoted prose in an enum. */
     public static JsonNode review(java.util.List<String> statements) {
-        if (statements == null || statements.isEmpty()
-                || statements.stream().anyMatch(value -> value == null || value.isBlank())
-                || statements.stream().distinct().count() != statements.size()) {
-            throw new IllegalArgumentException("Review criteria must be nonempty and unique");
-        }
+        var identifiers = ReviewCriterionIds.from(statements);
         com.fasterxml.jackson.databind.node.ObjectNode schema = REVIEW.deepCopy();
         com.fasterxml.jackson.databind.node.ObjectNode criteria =
                 (com.fasterxml.jackson.databind.node.ObjectNode) schema.path("properties").path("criteria");
         criteria.put("minItems", statements.size());
         criteria.put("maxItems", statements.size());
-        com.fasterxml.jackson.databind.node.ObjectNode statement =
-                (com.fasterxml.jackson.databind.node.ObjectNode) criteria.path("items").path("properties").path("statement");
-        statement.set("enum", JSON.valueToTree(statements));
+        var item = (com.fasterxml.jackson.databind.node.ObjectNode) criteria.path("items");
+        var properties = (com.fasterxml.jackson.databind.node.ObjectNode) item.path("properties");
+        var identifier = (com.fasterxml.jackson.databind.node.ObjectNode) properties.remove("statement");
+        identifier.set("enum", JSON.valueToTree(identifiers.keySet()));
+        properties.set("criterionId", identifier);
+        item.set("required", JSON.valueToTree(java.util.List.of("criterionId", "status", "evidence")));
         return schema;
     }
     public static JsonNode repositoryScan() { return REPOSITORY_SCAN.deepCopy(); }

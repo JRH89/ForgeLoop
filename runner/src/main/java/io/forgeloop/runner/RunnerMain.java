@@ -755,7 +755,8 @@ public final class RunnerMain {
             client.recordProviderAttempt(identity, lease, ProviderAttemptReport.rejected(invalid.usage(), invalid.category()));
             if (journal != null) safePatchRefused(journal, invalid);
             finishJournal(task, identity, lease, client, events, journal, invalid.category(), null);
-            client.completeLease(identity, lease.leaseId(), lease.nonce(), false);
+            // A malformed read-only result needs a provider/schema correction, not another source-repair spend.
+            client.failLease(identity, lease, "CONFIGURATION_ERROR");
             throw invalid;
         } catch (Exception failure) {
             finishJournal(task, identity, lease, client, events, journal, "HARNESS_FAILURE", null);
