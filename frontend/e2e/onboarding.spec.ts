@@ -25,7 +25,7 @@ for (const width of [390, 1440]) {
       await expect(page.getByRole('button', { name: 'Account', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Support', exact: true })).toHaveCount(0);
       await expect(page.getByRole('link', { name: 'Support tickets', exact: true })).toHaveCount(0);
-      await expect(page.getByRole('navigation').getByRole('link', { name: 'Sign out' })).toBeVisible();
+      await expect(page.getByRole('navigation').getByRole('button', { name: 'Sign out' })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
       await expect(page.getByRole('navigation', { name: 'ForgeLoop navigation' })).not.toBeVisible();
@@ -36,7 +36,7 @@ for (const width of [390, 1440]) {
       await page.getByRole('button', { name: 'Open navigation' }).click();
       await page.getByRole('button', { name: 'Runs', exact: true }).click();
     } else {
-      await expect(page.getByRole('link', { name: 'Sign out' })).toHaveCSS('border-top-style', 'solid');
+      await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCSS('border-top-style', 'solid');
     }
     await page.getByRole('button', { name: 'Open setup checklist' }).click();
     await expect(page.getByRole('heading', { name: 'Getting started', exact: true })).toBeVisible();

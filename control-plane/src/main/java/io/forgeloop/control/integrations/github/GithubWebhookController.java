@@ -11,6 +11,7 @@ import io.forgeloop.control.domain.RepositoryConnection;
 import io.forgeloop.control.domain.RepositoryConnectionRepository;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,7 +63,13 @@ public class GithubWebhookController {
                                         @RequestBody String body) {
         if (!verifier.valid(secret, signature, body)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         if (deliveries.existsByDeliveryId(delivery)) return ResponseEntity.accepted().build();
-        deliveries.save(new GithubDelivery(delivery, event));
+        // Claim the delivery ID before processing. The unique constraint makes this the idempotency lock
+        // when GitHub (or an operator) sends the same delivery twice concurrently.
+        try {
+            deliveries.saveAndFlush(new GithubDelivery(delivery, event));
+        } catch (DataIntegrityViolationException alreadyClaimed) {
+            return ResponseEntity.accepted().build();
+        }
         try {
             JsonNode payload = json.readTree(body);
             if ("issues".equals(event)) processIssue(payload);
@@ -90,6 +97,9 @@ public class GithubWebhookController {
                 autoMerge.reconcile(payload.path("repository").path("full_name").asText(), check.path("head_sha").asText(), payload.path("installation").path("id").asLong());
             }
         } catch (Exception exception) {
+            // Release the claim so a redelivery is processed instead of being skipped as a duplicate.
+            // Every handler is idempotent per source, so partial work from this attempt is safe to repeat.
+            deliveries.deleteByDeliveryId(delivery);
             throw new IllegalArgumentException("Invalid GitHub webhook payload", exception);
         }
         return ResponseEntity.accepted().build();

@@ -17,8 +17,11 @@ public class FeatureRunService {
   private final FeatureRunRepository runs; private final DeliveryTaskRepository tasks; private final RepositoryConnectionService connections; private final AuditLedgerService audit; private final PlatformConfigurationService platform; private final OperatorContext operators;
   public FeatureRunService(FeatureRunRepository runs, DeliveryTaskRepository tasks, RepositoryConnectionService connections, AuditLedgerService audit, PlatformConfigurationService platform, OperatorContext operators) { this.runs = runs; this.tasks = tasks; this.connections = connections; this.audit = audit; this.platform=platform; this.operators=operators; }
   @Transactional public FeatureRun submit(FeatureSubmission input) {
-    if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
+    // Starting a run spends provider budget, so read-only viewers may not submit work.
+    operators.requireOperator();
+    // Establish tenant access before the duplicate check so foreign runs are not revealed.
     RepositoryConnection connection = connections.requireEnabled(input.repository());
+    if (runs.findByRepositoryAndSourceRef(input.repository(), input.sourceRef()).isPresent()) throw new IllegalStateException("A run already exists for this source reference");
     var organizationPolicy = platform.policy();
     var harness = platform.requireHarness(connection.getHarnessProfile());
     return persist(input, connection, organizationPolicy, harness);

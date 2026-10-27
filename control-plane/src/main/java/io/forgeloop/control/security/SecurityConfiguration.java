@@ -1,6 +1,8 @@
 package io.forgeloop.control.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
@@ -45,18 +47,29 @@ public class SecurityConfiguration {
             case "github" -> {
                 authenticatedRoutes(http);
                 http.oauth2Login(login -> configureGithubLogin(login, githubSuccess));
-                http.logout(logout -> logout.logoutSuccessUrl("/").deleteCookies("JSESSIONID").invalidateHttpSession(true));
+                configureLogout(http);
             }
             case "production" -> {
                 authenticatedRoutes(http);
                 http.oauth2Login(login -> configureGithubLogin(login, githubSuccess));
                 http.oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt.decoder(issuerAudienceDecoder(issuerUri, audience))));
-                http.logout(logout -> logout.logoutSuccessUrl("/").deleteCookies("JSESSIONID").invalidateHttpSession(true));
+                configureLogout(http);
             }
             default -> throw new IllegalStateException("FORGELOOP_SECURITY_MODE must be development, github, or production");
         }
 
         return http.build();
+    }
+
+    /**
+     * Sign-out accepts only POST. CSRF tokens are disabled, and Spring Security then also matches GET
+     * /logout, which any page could trigger with an image tag. The SameSite=Lax session cookie is not
+     * sent on cross-site POSTs, so a POST-only endpoint cannot be triggered from another site.
+     */
+    private static void configureLogout(HttpSecurity http) throws Exception {
+        http.logout(logout -> logout
+                .logoutRequestMatcher(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/logout"))
+                .logoutSuccessUrl("/").deleteCookies("JSESSIONID").invalidateHttpSession(true));
     }
 
     private static void authenticatedRoutes(HttpSecurity http) throws Exception {

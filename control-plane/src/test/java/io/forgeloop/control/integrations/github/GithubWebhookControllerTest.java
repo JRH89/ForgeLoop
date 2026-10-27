@@ -1,6 +1,7 @@
 package io.forgeloop.control.integrations.github;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -55,7 +56,7 @@ class GithubWebhookControllerTest {
         ResponseEntity<Void> response = controller.receive("delivery-1", "issues", signature(body), body);
 
         assertEquals(HttpStatus.ACCEPTED, response.getStatusCode());
-        verify(deliveries).save(any());
+        verify(deliveries).saveAndFlush(any());
         verify(runs).submitIssue(any(), any());
     }
 
@@ -72,8 +73,41 @@ class GithubWebhookControllerTest {
         assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-duplicate", "issues", signature(body), body).getStatusCode());
         assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-duplicate", "issues", signature(body), body).getStatusCode());
 
-        verify(deliveries).save(any());
+        verify(deliveries).saveAndFlush(any());
         verify(runs).submitIssue(any(), any());
+    }
+
+    @Test
+    void aFailedDeliveryIsReleasedSoTheRedeliveryIsProcessed() throws Exception {
+        String body = """
+                {"action":"opened","repository":{"full_name":"acme/project"},
+                 "issue":{"number":8,"title":"Retry me","body":"Acceptance criteria","labels":[{"name":"forgeloop"}]}}
+                """;
+        RepositoryConnection connection = new RepositoryConnection("local-development", "acme/project", 1, "main", "forgeloop", "GENERIC", List.of("unit"), 20);
+        when(deliveries.existsByDeliveryId("delivery-retry")).thenReturn(false);
+        when(connections.findByRepository("acme/project")).thenReturn(java.util.Optional.of(connection));
+        when(runs.submitIssue(any(), any())).thenThrow(new IllegalStateException("database unavailable")).thenReturn(null);
+
+        assertThrows(IllegalArgumentException.class, () -> controller.receive("delivery-retry", "issues", signature(body), body));
+        Mockito.verify(deliveries).deleteByDeliveryId("delivery-retry");
+
+        assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-retry", "issues", signature(body), body).getStatusCode());
+        verify(runs, Mockito.times(2)).submitIssue(any(), any());
+        verify(deliveries, Mockito.times(1)).deleteByDeliveryId("delivery-retry");
+    }
+
+    @Test
+    void aConcurrentDuplicateThatLosesTheClaimIsAcknowledgedWithoutProcessing() throws Exception {
+        String body = """
+                {"action":"opened","repository":{"full_name":"acme/project"},
+                 "issue":{"number":9,"title":"Race","body":"Acceptance criteria","labels":[{"name":"forgeloop"}]}}
+                """;
+        when(deliveries.existsByDeliveryId("delivery-race")).thenReturn(false);
+        when(deliveries.saveAndFlush(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate delivery_id"));
+
+        assertEquals(HttpStatus.ACCEPTED, controller.receive("delivery-race", "issues", signature(body), body).getStatusCode());
+        verify(runs, never()).submitIssue(any(), any());
+        verify(deliveries, never()).deleteByDeliveryId(any());
     }
 
     @Test
@@ -81,7 +115,7 @@ class GithubWebhookControllerTest {
         ResponseEntity<Void> response = controller.receive("delivery-1", "issues", "sha256=bad", "{}");
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        verify(deliveries, never()).save(any());
+        verify(deliveries, never()).saveAndFlush(any());
         verify(runs, never()).submit(any());
     }
 

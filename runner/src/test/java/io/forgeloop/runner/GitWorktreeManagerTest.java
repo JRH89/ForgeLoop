@@ -34,6 +34,45 @@ class GitWorktreeManagerTest {
         assertFalse(new GitWorktreeManager().commit(worktree, "feat: task change").isBlank());
     }
     @Test
+    @org.junit.jupiter.api.condition.DisabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void repositoryHooksNeverRunOnTheRunnerHost() throws Exception {
+        run("git", "init", temporaryDirectory.toString());
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.email", "runner@example.test");
+        run("git", "-C", temporaryDirectory.toString(), "config", "user.name", "ForgeLoop Runner");
+        Files.writeString(temporaryDirectory.resolve("README.md"), "base");
+        run("git", "-C", temporaryDirectory.toString(), "add", ".");
+        run("git", "-C", temporaryDirectory.toString(), "commit", "-m", "base");
+        // Both the default hooks directory and a configured hooksPath carry hooks that would leave a marker.
+        Path marker = temporaryDirectory.resolve("hook-ran");
+        Path customHooks = Files.createDirectory(temporaryDirectory.resolve("custom-hooks"));
+        for (Path hooks : List.of(temporaryDirectory.resolve(".git/hooks"), customHooks)) {
+            Files.createDirectories(hooks);
+            for (String hook : List.of("pre-commit", "post-commit", "post-checkout")) {
+                Path script = hooks.resolve(hook);
+                Files.writeString(script, "#!/bin/sh\ntouch '" + marker + "'\n");
+                assertTrue(script.toFile().setExecutable(true));
+            }
+        }
+        run("git", "-C", temporaryDirectory.toString(), "config", "core.hooksPath", customHooks.toString());
+        GitWorktreeManager git = new GitWorktreeManager();
+
+        Path worktree = git.create(temporaryDirectory, "HEAD", "hooked", temporaryDirectory.resolve("worktrees"));
+        Files.writeString(worktree.resolve("README.md"), "changed");
+        git.commit(worktree, "feat: change");
+
+        assertFalse(Files.exists(marker), "git hooks must be disabled for runner-invoked commands");
+    }
+
+    @Test
+    void everyGitInvocationDisablesHooksAndFsmonitor() {
+        List<String> command = GitWorktreeManager.hardenedGit(temporaryDirectory);
+        assertEquals("git", command.getFirst());
+        assertTrue(command.contains("core.hooksPath=" + GitWorktreeManager.DISABLED_HOOKS_PATH));
+        assertTrue(command.contains("core.fsmonitor=false"));
+        assertTrue(command.contains("safe.directory=" + temporaryDirectory.toAbsolutePath().normalize()));
+    }
+
+    @Test
     void integratesIndependentDependencyCommitsInDeclaredOrder() throws Exception {
         run("git", "init", temporaryDirectory.toString());
         run("git", "-C", temporaryDirectory.toString(), "config", "user.email", "runner@example.test");

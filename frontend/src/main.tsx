@@ -1,3 +1,4 @@
+import { SignOutButton } from './SignOutButton';
 import RunsPage from './runs/RunsPage';
 import { terminal } from './runs/presentation';
 import ConsolePageHeader from './ConsolePageHeader';
@@ -195,7 +196,7 @@ function App() {
             </span>
           )}
           {operator && workspaces.length > 1 && <select className="workspace-switch desktop-workspace" aria-label="Workspace" value={operator.organizationId} onChange={event => switchWorkspace(event.target.value)}>{workspaces.map(workspace => <option value={workspace.organizationId} key={workspace.id}>{workspace.organizationName} · {workspace.role.toLowerCase()}</option>)}</select>}
-          <a className="logout desktop-signout" href="/logout">Sign out</a>
+          <SignOutButton className="desktop-signout"/>
           <button ref={menuButton} className="console-menu-toggle" aria-label={mobileMenuOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenuOpen} aria-controls="console-navigation" onClick={() => setMobileMenuOpen(value => !value)}>{mobileMenuOpen ? <X aria-hidden="true" size={22}/> : <Menu aria-hidden="true" size={22}/>}</button>
         </div>
       </header>
@@ -221,7 +222,7 @@ function App() {
             <GuideNavigation active={page === 'Guide'} onSelect={id => { setGuideTarget({ id }); navigate('Guide'); }}/>
             {operator?.role === 'ADMIN' && <button className={page === 'Team' ? 'active' : ''} onClick={() => navigate('Team')}><span className="nav-icon" aria-hidden="true"><Users size={17} strokeWidth={1.9}/></span> Team</button>}
             <button className={`account-console-link ${page === 'Account' ? 'active' : ''}`} onClick={() => navigate('Account')}><span className="nav-icon" aria-hidden="true"><UserRound size={17} strokeWidth={1.9}/></span> Account</button>
-            <a className="logout mobile-signout" href="/logout">Sign out</a>
+            <SignOutButton className="mobile-signout"/>
           </nav>
           <p className="sidebar-note">
             Repository code and commands execute only on an enrolled customer
