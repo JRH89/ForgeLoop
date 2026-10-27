@@ -9,7 +9,8 @@ RUN mvn -q "-Dforgeloop.revision=${FORGELOOP_REVISION}" test package
 FROM eclipse-temurin:21-jre-alpine
 # The Docker CLI is used only for policy-selected disposable verification containers.
 # Operators must explicitly mount a daemon socket when enabling this capability.
-RUN apk add --no-cache docker-cli git && addgroup -S forgeloop && adduser -S forgeloop -G forgeloop
+# Pick up Alpine security fixes published after the base image was built.
+RUN apk upgrade --no-cache && apk add --no-cache docker-cli git && addgroup -S forgeloop && adduser -S forgeloop -G forgeloop
 WORKDIR /app
 COPY --from=build /app/target/runner-0.1.0.jar runner.jar
 RUN mkdir /state && chown forgeloop:forgeloop /state
