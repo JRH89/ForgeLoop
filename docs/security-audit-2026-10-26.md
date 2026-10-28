@@ -53,3 +53,12 @@ All findings from this audit, including the three first listed as recommendation
 - MCP server: tests and typecheck.
 - Gateway: `nginx -t` on `nginx:1.29-alpine`, plus a served-response check of the headers on public,
   support, asset, pairing and 404 routes. `scripts/Test-ComposeSecurity.mjs` passes.
+
+## Follow-up — 2026-10-28
+
+The supply-chain scan began reporting CVE-2026-102554 (Guava deserialization
+denial of service) in the Guava 32.1.2 copy shaded inside graphql-java. Every
+graphql-java release through 26.1 ships the same shaded copy, so no upgrade is
+available. ForgeLoop never performs Java deserialization, so the path is not
+reachable. The finding is accepted in `.trivyignore` with a 2027-01-31 expiry,
+after which the gate fails again and the decision must be revisited.
