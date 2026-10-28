@@ -71,8 +71,22 @@ public final class LocalMcpContextClient {
             }
             return configuration.name() + ":\n" + context;
         } finally {
-            process.destroy();
-            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly();
+            stop(process);
+        }
+    }
+
+    /**
+     * Stops the server and anything it spawned, and waits until they have exited. On Windows a live
+     * process locks its working directory (the worktree), so returning early would block cleanup.
+     */
+    private static void stop(Process process) throws InterruptedException {
+        // Snapshot descendants first; they are re-parented once the server exits.
+        List<ProcessHandle> descendants = process.descendants().toList();
+        process.destroy();
+        if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly().waitFor(5, TimeUnit.SECONDS);
+        for (ProcessHandle child : descendants) {
+            child.destroyForcibly();
+            child.onExit().completeOnTimeout(child, 5, TimeUnit.SECONDS).join();
         }
     }
 
