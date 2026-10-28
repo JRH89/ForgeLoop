@@ -30,3 +30,5 @@ Work autonomously and continuously toward the user's overall goal.
 ## Git remotes
 
 When a push is requested for this repository, push the same intended branch and commits to both `origin` (Gitea) and `github` (GitHub). Verify the remotes and the changes being published first. Do not push secrets or unrelated changes.
+
+Never push a feature branch and leave the merge to the user. Merge the work into `master` locally first, then push `master` to both `origin` and `github`, and confirm all three refs point at the same commit. Do not open pull requests or hand back merge steps unless the user explicitly asks for a branch.
