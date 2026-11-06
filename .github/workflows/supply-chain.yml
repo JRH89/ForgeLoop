@@ -9,8 +9,8 @@ jobs:
   scan-and-sbom:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
@@ -27,7 +27,7 @@ jobs:
           mvn -B -q -f runner/pom.xml dependency:go-offline
           mvn -B -q -f harness/pom.xml dependency:go-offline
       - name: Scan source, lockfiles, configuration, and committed secrets
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -42,7 +42,7 @@ jobs:
           docker build -t "forgeloop/runner:${GITHUB_SHA}" runner
           docker build -f deploy/web.Dockerfile -t "forgeloop/web:${GITHUB_SHA}" .
       - name: Scan control-plane image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: "forgeloop/control-plane:${{ github.sha }}"
           severity: HIGH,CRITICAL
@@ -50,7 +50,7 @@ jobs:
           exit-code: '1'
           skip-setup-trivy: true
       - name: Scan runner image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: "forgeloop/runner:${{ github.sha }}"
           severity: HIGH,CRITICAL
@@ -58,7 +58,7 @@ jobs:
           exit-code: '1'
           skip-setup-trivy: true
       - name: Scan web image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: "forgeloop/web:${{ github.sha }}"
           severity: HIGH,CRITICAL
@@ -66,14 +66,14 @@ jobs:
           exit-code: '1'
           skip-setup-trivy: true
       - name: Generate repository SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: .
           format: spdx-json
           output-file: forgeloop.spdx.json
           upload-artifact: false
       - name: Upload SBOM evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: "forgeloop-sbom-${{ github.sha }}"
           path: forgeloop.spdx.json
