@@ -65,7 +65,7 @@ test('full-width chrome and console-style mobile dropdown',async({page})=>{
     await expect(panel).toHaveAttribute('aria-hidden','false');
     await expect(toggle).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(panel.getByRole('link',{name:'Features',exact:true})).toBeFocused();
+    await expect(panel.getByRole('link',{name:'Demo',exact:true})).toBeFocused();
     // Absolute positioning starts at the header's inner border edge.
     await expect.poll(async()=>Math.round((await panel.boundingBox())!.y)).toBe(75);
     const box=(await panel.boundingBox())!;
@@ -177,7 +177,7 @@ test('new runner recovery article has truthful date and unique search/social met
 });
 
 test('public templates pass automated accessibility checks',async({page})=>{
-  for(const path of ['/','/features','/blog','/blog/self-hosted-ai-runners']){
+  for(const path of ['/','/demo','/features','/blog','/blog/self-hosted-ai-runners']){
     await page.goto(path);
     const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
     expect(result.violations,path).toEqual([]);

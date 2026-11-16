@@ -116,3 +116,23 @@
 @media(max-width:760px){.public-site .landing-hero h1{margin-bottom:13px}.public-site .landing-hero>p:not(.eyebrow){margin-top:8px}}
 /* Avoid stacking paragraph margins onto the mobile footer's closing padding. */
 @media(max-width:760px){.public-site .public-footer{padding-bottom:20px}.public-site .footer-note{margin-bottom:0}}
+
+/* /demo: recorded-run replay. Steps reveal in sequence via CSS only (CSP-safe, works without JS). */
+.demo-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:46px}
+.demo-summary>div{padding:20px;border:1px solid #23384d;border-radius:12px;background:linear-gradient(140deg,#112133,#0b1723)}
+.demo-summary span{display:block;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:#8ca5c0;margin-bottom:8px}
+.demo-summary strong,.demo-summary a{font-size:1.05rem;color:#edf4ff}
+.demo-timeline{list-style:none;margin:0;padding:0;position:relative}
+.demo-timeline::before{content:'';position:absolute;left:21px;top:10px;bottom:10px;width:2px;background:linear-gradient(#71abf5,#5fd18a)}
+.demo-timeline li{display:grid;grid-template-columns:44px 1fr;gap:22px;padding:0 0 34px;position:relative;animation:demo-reveal .6s ease both;animation-delay:calc(var(--step) * .9s + .2s)}
+.demo-marker{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#122a44;border:2px solid #71abf5;color:#e6f0ff;font-weight:700;position:relative}
+.demo-timeline li:last-child .demo-marker{background:#1d4d2f;border-color:#5fd18a}
+.demo-timeline h3{margin:6px 0 8px;font-size:1.25rem;color:#edf4ff}
+.demo-timeline p.eyebrow{margin:0}
+.demo-timeline code{display:inline-block;margin-top:10px;padding:6px 10px;border-radius:8px;background:#0b1826;border:1px solid #23384d;color:#9fc3ec;font-size:.8rem;white-space:normal;overflow-wrap:anywhere}
+.demo-terminal{margin:14px 0 40px;padding:22px 24px;border-radius:14px;background:#060d16;border:1px solid #2a4764;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85rem;animation:demo-reveal .6s ease both;animation-delay:5.8s}
+.demo-terminal p{margin:6px 0;color:#9fc3ec;overflow-wrap:anywhere}
+.demo-terminal .demo-prompt{color:#71abf5}.demo-terminal .demo-pass{color:#5fd18a}
+@keyframes demo-reveal{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media(max-width:760px){.demo-summary{grid-template-columns:1fr 1fr}.demo-timeline li{grid-template-columns:36px 1fr;gap:14px}.demo-marker{width:36px;height:36px}.demo-timeline::before{left:17px}}
+@media(prefers-reduced-motion:reduce){.demo-timeline li,.demo-terminal{animation:none}}

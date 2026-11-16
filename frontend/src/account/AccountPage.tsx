@@ -1,3 +1,4 @@
+import { SignOutButton } from '../SignOutButton';
 import ConsolePageHeader from '../ConsolePageHeader';
 import { ArrowUpRight, BarChart3, Settings2, ShieldCheck } from 'lucide-react';
 import type { OrganizationMember, OperatorSession } from '../api';
@@ -16,7 +17,7 @@ export default function AccountPage({ operator, workspaces, onUsage, onWorkspace
   const activeWorkspace = workspaces.find(item => item.organizationId === operator.organizationId);
 
   return <section className="account-page">
-    <ConsolePageHeader eyebrow="Profile & help" title="Account" description="Review your identity, workspace access, and support requests." actions={<a className="logout account-signout" href="/logout">Sign out</a>}/>
+    <ConsolePageHeader eyebrow="Profile & help" title="Account" description="Review your identity, workspace access, and support requests." actions={<SignOutButton className="account-signout"/>}/>
 
     <div className="account-overview" aria-label="Account overview">
       <article><span>Signed-in GitHub identity</span><strong>{operator.subject}</strong><small>Your identity is managed by GitHub.</small></article>

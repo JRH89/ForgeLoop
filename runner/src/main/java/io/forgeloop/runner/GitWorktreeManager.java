@@ -21,6 +21,8 @@ public final class GitWorktreeManager {
     private static final int MAX_CHANGED_FILE_OUTPUT_BYTES = 64 * 1024;
     private static final java.util.regex.Pattern RAW_DIFF = java.util.regex.Pattern.compile(
             ":\\d{6} \\d{6} ([0-9a-f]{40,64}) ([0-9a-f]{40,64}) ([A-Z])(?:\\d+)?");
+    /** A path that never contains hook scripts; Git for Windows also maps it to its null device. */
+    static final String DISABLED_HOOKS_PATH = "/dev/null";
     private static final List<String> FORGELOOP_IDENTITY = List.of("-c", "user.name=ForgeLoop", "-c", "user.email=runner@forgeloop.invalid");
 
     public Path create(Path repository, String baseRef, String taskId, Path workspaceRoot) throws IOException, InterruptedException {
@@ -123,9 +125,9 @@ public final class GitWorktreeManager {
         }
         // An empty expected value asserts that the branch does not exist. Retries must match the previously recorded head.
         String lease = "--force-with-lease=refs/heads/" + branch + ":" + (expectedHeadSha == null ? "" : expectedHeadSha);
-        ProcessBuilder builder = new ProcessBuilder("git", "-c", "safe.directory=" + worktree.toAbsolutePath().normalize(), "push",
-                lease, "https://github.com/" + repository + ".git", sha + ":refs/heads/" + branch)
-                .directory(worktree.toFile()).redirectErrorStream(true);
+        List<String> push = hardenedGit(worktree);
+        push.addAll(List.of("push", lease, "https://github.com/" + repository + ".git", sha + ":refs/heads/" + branch));
+        ProcessBuilder builder = new ProcessBuilder(push).directory(worktree.toFile()).redirectErrorStream(true);
         String authorization = Base64.getEncoder().encodeToString(("x-access-token:" + token).getBytes(StandardCharsets.UTF_8));
         builder.environment().put("GIT_CONFIG_COUNT", "1"); builder.environment().put("GIT_CONFIG_KEY_0", "http.https://github.com/.extraheader"); builder.environment().put("GIT_CONFIG_VALUE_0", "AUTHORIZATION: basic " + authorization);
         Process process = builder.start();
@@ -241,10 +243,7 @@ public final class GitWorktreeManager {
     }
 
     private void run(Path repository, List<String> command) throws IOException, InterruptedException {
-        List<String> safeCommand = new ArrayList<>();
-        safeCommand.add("git");
-        safeCommand.add("-c");
-        safeCommand.add("safe.directory=" + repository.toAbsolutePath().normalize());
+        List<String> safeCommand = hardenedGit(repository);
         safeCommand.addAll(command.subList(1, command.size()));
         Process process = new ProcessBuilder(safeCommand).directory(repository.toFile()).redirectErrorStream(true).start();
         if (!process.waitFor(COMMAND_TIMEOUT.toSeconds(), TimeUnit.SECONDS)) { process.destroyForcibly(); throw new IllegalStateException("Git worktree command timed out"); }
@@ -257,7 +256,7 @@ public final class GitWorktreeManager {
     }
     private String outputRaw(Path repository, List<String> command, int limit) throws IOException, InterruptedException {
         if (limit < 1) throw new IllegalArgumentException("Git output limit must be positive");
-        List<String> safe = new ArrayList<>(List.of("git", "-c", "safe.directory=" + repository.toAbsolutePath().normalize())); safe.addAll(command.subList(1, command.size()));
+        List<String> safe = hardenedGit(repository); safe.addAll(command.subList(1, command.size()));
         Process process = new ProcessBuilder(safe).directory(repository.toFile()).redirectErrorStream(true).start();
         ByteArrayOutputStream captured = new ByteArrayOutputStream(Math.min(limit, 8192));
         AtomicReference<IOException> readFailure = new AtomicReference<>();
@@ -286,6 +285,18 @@ public final class GitWorktreeManager {
         String value = captured.toString(StandardCharsets.UTF_8);
         if (process.exitValue() != 0) throw new IllegalStateException("Git command failed: " + value.strip());
         return value;
+    }
+    /**
+     * Starts every Git invocation with settings that keep repository content from executing code on the
+     * runner host. The worktree is written by an agent and the repository comes from a customer, so hooks
+     * and the fsmonitor command (both of which Git runs implicitly during add, commit, status and
+     * cherry-pick) are disabled. Command-line {@code -c} values take precedence over any repository config.
+     */
+    static List<String> hardenedGit(Path repository) {
+        return new ArrayList<>(List.of("git",
+                "-c", "safe.directory=" + repository.toAbsolutePath().normalize(),
+                "-c", "core.hooksPath=" + DISABLED_HOOKS_PATH,
+                "-c", "core.fsmonitor=false"));
     }
     private static List<String> gitWithIdentity(String... arguments) {
         List<String> command = new ArrayList<>();

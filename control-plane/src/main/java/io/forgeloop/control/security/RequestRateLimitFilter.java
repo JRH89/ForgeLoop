@@ -15,12 +15,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Bounds request bursts per authenticated runner or network peer. This is deliberately a
+ * Bounds request bursts per network peer and, on runner routes, per runner. This is deliberately a
  * control-plane safety net; production ingress must also enforce connection and body limits.
+ *
+ * <p>The runner header is unauthenticated at this point in the chain, so it never replaces the peer
+ * address: every request is first charged to its peer, which stops header rotation from bypassing
+ * the limit or flooding the window table.</p>
  */
 @Component
 public class RequestRateLimitFilter extends OncePerRequestFilter {
     private static final int MAX_TRACKED_CLIENTS = 10_000;
+    /** Several runners may share one NAT address, so the per-peer runner allowance is larger. */
+    static final int RUNNER_PEER_MULTIPLIER = 10;
+    private static final java.util.regex.Pattern RUNNER_ID = java.util.regex.Pattern.compile("[A-Za-z0-9_-]{1,64}");
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
     private final int requestsPerMinute;
     private final Clock clock;
@@ -43,21 +50,32 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         long minute = Instant.now(clock).getEpochSecond() / 60;
+        String group = routeGroup(request.getRequestURI());
+        boolean runnerRoute = "runner".equals(group);
+        // The peer window always applies and cannot be influenced by request headers.
+        if (!admit("peer:" + request.getRemoteAddr() + ":" + group,
+                runnerRoute ? requestsPerMinute * RUNNER_PEER_MULTIPLIER : requestsPerMinute, minute, response)) return;
         String runner = request.getHeader("X-ForgeLoop-Runner-Id");
-        String client = runner == null || runner.isBlank() ? request.getRemoteAddr() : "runner:" + runner;
-        String key = client + ":" + routeGroup(request.getRequestURI());
+        // Well-formed runner IDs also get an individual window so one runner cannot starve its NAT neighbours.
+        if (runnerRoute && runner != null && RUNNER_ID.matcher(runner).matches()
+                && !admit("runner:" + runner, requestsPerMinute, minute, response)) return;
+        chain.doFilter(request, response);
+    }
+
+    /** Counts one request against a window, writing the 429 response and returning false when it is exhausted. */
+    private boolean admit(String key, int limit, long minute, HttpServletResponse response) throws IOException {
         if (windows.size() >= MAX_TRACKED_CLIENTS && !windows.containsKey(key)) removeExpired(minute);
         if (windows.size() >= MAX_TRACKED_CLIENTS && !windows.containsKey(key)) {
             reject(response, 60);
-            return;
+            return false;
         }
         Window window = windows.compute(key, (ignored, current) -> current == null || current.minute != minute
                 ? new Window(minute, 1) : new Window(minute, current.count + 1));
-        if (window.count > requestsPerMinute) {
+        if (window.count > limit) {
             reject(response, Math.max(1, 60 - (Instant.now(clock).getEpochSecond() % 60)));
-            return;
+            return false;
         }
-        chain.doFilter(request, response);
+        return true;
     }
 
     private void removeExpired(long minute) { windows.entrySet().removeIf(entry -> entry.getValue().minute < minute); }

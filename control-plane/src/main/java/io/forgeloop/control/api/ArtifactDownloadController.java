@@ -14,6 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/artifacts")
 public class ArtifactDownloadController {
+    /**
+     * Artifact bytes are produced by runners, not by ForgeLoop, yet they are served inline on the
+     * operator origin. A sandboxed, resource-free policy guarantees that even a mislabeled payload
+     * can never execute script with the operator's session.
+     */
+    static final String CONTENT_SECURITY_POLICY = "sandbox; default-src 'none'";
     private final ArtifactDownloadService artifacts;
     public ArtifactDownloadController(ArtifactDownloadService artifacts) { this.artifacts = artifacts; }
 
@@ -24,6 +30,8 @@ public class ArtifactDownloadController {
                 .contentType(MediaType.parseMediaType(artifact.contentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename(artifact.displayName()).build().toString())
                 .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+                .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+                .header("X-Content-Type-Options", "nosniff")
                 .body(artifact.content());
     }
 }

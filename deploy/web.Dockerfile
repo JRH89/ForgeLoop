@@ -20,6 +20,7 @@ FROM nginx:1.29-alpine
 COPY --from=frontend /app/dist /usr/share/nginx/html
 COPY --from=runner-package /downloads /usr/share/nginx/html/downloads
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx-security-headers.conf /etc/nginx/snippets/forgeloop-security-headers.conf
 # Nginx needs writable cache/pid paths, but does not need a root master process.
 RUN apk upgrade --no-cache \
     && sed -i 's@^[[:space:]]*pid[[:space:]].*;@pid /tmp/nginx.pid;@' /etc/nginx/nginx.conf \

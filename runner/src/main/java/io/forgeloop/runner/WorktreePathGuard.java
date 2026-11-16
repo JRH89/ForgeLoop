@@ -68,8 +68,24 @@ public final class WorktreePathGuard {
 
     private void rejectGitMetadata(String relativePath) {
         for (Path segment : Path.of(relativePath)) {
-            if (segment.toString().equalsIgnoreCase(".git")) throw new IllegalArgumentException("Repository metadata is not accessible");
+            if (isGitMetadataAlias(segment.toString())) throw new IllegalArgumentException("Repository metadata is not accessible");
         }
+    }
+
+    /**
+     * Matches every spelling that a Windows filesystem resolves to {@code .git}, mirroring Git's own
+     * {@code core.protectNTFS} rules. Win32 drops trailing dots and spaces ({@code ".git. "}), treats
+     * {@code ".git::$INDEX_ALLOCATION"} as the directory itself, and exposes the 8.3 short name
+     * {@code GIT~1}. In a worktree, {@code .git} is a gitfile, so overwriting it could redirect Git to an
+     * attacker-controlled configuration that runs commands on the runner host. The check applies on every
+     * platform because a repository written here may later be checked out on Windows.
+     */
+    static boolean isGitMetadataAlias(String segment) {
+        String name = segment.toLowerCase(java.util.Locale.ROOT);
+        int stream = name.indexOf(':');
+        if (stream >= 0) name = name.substring(0, stream);
+        name = name.replaceAll("[. ]+$", "");
+        return name.equals(".git") || name.matches("git~\\d+");
     }
 
     private void rejectSymbolicLinkTraversal(Path target) {

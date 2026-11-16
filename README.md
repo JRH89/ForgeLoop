@@ -2,7 +2,15 @@
 
 **A live software-delivery product—and a case study in making coding agents accountable for verified work.**
 
-[Explore the hosted product](https://forgeloop.codefrontlabs.com) · [View the source](https://github.com/JRH89/ForgeLoop)
+[Watch the demo run](https://forgeloop.codefrontlabs.com/demo) · [Explore the hosted product](https://forgeloop.codefrontlabs.com) · [View the source](https://github.com/JRH89/ForgeLoop)
+
+## In 30 seconds
+
+- **What it does:** you label a GitHub issue; ForgeLoop plans it, has a coding agent implement it, runs your real tests, reviews the diff, and opens (or, if you allow it, merges) a pull request.
+- **Why it's different:** an agent saying "done" counts for nothing. A change only moves forward when your configured checks pass and every acceptance criterion has recorded evidence.
+- **Where code runs:** on a runner you control, with your own model API key. The hosted control plane coordinates and keeps the audit trail; it never checks out your repository.
+- **Proof it works:** [issue #10 → PR #11](https://github.com/JRH89/project-hub/pull/11) on a public repository was planned, implemented, verified, and merged with zero human approvals, for about $0.22 in recorded model cost. [Replay it step by step.](https://forgeloop.codefrontlabs.com/demo)
+- **Built with:** Java 21, Spring Boot, GraphQL, PostgreSQL, React 19 + TypeScript, Docker, GitHub Apps, and MCP — over 900 automated unit and integration tests plus end-to-end browser tests in CI.
 
 ForgeLoop takes GitHub issues or feature specifications through planning, bounded agent work, integration, verification, and human review. Its central design principle is simple: an agent saying “done” is not evidence. A run becomes reviewable only when its configured checks and acceptance criteria have supporting results.
 

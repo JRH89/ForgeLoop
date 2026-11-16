@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import { brandIcon as favicon } from '../brand';
 import { PUBLISHER, REPOSITORY } from './content';
 import { heroStyle } from './heroes';
-import { BookOpen, CircleHelp, Download, FileText, Info, Layers, LifeBuoy, Menu, Shield, X } from 'lucide-react';
+import { BookOpen, CircleHelp, Download, FileText, Info, Layers, LifeBuoy, Menu, PlayCircle, Shield, X } from 'lucide-react';
 
-const links = [['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs'],['Downloads','/app/runner-downloads']];
-const mobileIcons = [Layers, CircleHelp, Info, FileText, BookOpen, Download, Shield, LifeBuoy];
+const links = [['Demo','/demo'],['Features','/features'],['How it works','/how-it-works'],['About','/about'],['Blog','/blog'],['Docs','/docs'],['Downloads','/app/runner-downloads']];
+const mobileIcons = [PlayCircle, Layers, CircleHelp, Info, FileText, BookOpen, Download, Shield, LifeBuoy];
 export function PublicHeader() {
   return <header className="landing-nav public-nav">
     <a className="brand" href="/" aria-label="ForgeLoop home"><img src={favicon} width="50" height="50" alt=""/><strong>ForgeLoop</strong></a>
@@ -20,7 +20,7 @@ export function PublicHeader() {
   </header>;
 }
 export function PublicFooter() {
-  const groups=[['Product',[['Features','/features'],['How it works','/how-it-works'],['Security','/security'],['Open the console','/oauth2/authorization/github']]],['Resources',[['Download runner','/app/runner-downloads'],['Getting started','/docs'],['Field notes','/blog'],['Changelog','/changelog'],['User guide','/app'],['Release progress',`${REPOSITORY}#readme`]]],['Project',[['About','/about'],['Contact & support','/contact'],['Track support tickets','/support'],['GitHub',REPOSITORY],['Issue tracker',`${REPOSITORY}/issues`]]]] as const;
+  const groups=[['Product',[['Live demo','/demo'],['Features','/features'],['How it works','/how-it-works'],['Security','/security'],['Open the console','/oauth2/authorization/github']]],['Resources',[['Download runner','/app/runner-downloads'],['Getting started','/docs'],['Field notes','/blog'],['Changelog','/changelog'],['User guide','/app'],['Release progress',`${REPOSITORY}#readme`]]],['Project',[['About','/about'],['Contact & support','/contact'],['Track support tickets','/support'],['GitHub',REPOSITORY],['Issue tracker',`${REPOSITORY}/issues`]]]] as const;
   return <footer className="public-footer"><div className="footer-intro"><a className="brand" href="/"><img src={favicon} width="30" height="30" alt=""/><strong>ForgeLoop</strong></a><p>ForgeLoop turns GitHub issues into verified pull requests with AI coding agents. Coordinate tasks, run checks, and review delivery evidence using runners on your own infrastructure.</p></div>{groups.map(([title,items])=><nav key={title} aria-label={`${title} footer`}><h2>{title}</h2>{items.map(([label,url])=><a href={url} key={label}>{label}</a>)}</nav>)}<p className="footer-note">© 2026 <a href={PUBLISHER.url}>{PUBLISHER.name}</a>. Desktop installers are development previews; signed public distribution remains a release milestone.</p></footer>;
 }
 export function PublicLayout({children}:{children:ReactNode}) {

@@ -5,25 +5,20 @@ RPM for Fedora/RHEL/openSUSE, portable `.tar.gz` archives, and native Arch
 
 ## What changed in this preview
 
-- **Guarded multi-turn execution:** Writing tasks can use the agent loop when both
-  the repository policy and the runner-local `FORGELOOP_AGENT_LOOP_ENABLED=true`
-  switch permit it. The switch is off by default; existing installations retain
-  their current execution behavior after upgrading.
-- **Lease and budget controls:** Loop execution renews its lease, reports usage
-  for every provider turn, reserves known spend, and stops when the lease is lost
-  or a policy or budget limit is reached. A final lease check prevents cancelled
-  work from being returned for delivery. Official verification remains separate.
-- **Execution evidence:** Loop policy is preserved with task context and execution
-  pins. Local journals remain private; remote run-record upload still requires
-  the repository's separate opt-in.
-- **Security:** Updated the runner’s Jackson dependency to 2.21.7 to address
-  the high-severity findings detected by the release security scan.
-- **Maintenance:** Provider diagnostics and standalone verification commands are
-  separated from runner orchestration while preserving the existing CLI commands.
+- **Worktree sandbox hardening:** Agent file reads and writes now refuse Windows
+  aliases of the `.git` directory (trailing dots or spaces, 8.3 short names such
+  as `GIT~1`, and NTFS stream suffixes), closing a path that could reach Git
+  metadata on Windows hosts. Ordinary names such as `.github/` are unaffected.
+- **Git hook isolation:** Every Git command the runner executes in a repository
+  worktree disables repository hooks and filesystem monitors, so a checked-out
+  repository cannot run its own code through Git during checkout or commit.
+- **Image updates:** The runner container image applies current Alpine security
+  updates, clearing a high-severity compression-library finding from the release
+  scan.
 
-The new loop requires the matching control-plane update. Installers alone do not
-activate it. Pause and close the runner before updating; identity, settings, and
-provider keys remain in their existing external state directories.
+These changes are runner-side and work with the current control plane. Pause and
+close the runner before updating; identity, settings, and provider keys remain in
+their existing external state directories.
 
 ## Setup and costs
 

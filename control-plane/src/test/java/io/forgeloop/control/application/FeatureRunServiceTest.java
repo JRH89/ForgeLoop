@@ -54,6 +54,13 @@ class FeatureRunServiceTest {
     assertEquals(submittedPolicySnapshotSha, run.getPolicySnapshotSha256());
     verify(runs).save(run);
   }
+  @Test void viewersCannotSubmitBudgetSpendingRuns() {
+    doThrow(new org.springframework.security.access.AccessDeniedException("Organization operator role is required")).when(operators).requireOperator();
+    assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> service.submit(new FeatureSubmission("acme/support", "issue-9", "Title", "- Criterion", 5)));
+    verify(connections, never()).requireEnabled(Mockito.anyString());
+    verify(runs, never()).save(any(FeatureRun.class));
+  }
   @Test void rejectsBudgetAboveRepositoryPolicy() {
     when(connections.requireEnabled("acme/support")).thenReturn(new RepositoryConnection("local-development", "acme/support", 1, "main", "forgeloop", "JVM_REACT", List.of("compile"), 10));
     assertThrows(IllegalArgumentException.class, () -> service.submit(new FeatureSubmission("acme/support", "issue-1", "Title", "- Criterion", 11)));

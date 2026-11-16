@@ -7,6 +7,7 @@ import io.forgeloop.control.security.OperatorContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,15 +22,17 @@ public class GithubAppInstallationController {
     private final GithubInstallationRepository installations;
     private final GithubInstallationRepositorySyncService synchronization;
     private final OperatorContext operators;
+    private final GithubInstallationOwnershipVerifier ownership;
 
     public GithubAppInstallationController(@Value("${forgeloop.github.app-slug:}") String appSlug, GithubInstallationState state,
                                            GithubInstallationRepository installations, GithubInstallationRepositorySyncService synchronization,
-                                           OperatorContext operators) {
+                                           OperatorContext operators, GithubInstallationOwnershipVerifier ownership) {
         this.appSlug = appSlug;
         this.state = state;
         this.installations = installations;
         this.synchronization = synchronization;
         this.operators = operators;
+        this.ownership = ownership;
     }
 
     @GetMapping("/install")
@@ -37,14 +40,19 @@ public class GithubAppInstallationController {
         if (appSlug == null || !appSlug.matches("[A-Za-z0-9-]+")) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
+        // Installing grants repository access to the whole tenant, so only administrators may start it.
+        operators.requireAdministrator();
         return ResponseEntity.status(HttpStatus.FOUND)
-                .location(URI.create("https://github.com/apps/" + appSlug + "/installations/new?state=" + state.issue(operators.organizationId())))
+                .location(URI.create("https://github.com/apps/" + appSlug + "/installations/new?state=" + state.issue(operators.organizationId(), operators.subject())))
                 .build();
     }
     /** GitHub redirects here after installation; signed state prevents cross-tenant installation ownership. */
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(@RequestParam("installation_id") long installationId, @RequestParam String state) {
-        String organizationId = this.state.verify(state);
+        GithubInstallationState.Claim claim = this.state.verify(state);
+        // installation_id is attacker-editable; prove the initiating GitHub user can access it before binding.
+        ownership.requireAccess(claim, installationId);
+        String organizationId = claim.organizationId();
         installations.findByInstallationId(installationId).ifPresentOrElse(existing -> {
             if (!existing.getOrganizationId().equals(organizationId)) {
                 throw new IllegalArgumentException("GitHub installation is already owned by another organization");
@@ -54,5 +62,11 @@ public class GithubAppInstallationController {
         // installation webhook before this browser redirect reaches ForgeLoop.
         synchronization.synchronizeInstallation(installationId);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Forged, expired or conflicting callback input is a client error; no detail is echoed back. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Void> rejectInvalidCallback() {
+        return ResponseEntity.badRequest().build();
     }
 }

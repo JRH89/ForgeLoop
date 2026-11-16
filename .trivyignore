@@ -1,0 +1,10 @@
+# Accepted findings for the HIGH/CRITICAL supply-chain gate. Every entry needs a
+# reason and an expiry date; Trivy fails the scan again once the date passes.
+
+# Guava deserialization DoS (CVE-2026-102554) in the copy of Guava 32.1.2 that
+# graphql-java shades into its own jar. No graphql-java release (through 26.1)
+# ships a fixed copy, so it cannot be upgraded independently. Not reachable here:
+# the vulnerable path is Java deserialization of Guava collections, and ForgeLoop
+# never uses Java serialization (GraphQL input is parsed as JSON). Re-check when
+# graphql-java updates its shaded Guava.
+CVE-2026-102554 exp:2027-01-31
