@@ -5,20 +5,24 @@ RPM for Fedora/RHEL/openSUSE, portable `.tar.gz` archives, and native Arch
 
 ## What changed in this preview
 
-- **Worktree sandbox hardening:** Agent file reads and writes now refuse Windows
-  aliases of the `.git` directory (trailing dots or spaces, 8.3 short names such
-  as `GIT~1`, and NTFS stream suffixes), closing a path that could reach Git
-  metadata on Windows hosts. Ordinary names such as `.github/` are unaffected.
-- **Git hook isolation:** Every Git command the runner executes in a repository
-  worktree disables repository hooks and filesystem monitors, so a checked-out
-  repository cannot run its own code through Git during checkout or commit.
-- **Image updates:** The runner container image applies current Alpine security
-  updates, clearing a high-severity compression-library finding from the release
-  scan.
+- **Spend-limited provider calls:** Every model call now reserves against the
+  task's remaining budget before it is sent, and planner cost counts toward the
+  run. A call that would exceed the limit stops with a budget outcome instead of
+  running over.
+- **More reliable live delivery:** Delivery contracts, failure accounting and
+  bounded retries were fixed after live runs; malformed review decisions are held
+  for attention, and review output is bound to stable acceptance-criterion IDs.
+- **Bounded patch output:** Patch-writing tasks state their metadata limits up
+  front and can opt in to a larger, capped output allowance.
+- **Stage-scoped skills (opt-in, experimental):** A bundled, reviewed skill pack
+  can add stage-specific procedures to planning, implementation, testing, repair
+  and review for selected repositories. It is off unless
+  `FORGELOOP_SKILL_PROFILE` and `FORGELOOP_SKILL_REPOSITORIES` are set, and
+  `skills-inspect` shows exactly what a stage would receive.
+- **Dependency updates:** Jackson databind 2.22.4 and current Maven build plugins.
 
-These changes are runner-side and work with the current control plane. Pause and
-close the runner before updating; identity, settings, and provider keys remain in
-their existing external state directories.
+Pause and close the runner before updating; identity, settings, and provider keys
+remain in their existing external state directories.
 
 ## Setup and costs
 
