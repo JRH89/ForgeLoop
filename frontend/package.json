@@ -20,7 +20,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "typescript": "6.0.3",
-    "vite": "8.3.5"
+    "vite": "8.3.8"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
