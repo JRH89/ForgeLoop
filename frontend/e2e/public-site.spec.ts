@@ -223,7 +223,7 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
       const top=parseFloat(css.paddingTop),bottom=parseFloat(css.paddingBottom);
       return {
         padding:[css.paddingTop,css.paddingBottom],display:css.display,direction:css.flexDirection,
-        alignment:css.justifyContent,minHeight:parseFloat(css.minHeight),viewportHeight:innerHeight,
+        alignment:css.justifyContent,crossAlignment:css.alignItems,minHeight:parseFloat(css.minHeight),viewportHeight:innerHeight,
         headerHeight:document.querySelector('.public-nav')!.getBoundingClientRect().height,
         headlineGap:descriptionBox.top-headingBox.bottom,
         headingMarginBottom:getComputedStyle(heading).marginBottom,
@@ -233,32 +233,31 @@ test('landing hero uses the refined reference-inspired artwork',async({page,requ
         contentAreaCenter:(hero.top+top+hero.bottom-bottom)/2,
       };
     });
-    expect(layout.padding).toEqual(width<=1000?['24px','40px']:['40px','65px']);
-    expect(layout.actionMarginTop).toBe(width<=760?'16px':'32px');
-    expect(layout.headingMarginBottom).toBe(width<=760?'13px':'26px');
+    expect(layout.padding).toEqual(width<=1000?['48px','48px']:['64px','64px']);
+    expect(layout.actionMarginTop).toBe(width<=760?'20px':'34px');
+    expect(layout.headingMarginBottom).toBe(width<=760?'14px':'24px');
     expect(layout.descriptionMarginTop).toBe(width<=760?'8px':'16px');
-    if(width<=760)expect(layout.headlineGap).toBe(21);
+    expect(layout.display).toBe('flex');
+    expect(layout.direction).toBe('column');
+    expect(layout.alignment).toBe('center');
+    expect(layout.crossAlignment).toBe('flex-start');
+    expect(Math.round(layout.minHeight)).toBe(Math.round(layout.viewportHeight-layout.headerHeight));
+    expect(Math.abs(layout.contentCenter-layout.contentAreaCenter)).toBeLessThan(2);
     if(width<=760){
       const footer=await page.locator('.public-footer').boundingBox();
       const note=await page.locator('.footer-note').boundingBox();
       expect(Math.round(footer!.y+footer!.height-note!.y-note!.height)).toBe(20);
     }
-    if(width<=1000){
-      expect(layout.display).toBe('flex');
-      expect(layout.direction).toBe('column');
-      expect(layout.alignment).toBe('flex-start');
-      expect(layout.minHeight).toBe(0);
-      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    }
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
 });
 
-test('homepage copy stays close to navigation at desktop and mobile sizes',async({page})=>{
+test('homepage hero fills viewport with vertically centered copy and handles login alert',async({page})=>{
   for(const viewport of [{width:1840,height:1000},{width:1000,height:1000},{width:390,height:844}]){
     await page.setViewportSize(viewport);await page.goto('/');
     const nav=await page.locator('.public-nav').boundingBox();
-    const intro=await page.locator('.landing-hero .eyebrow').boundingBox();
-    expect(intro!.y-(nav!.y+nav!.height)).toBeLessThan(75);
+    const hero=await page.locator('.landing-hero').boundingBox();
+    expect(Math.round(hero!.height)).toBeGreaterThanOrEqual(Math.round(viewport.height-nav!.height));
   }
   await page.goto('/?login=failed');
   await expect(page.getByRole('alert')).toContainText('Please try signing in again');
