@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: '21', cache: maven }
       - run: mvn -B verify
         working-directory: control-plane
@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: '21', cache: maven }
       - run: mvn -B verify
         working-directory: harness
@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: git show --no-patch --format='Building ForgeLoop commit %H (%s)'
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: '21', cache: maven }
       - run: mvn -B -Dforgeloop.revision=${{ github.sha }} verify
         working-directory: runner
@@ -93,7 +93,7 @@ jobs:
       - name: Verify single-use browser runner pairing
         shell: pwsh
         run: ./scripts/Test-RunnerPairing.ps1
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with: { distribution: temurin, java-version: '21' }
       - name: Verify downloadable runner and enrollment
         shell: pwsh
